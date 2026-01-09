@@ -9,7 +9,7 @@ dependencies = [
     "pandas",
     "tqdm",
     "matplotlib",
-    "dgl",
+    "torch_geometric",
     "numpy",
     "SciencePlots",
     "scikit-learn",

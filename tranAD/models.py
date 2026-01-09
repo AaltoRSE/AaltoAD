@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import pickle
-import dgl
-from dgl.nn import GATConv
+from torch_geometric.data import Data
+from torch_geometric.utils import add_self_loops
+from torch_geometric.nn import GATConv
 from torch.nn import TransformerEncoder
 from torch.nn import TransformerDecoder
 from tranAD.dlutils import *
@@ -263,13 +263,14 @@ class MTAD_GAT(nn.Module):
 		self.n_feats = feats
 		self.n_window = feats
 		self.n_hidden = feats * feats
-		self.g = dgl.graph((torch.tensor(list(range(1, feats+1))), torch.tensor([0]*feats)))
-		self.g = dgl.add_self_loop(self.g)
-		self.feature_gat = GATConv(feats, 1, feats)
-		self.time_gat = GATConv(feats, 1, feats)
+		edge_index = torch.tensor([list(range(1, feats+1)), [0]*feats], dtype=torch.long)
+		edge_index, _ = add_self_loops(edge_index)
+		self.g = Data(edge_index=edge_index)
+		self.feature_gat = GATConv(feats, feats, heads=1)
+		self.time_gat = GATConv(feats, feats, heads=1)
 		self.gru = nn.GRU((feats+1)*feats*3, feats*feats, 1)
 
-	def forward(self, data, hidden):
+	def forward(self, data, hidden=None):
 		hidden = torch.rand(1, 1, self.n_hidden, dtype=torch.float64) if hidden is not None else hidden
 		data = data.view(self.n_window, self.n_feats)
 		data_r = torch.cat((torch.zeros(1, self.n_feats), data))
@@ -294,8 +295,9 @@ class GDN(nn.Module):
 		self.n = self.n_window * self.n_feats
 		src_ids = np.repeat(np.array(list(range(feats))), feats)
 		dst_ids = np.array(list(range(feats))*feats)
-		self.g = dgl.graph((torch.tensor(src_ids), torch.tensor(dst_ids)))
-		self.g = dgl.add_self_loop(self.g)
+		edge_index = torch.tensor([torch.tensor(src_ids), torch.tensor(dst_ids)], dtype=torch.long)
+		edge_index, _ = add_self_loops(edge_index)
+		self.g = Data(edge_index=edge_index)
 		self.feature_gat = GATConv(1, 1, feats)
 		self.attention = nn.Sequential(
 			nn.Linear(self.n, self.n_hidden), nn.LeakyReLU(True),
