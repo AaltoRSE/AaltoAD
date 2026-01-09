@@ -8,22 +8,22 @@ from tranAD.models import (
 )
 
 @pytest.mark.parametrize("ModelClass, input_shape", [
-    (LSTM_Univariate, (5, 5)),      # feats=5, batch=5
-    (Attention, (5, 5)),
-    (LSTM_AD, (5, 5)),
-    (DAGMM, (1, 25)),               # n_feats=5, n_window=5 -> 25
-    (OmniAnomaly, (5,)),
-    (USAD, (25,)),                  # n_feats=5, n_window=5 -> 25
-    (MSCRED, (5, 5)),
-    (CAE_M, (5, 5)),
-    (MTAD_GAT, (5, 5)),
-    (GDN, (25,)),                   # n_feats=5, n_window=5 -> 25
-    (MAD_GAN, (25,)),
-    (TranAD_Basic, ((10, 5), (10, 5))),  # src, tgt shapes
-    (TranAD_Transformer, ((10, 5), (10, 5))),
-    (TranAD_Adversarial, ((10, 5), (10, 5))),
-    (TranAD_SelfConditioning, ((10, 5), (10, 5))),
-    (TranAD, ((10, 5), (10, 5))),
+    (LSTM_Univariate, (5, 5, 1)),      # feats=1, batch=5, seq_len=5
+    (Attention, (5, 5, 5)),           # batch=5, seq_len=5, feats=5
+    (LSTM_AD, (5, 5, 5)),             # batch=5, seq_len=5, feats=5
+    (DAGMM, (1, 25)),                 # batch=1, flattened seq_len*feats=25
+    (OmniAnomaly, (5, 5, 5)),         # batch=5, seq_len=5, feats=5
+    (USAD, (1, 25)),                  # batch=1, flattened seq_len*feats=25
+    (MSCRED, (5, 5, 5, 5)),           # batch=5, seq_len=5, feats=5, feats=5
+    (CAE_M, (5, 5, 5)),               # batch=5, seq_len=5, feats=5
+    (MTAD_GAT, (5, 5, 5)),            # batch=5, seq_len=5, feats=5
+    (GDN, (1, 25)),                   # batch=1, flattened seq_len*feats=25
+    (MAD_GAN, (1, 25)),               # batch=1, flattened seq_len*feats=25
+    (TranAD_Basic, ((10, 5, 5), (10, 5, 5))),  # src, tgt shapes
+    (TranAD_Transformer, ((10, 5, 5), (10, 5, 5))),
+    (TranAD_Adversarial, ((10, 5, 5), (10, 5, 5))),
+    (TranAD_SelfConditioning, ((10, 5, 5), (10, 5, 5))),
+    (TranAD, ((10, 5, 5), (10, 5, 5))),
 ])
 def test_model_forward(ModelClass, input_shape):
     feats = 5
