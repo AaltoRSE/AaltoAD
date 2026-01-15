@@ -18,14 +18,14 @@ with open(spec_path, "r") as f:
     (LSTM_Univariate, (5, 5, 1)),      # feats=1, batch=5, seq_len=5
     (Attention, (5, 5)),               # seq_len=5, feats=5
     (LSTM_AD, (5, 5)),                 # seq_len=5, feats=5
-    (DAGMM, (1, 25)),                 # batch=1, flattened seq_len*feats=25
+    (DAGMM, (1, 25)),                  # batch=1, flattened seq_len*feats=25
     (OmniAnomaly, (5,)),               # feats=5
-    (USAD, (1, 25)),                  # batch=1, flattened seq_len*feats=25
-    (MSCRED, (1, 25)),                # batch=1, flattened seq_len*feats=25
-    (CAE_M, (1, 25)),                 # batch=1, flattened seq_len*feats=25
-    (MTAD_GAT, (1, 25)),              # batch=1, flattened seq_len*feats=25
-    (GDN, (1, 25)),                   # batch=1, flattened seq_len*feats=25
-    (MAD_GAN, (1, 25)),               # batch=1, flattened seq_len*feats=25
+    (USAD, (1, 25)),                   # batch=1, flattened seq_len*feats=25
+    (MSCRED, (1, 25)),                 # batch=1, flattened seq_len*feats=25
+    (CAE_M, (1, 25)),                  # batch=1, flattened seq_len*feats=25
+    (MTAD_GAT, (1, 25)),               # batch=1, flattened seq_len*feats=25
+    (GDN, (1, 25)),                    # batch=1, flattened seq_len*feats=25
+    (MAD_GAN, (1, 25)),                # batch=1, flattened seq_len*feats=25
     (TranAD_Basic, ((10, 5, 5), (10, 5, 5))),  # src, tgt shapes
     (TranAD_Transformer, ((10, 5, 5), (10, 5, 5))),
     (TranAD_Adversarial, ((10, 5, 5), (10, 5, 5))),
