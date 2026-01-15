@@ -14,7 +14,7 @@ lm_d = {
 		'MSDS': [(0.91, 1), (0.9, 1.04)],
 		'MBA': [(0.87, 1), (0.93, 1.04)],
 	}
-lm = lm_d[args.dataset][1 if 'TranAD' in args.model else 0]
+lm = lm_d.get(args.dataset, lm_d['synthetic'])[1 if 'TranAD' in args.model else 0]
 
 # Hyperparameters
 lr_d = {
@@ -29,7 +29,7 @@ lr_d = {
 		'NAB': 0.009, 
 		'MBA': 0.001, 
 	}
-lr = lr_d[args.dataset]
+lr = lr_d.get(args.dataset, 0.0001)
 
 # Debugging
 percentiles = {
@@ -44,7 +44,7 @@ percentiles = {
 		'NAB': (98, 2),
 		'MBA': (99, 2),
 	}
-percentile_merlin = percentiles[args.dataset][0]
-cvp = percentiles[args.dataset][1]
+percentile_merlin = percentiles.get(args.dataset, percentiles['synthetic'])[0]
+cvp = percentiles.get(args.dataset, percentiles['synthetic'])[1]
 preds = []
 debug = 9

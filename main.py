@@ -2,18 +2,22 @@ import pickle
 import os
 import pandas as pd
 from tqdm import tqdm
-from src.models import *
-from src.constants import *
-from src.plotting import *
-from src.pot import *
-from src.utils import *
-from src.diagnosis import *
-from src.merlin import *
+from tranAD.parser import parse_arguments
+from tranAD.models import *
+from tranAD.constants import *
+from tranAD.plotting import *
+from tranAD.pot import *
+from tranAD.utils import *
+from tranAD.diagnosis import *
+from tranAD.merlin import *
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 import torch.nn as nn
 from time import time
 from pprint import pprint
 # from beepy import beep
+
+# Parse command-line arguments
+parse_arguments()
 
 def convert_to_windows(data, model):
 	windows = []; w_size = model.n_window
@@ -54,8 +58,8 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list):
         'accuracy_list': accuracy_list}, file_path)
 
 def load_model(modelname, dims):
-	import src.models
-	model_class = getattr(src.models, modelname)
+	import tranAD.models
+	model_class = getattr(tranAD.models, modelname)
 	model = model_class(dims).double()
 	optimizer = torch.optim.AdamW(model.parameters() , lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)

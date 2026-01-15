@@ -255,7 +255,7 @@ class TransformerDecoderLayer(nn.Module):
         for key, value in kwargs.items():
             if value:
                 raise ValueError(f"Unexpected parameter '{key}' is set to True in TransformerDecoderLayer.")
-
+        
         tgt2 = self.self_attn(tgt, tgt, tgt)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt2 = self.multihead_attn(tgt, memory, memory)[0]

@@ -7,6 +7,7 @@ from torch_geometric.utils import add_self_loops
 from torch_geometric.nn import GATConv
 from torch.nn import TransformerEncoder
 from torch.nn import TransformerDecoder
+from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
 from tranAD.dlutils import *
 from tranAD.constants import *
 torch.manual_seed(1)
@@ -20,6 +21,7 @@ class LSTM_Univariate(nn.Module):
 		self.n_feats = feats
 		self.n_hidden = 1
 		self.lstm = nn.ModuleList([nn.LSTM(1, self.n_hidden) for i in range(feats)])
+		self.lstm = self.lstm.double()
 
 	def forward(self, x):
 		hidden = [(torch.rand(1, 1, self.n_hidden, dtype=torch.float64), 
@@ -28,7 +30,7 @@ class LSTM_Univariate(nn.Module):
 		for i, g in enumerate(x):
 			multivariate_output = []
 			for j in range(self.n_feats):
-				univariate_input = g.view(-1)[j].view(1, 1, -1)
+				univariate_input = g.view(-1)[j].view(1, 1, -1).to(torch.float64)
 				out, hidden[j] = self.lstm[j](univariate_input, hidden[j])
 				multivariate_output.append(2 * out.view(-1))
 			output = torch.cat(multivariate_output)
@@ -47,6 +49,7 @@ class Attention(nn.Module):
 		self.atts = [ nn.Sequential( nn.Linear(self.n, feats * feats), 
 				nn.ReLU(True))	for i in range(1)]
 		self.atts = nn.ModuleList(self.atts)
+		self.atts = self.atts.double()
 
 	def forward(self, g):
 		for at in self.atts:
@@ -65,6 +68,9 @@ class LSTM_AD(nn.Module):
 		self.lstm = nn.LSTM(feats, self.n_hidden)
 		self.lstm2 = nn.LSTM(feats, self.n_feats)
 		self.fcn = nn.Sequential(nn.Linear(self.n_feats, self.n_feats), nn.Sigmoid())
+		self.lstm = self.lstm.double()
+		self.lstm2 = self.lstm2.double()
+		self.fcn = self.fcn.double()
 
 	def forward(self, x):
 		hidden = (torch.rand(1, 1, self.n_hidden, dtype=torch.float64), torch.randn(1, 1, self.n_hidden, dtype=torch.float64))
@@ -104,6 +110,9 @@ class DAGMM(nn.Module):
 			nn.Linear(self.n_latent+2, self.n_hidden), nn.Tanh(), nn.Dropout(0.5),
 			nn.Linear(self.n_hidden, self.n_gmm), nn.Softmax(dim=1),
 		)
+		self.encoder = self.encoder.double()
+		self.decoder = self.decoder.double()
+		self.estimate = self.estimate.double()
 
 	def compute_reconstruction(self, x, x_hat):
 		relative_euclidean_distance = (x-x_hat).norm(2, dim=1) / x.norm(2, dim=1)
@@ -144,6 +153,9 @@ class OmniAnomaly(nn.Module):
 			nn.Linear(self.n_hidden, self.n_hidden), nn.PReLU(),
 			nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid(),
 		)
+		self.lstm = self.lstm.double()
+		self.encoder = self.encoder.double()
+		self.decoder = self.decoder.double()
 
 	def forward(self, x, hidden = None):
 		hidden = torch.rand(2, 1, self.n_hidden, dtype=torch.float64) if hidden is not None else hidden
@@ -186,6 +198,9 @@ class USAD(nn.Module):
 			nn.Linear(self.n_hidden, self.n_hidden), nn.ReLU(True),
 			nn.Linear(self.n_hidden, self.n), nn.Sigmoid(),
 		)
+		self.encoder = self.encoder.double()
+		self.decoder1 = self.decoder1.double()
+		self.decoder2 = self.decoder2.double()
 
 	def forward(self, g):
 		## Encode
@@ -216,6 +231,8 @@ class MSCRED(nn.Module):
 			nn.ConvTranspose2d(64, 32, (3, 3), 1, 1), nn.ReLU(True),
 			nn.ConvTranspose2d(32, 1, (3, 3), 1, 1), nn.Sigmoid(),
 		)
+		self.encoder = self.encoder.double()
+		self.decoder = self.decoder.double()
 
 	def forward(self, g):
 		## Encode
@@ -245,6 +262,8 @@ class CAE_M(nn.Module):
 			nn.ConvTranspose2d(4, 4, (3, 3), 1, 1), nn.Sigmoid(),
 			nn.ConvTranspose2d(4, 1, (3, 3), 1, 1), nn.Sigmoid(),
 		)
+		self.encoder = self.encoder.double()
+		self.decoder = self.decoder.double()
 
 	def forward(self, g):
 		## Encode
@@ -269,16 +288,21 @@ class MTAD_GAT(nn.Module):
 		self.feature_gat = GATConv(feats, feats, heads=1)
 		self.time_gat = GATConv(feats, feats, heads=1)
 		self.gru = nn.GRU((feats+1)*feats*3, feats*feats, 1)
+		self.feature_gat = self.feature_gat.double()
+		self.time_gat = self.time_gat.double()
+		self.gru = self.gru.double()
 
 	def forward(self, data, hidden=None):
 		hidden = torch.rand(1, 1, self.n_hidden, dtype=torch.float64) if hidden is not None else hidden
 		data = data.view(self.n_window, self.n_feats)
 		data_r = torch.cat((torch.zeros(1, self.n_feats), data))
-		feat_r = self.feature_gat(self.g, data_r)
+		feat_r = self.feature_gat(data_r, self.g.edge_index)
 		data_t = torch.cat((torch.zeros(1, self.n_feats), data.t()))
-		time_r = self.time_gat(self.g, data_t)
+		time_r = self.time_gat(data_t, self.g.edge_index)
 		data = torch.cat((torch.zeros(1, self.n_feats), data))
 		data = data.view(self.n_window+1, self.n_feats, 1)
+		feat_r = feat_r.unsqueeze(2)
+		time_r = time_r.unsqueeze(2)
 		x = torch.cat((data, feat_r, time_r), dim=2).view(1, 1, -1)
 		x, h = self.gru(x, hidden)
 		return x.view(-1), h
@@ -295,7 +319,7 @@ class GDN(nn.Module):
 		self.n = self.n_window * self.n_feats
 		src_ids = np.repeat(np.array(list(range(feats))), feats)
 		dst_ids = np.array(list(range(feats))*feats)
-		edge_index = torch.tensor([torch.tensor(src_ids), torch.tensor(dst_ids)], dtype=torch.long)
+		edge_index = torch.tensor(np.array([src_ids, dst_ids]), dtype=torch.long)
 		edge_index, _ = add_self_loops(edge_index)
 		self.g = Data(edge_index=edge_index)
 		self.feature_gat = GATConv(1, 1, feats)
@@ -308,6 +332,9 @@ class GDN(nn.Module):
 			nn.Linear(self.n_feats, self.n_hidden), nn.LeakyReLU(True),
 			nn.Linear(self.n_hidden, self.n_window), nn.Sigmoid(),
 		)
+		self.feature_gat = self.feature_gat.double()
+		self.attention = self.attention.double()
+		self.fcn = self.fcn.double()
 
 	def forward(self, data):
 		# Bahdanau style attention
@@ -315,7 +342,7 @@ class GDN(nn.Module):
 		data = data.view(self.n_window, self.n_feats)
 		data_r = torch.matmul(data.permute(1, 0), att_score)
 		# GAT convolution on complete graph
-		feat_r = self.feature_gat(self.g, data_r)
+		feat_r = self.feature_gat(data_r, self.g.edge_index)
 		feat_r = feat_r.view(self.n_feats, self.n_feats)
 		# Pass through a FCN
 		x = self.fcn(feat_r)
@@ -343,6 +370,8 @@ class MAD_GAN(nn.Module):
 			nn.Linear(self.n_hidden, self.n_hidden), nn.LeakyReLU(True),
 			nn.Linear(self.n_hidden, 1), nn.Sigmoid(),
 		)
+		self.generator = self.generator.double()
+		self.discriminator = self.discriminator.double()
 
 	def forward(self, g):
 		## Generate
@@ -368,6 +397,9 @@ class TranAD_Basic(nn.Module):
 		decoder_layers = TransformerDecoderLayer(d_model=feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_decoder = TransformerDecoder(decoder_layers, 1)
 		self.fcn = nn.Sigmoid()
+		self.pos_encoder = self.pos_encoder.double()
+		self.transformer_encoder = self.transformer_encoder.double()
+		self.transformer_decoder = self.transformer_decoder.double()
 
 	def forward(self, src, tgt):
 		src = src * math.sqrt(self.n_feats)
@@ -398,6 +430,10 @@ class TranAD_Transformer(nn.Module):
 			nn.Linear(self.n, self.n_hidden), nn.ReLU(True),
 			nn.Linear(self.n_hidden, 2 * feats), nn.ReLU(True))
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
+		self.transformer_encoder = self.transformer_encoder.double()
+		self.transformer_decoder1 = self.transformer_decoder1.double()
+		self.transformer_decoder2 = self.transformer_decoder2.double()
+		self.fcn = self.fcn.double()
 
 	def encode(self, src, c, tgt):
 		src = torch.cat((src, c), dim=2)
@@ -434,6 +470,10 @@ class TranAD_Adversarial(nn.Module):
 		decoder_layers = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_decoder = TransformerDecoder(decoder_layers, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
+		self.pos_encoder = self.pos_encoder.double()
+		self.transformer_encoder = self.transformer_encoder.double()
+		self.transformer_decoder = self.transformer_decoder.double()
+		self.fcn = self.fcn.double()
 
 	def encode_decode(self, src, c, tgt):
 		src = torch.cat((src, c), dim=2)
@@ -472,6 +512,11 @@ class TranAD_SelfConditioning(nn.Module):
 		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
+		self.pos_encoder = self.pos_encoder.double()
+		self.transformer_encoder = self.transformer_encoder.double()
+		self.transformer_decoder1 = self.transformer_decoder1.double()
+		self.transformer_decoder2 = self.transformer_decoder2.double()
+		self.fcn = self.fcn.double()
 
 	def encode(self, src, c, tgt):
 		src = torch.cat((src, c), dim=2)
@@ -507,6 +552,11 @@ class TranAD(nn.Module):
 		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
+		self.pos_encoder = self.pos_encoder.double()
+		self.transformer_encoder = self.transformer_encoder.double()
+		self.transformer_decoder1 = self.transformer_decoder1.double()
+		self.transformer_decoder2 = self.transformer_decoder2.double()
+		self.fcn = self.fcn.double()
 
 	def encode(self, src, c, tgt):
 		src = torch.cat((src, c), dim=2)
