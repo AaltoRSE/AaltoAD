@@ -3,7 +3,9 @@ import sys
 import pandas as pd
 import numpy as np
 import json
+import argparse
 from tranAD.folderconstants import *
+
 
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL']
 
@@ -309,11 +311,56 @@ def load_data(dataset):
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 
 if __name__ == '__main__':
-	commands = sys.argv[1:]
-	load = []
-	if len(commands) > 0:
-		for d in commands:
+	parser = argparse.ArgumentParser(description='Preprocess datasets for anomaly detection')
+	parser.add_argument('datasets', nargs='*', help='Dataset names to preprocess')
+	parser.add_argument('--csv', type=str, help='Path to CSV file to preprocess')
+	args = parser.parse_args()
+	
+	if args.csv:
+		# Process a custom CSV file
+		csv_path = args.csv
+		if not os.path.exists(csv_path):
+			print(f"Error: CSV file not found: {csv_path}")
+			sys.exit(1)
+		
+		# Extract dataset name from filename (without extension)
+		dataset_name = os.path.splitext(os.path.basename(csv_path))[0]
+		output_subfolder = os.path.join(output_folder, dataset_name)
+		os.makedirs(output_subfolder, exist_ok=True)
+		
+		# Load and process CSV
+		df = pd.read_csv(csv_path)
+		
+		# Group by first column (assumed to be timestamp) and count occurrences
+		col_name = df.columns[0]
+		connection_counts = df.groupby(col_name).size().values.astype(float)
+		
+		# Create train/test split (70/30)
+		split_idx = int(len(connection_counts) * 0.7)
+		train = connection_counts[:split_idx]
+		test = connection_counts[split_idx:]
+		
+		# Normalize using per-feature scaling
+		train, min_a, max_a = normalize3(train.reshape(-1, 1))
+		test, _, _ = normalize3(test.reshape(-1, 1), min_a, max_a)
+		
+		# Create dummy labels (all zeros - no ground truth)
+		labels = np.zeros_like(test)
+		
+		# Save files
+		for file in ['train', 'test', 'labels']:
+			np.save(os.path.join(output_subfolder, f'{file}.npy'), eval(file).astype('float64'))
+		
+		print(f"Processed {csv_path} -> {output_subfolder}/")
+		print(f"  train.npy: {train.shape}, test.npy: {test.shape}, labels.npy: {labels.shape}")
+	
+	elif args.datasets:
+		# Process specified datasets
+		for d in args.datasets:
 			load_data(d)
 	else:
 		print("Usage: python preprocess.py <datasets>")
-		print(f"where <datasets> is space separated list of {datasets}")
+		print(f"       where <datasets> is space separated list of {datasets}")
+		print()
+		print("Or:    python preprocess.py --csv <path_to_csv>")
+		print("       where <path_to_csv> is path to a CSV file to preprocess")
