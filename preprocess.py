@@ -116,12 +116,14 @@ def convertNumpy(df):
 	x = df[df.columns[3:]].values[::10, :]
 	return (x - x.min(0)) / (x.ptp(0) + 1e-4)
 
-def load_data(dataset):
+def load_data(dataset, csv_path=None):
 	"""Load raw dataset and preprocess into normalized train/test/label numpy arrays.
 	
 	Args:
 		dataset (str): Name of the dataset to process. Must be one of:
-			'synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB'
+			'synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL'
+		csv_path (str, optional): Path to a CSV file to process using the dataset type logic.
+			If provided, the CSV will be processed instead of the default dataset location.
 	
 	Returns:
 		None. Saves three normalized numpy arrays for each dataset:
@@ -134,11 +136,52 @@ def load_data(dataset):
 		Format: (num_samples, num_features) for multivariate, (num_samples, 1) for univariate.
 		
 	Raises:
-		Exception: If dataset name is not in supported list.
+		Exception: If dataset name is not in supported list or CSV file not found.
 	"""
-	folder = os.path.join(output_folder, dataset)
-	os.makedirs(folder, exist_ok=True)
-	if dataset == 'synthetic':
+	if csv_path:
+		# Determine output folder based on CSV filename
+		dataset_name = os.path.splitext(os.path.basename(csv_path))[0]
+		folder = os.path.join(output_folder, dataset_name)
+		os.makedirs(folder, exist_ok=True)
+		if not os.path.exists(csv_path):
+			raise Exception(f'CSV file not found: {csv_path}')
+	else:
+		# Use default dataset folder
+		folder = os.path.join(output_folder, dataset)
+		os.makedirs(folder, exist_ok=True)
+	
+	if dataset == 'TOL':
+		if csv_path:
+			df = pd.read_csv(csv_path)
+		else:
+			df = pd.read_csv(os.path.join('data', 'sample_data.csv'))
+		
+		# Group by first column (assumed to be timestamp) and count occurrences
+		col_name = df.columns[0]
+		connection_counts = df.groupby(col_name).size().values.astype(float)
+		
+		# Create train/test split (70/30)
+		split_idx = int(len(connection_counts) * 0.7)
+		train = connection_counts[:split_idx]
+		test = connection_counts[split_idx:]
+		
+		# Normalize using per-feature scaling
+		train, min_a, max_a = normalize3(train.reshape(-1, 1))
+		test, _, _ = normalize3(test.reshape(-1, 1), min_a, max_a)
+		
+		# Create dummy labels (all zeros - no ground truth for this dataset)
+		labels = np.zeros_like(test)
+		
+		# Save files
+		for file in ['train', 'test', 'labels']:
+			np.save(os.path.join(folder, f'{file}.npy'), eval(file).astype('float64'))
+		
+		if csv_path:
+			print(f"Processed {csv_path} as TOL -> {folder}/")
+			print(f"  train.npy: {train.shape}, test.npy: {test.shape}, labels.npy: {labels.shape}")
+	elif csv_path:
+		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
+	elif dataset == 'synthetic':
 		train_file = os.path.join(data_folder, dataset, 'synthetic_data_with_anomaly-s-1.csv')
 		test_labels = os.path.join(data_folder, dataset, 'test_anomaly.csv')
 		dat = pd.read_csv(train_file, header=None)
@@ -285,82 +328,22 @@ def load_data(dataset):
 			labels[ls + i, :] = 1
 		for file in ['train', 'test', 'labels']:
 			np.save(os.path.join(folder, f'{file}.npy'), eval(file))
-	elif dataset == 'TOL':
-		dataset_folder = 'data'
-		df = pd.read_csv(os.path.join(dataset_folder, 'sample_data.csv'))
-		
-		# Group by epoch_time and count number of connections per timestamp
-		connection_counts = df.groupby('epoch_time').size().values.astype(float)
-		
-		# Create train/test split (70/30)
-		split_idx = int(len(connection_counts) * 0.7)
-		train = connection_counts[:split_idx]
-		test = connection_counts[split_idx:]
-		
-		# Normalize using per-feature scaling
-		train, min_a, max_a = normalize3(train.reshape(-1, 1))
-		test, _, _ = normalize3(test.reshape(-1, 1), min_a, max_a)
-		
-		# Create dummy labels (all zeros - no ground truth for this dataset)
-		labels = np.zeros_like(test)
-		
-		# Save files
-		for file in ['train', 'test', 'labels']:
-			np.save(os.path.join(folder, f'{file}.npy'), eval(file).astype('float64'))
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Preprocess datasets for anomaly detection')
-	parser.add_argument('datasets', nargs='*', help='Dataset names to preprocess')
-	parser.add_argument('--csv', type=str, help='Path to CSV file to preprocess')
+	parser.add_argument('dataset', nargs='?', help='Dataset type to preprocess (required)')
+	parser.add_argument('--csv', type=str, help='Path to CSV file to preprocess (optional, uses dataset type for processing)')
 	args = parser.parse_args()
 	
-	if args.csv:
-		# Process a custom CSV file
-		csv_path = args.csv
-		if not os.path.exists(csv_path):
-			print(f"Error: CSV file not found: {csv_path}")
-			sys.exit(1)
-		
-		# Extract dataset name from filename (without extension)
-		dataset_name = os.path.splitext(os.path.basename(csv_path))[0]
-		output_subfolder = os.path.join(output_folder, dataset_name)
-		os.makedirs(output_subfolder, exist_ok=True)
-		
-		# Load and process CSV
-		df = pd.read_csv(csv_path)
-		
-		# Group by first column (assumed to be timestamp) and count occurrences
-		col_name = df.columns[0]
-		connection_counts = df.groupby(col_name).size().values.astype(float)
-		
-		# Create train/test split (70/30)
-		split_idx = int(len(connection_counts) * 0.7)
-		train = connection_counts[:split_idx]
-		test = connection_counts[split_idx:]
-		
-		# Normalize using per-feature scaling
-		train, min_a, max_a = normalize3(train.reshape(-1, 1))
-		test, _, _ = normalize3(test.reshape(-1, 1), min_a, max_a)
-		
-		# Create dummy labels (all zeros - no ground truth)
-		labels = np.zeros_like(test)
-		
-		# Save files
-		for file in ['train', 'test', 'labels']:
-			np.save(os.path.join(output_subfolder, f'{file}.npy'), eval(file).astype('float64'))
-		
-		print(f"Processed {csv_path} -> {output_subfolder}/")
-		print(f"  train.npy: {train.shape}, test.npy: {test.shape}, labels.npy: {labels.shape}")
-	
-	elif args.datasets:
-		# Process specified datasets
-		for d in args.datasets:
-			load_data(d)
-	else:
-		print("Usage: python preprocess.py <datasets>")
-		print(f"       where <datasets> is space separated list of {datasets}")
+	if not args.dataset:
+		print("Usage: python preprocess.py <dataset_type>")
+		print(f"       where <dataset_type> is one of {datasets}")
 		print()
-		print("Or:    python preprocess.py --csv <path_to_csv>")
-		print("       where <path_to_csv> is path to a CSV file to preprocess")
+		print("Or:    python preprocess.py <dataset_type> --csv <path_to_csv>")
+		print("       where <path_to_csv> is path to a CSV file, processed using <dataset_type> logic")
+		sys.exit(1)
+	
+	# Call load_data with optional csv_path
+	load_data(args.dataset, csv_path=args.csv)
