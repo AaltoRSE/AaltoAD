@@ -1,7 +1,8 @@
-import pickle
 import os
 import pandas as pd
 from tqdm import tqdm
+import warnings
+import tranAD.parser
 from tranAD.parser import parse_arguments
 from tranAD.models import *
 from tranAD.constants import *
@@ -10,16 +11,30 @@ from tranAD.pot import *
 from tranAD.utils import *
 from tranAD.diagnosis import *
 from tranAD.merlin import *
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 import torch.nn as nn
 from time import time
 from pprint import pprint
 # from beepy import beep
 
+# Suppress matplotlib font warnings
+warnings.filterwarnings('ignore', message='.*findfont.*')
+
 # Parse command-line arguments
 parse_arguments()
+args = tranAD.parser.args
 
 def convert_to_windows(data, model):
+	"""Convert time series data into sliding windows for model input.
+	
+	Args:
+		data (torch.Tensor): Input time series data with shape (num_samples, num_features).
+		model: Model object that contains the n_window attribute specifying window size.
+	
+	Returns:
+		torch.Tensor: Stacked windows with shape (num_samples, window_size, num_features) for TranAD/Attention
+			models or (num_samples, window_size * num_features) for other models.
+	"""
 	windows = []; w_size = model.n_window
 	for i, g in enumerate(data): 
 		if i >= w_size: w = data[i-w_size:i]
@@ -28,6 +43,21 @@ def convert_to_windows(data, model):
 	return torch.stack(windows)
 
 def load_dataset(dataset):
+	"""Load pre-processed training, testing, and label data for a given dataset.
+	
+	Args:
+		dataset (str): Name of the dataset (e.g., 'SMD', 'SMAP', 'MSL', 'UCR', 'NAB').
+			Must have corresponding processed .npy files in the output folder.
+	
+	Returns:
+		tuple: A tuple containing:
+			- train_loader (DataLoader): PyTorch DataLoader for training data.
+			- test_loader (DataLoader): PyTorch DataLoader for test data.
+			- labels (np.ndarray): Ground truth anomaly labels with shape (num_test_samples, num_features).
+		
+	Raises:
+		Exception: If processed data folder does not exist for the given dataset.
+	"""
 	folder = os.path.join(output_folder, dataset)
 	if not os.path.exists(folder):
 		raise Exception('Processed Data not found.')
@@ -47,6 +77,18 @@ def load_dataset(dataset):
 	return train_loader, test_loader, labels
 
 def save_model(model, optimizer, scheduler, epoch, accuracy_list):
+	"""Save model checkpoint including state dicts and training metadata.
+	
+	Args:
+		model (torch.nn.Module): The neural network model to save.
+		optimizer (torch.optim.Optimizer): The optimizer state to save (e.g., AdamW).
+		scheduler (torch.optim.lr_scheduler): Learning rate scheduler state to save.
+		epoch (int): Current epoch number for checkpoint tracking.
+		accuracy_list (list): List of tuples containing (loss, learning_rate) for each epoch.
+	
+	Returns:
+		None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/model.ckpt
+	"""
 	folder = f'checkpoints/{args.model}_{args.dataset}/'
 	os.makedirs(folder, exist_ok=True)
 	file_path = f'{folder}/model.ckpt'
@@ -58,6 +100,24 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list):
         'accuracy_list': accuracy_list}, file_path)
 
 def load_model(modelname, dims):
+	"""Load or create a model with optimizer and scheduler, resuming from checkpoint if available.
+	
+	Args:
+		modelname (str): Name of the model class to instantiate (e.g., 'TranAD', 'USAD', 'DAGMM').
+		dims (int): Number of features/dimensions in the input data.
+	
+	Returns:
+		tuple: A tuple containing:
+			- model (torch.nn.Module): The loaded or newly created model in double precision.
+			- optimizer (torch.optim.AdamW): AdamW optimizer configured for the model.
+			- scheduler (torch.optim.lr_scheduler.StepLR): Learning rate scheduler (step every 5 epochs).
+			- epoch (int): Starting epoch (-1 if new model, otherwise loaded epoch from checkpoint).
+			- accuracy_list (list): List of training metrics from checkpoint or empty list for new model.
+			
+	Note:
+		Attempts to load from checkpoints/{modelname}_{dataset}/model.ckpt if it exists,
+		unless args.retrain is True and args.test is False.
+	"""
 	import tranAD.models
 	model_class = getattr(tranAD.models, modelname)
 	model = model_class(dims).double()
@@ -78,6 +138,31 @@ def load_model(modelname, dims):
 	return model, optimizer, scheduler, epoch, accuracy_list
 
 def backprop(epoch, model, data, dataO, optimizer, scheduler, training = True):
+	"""Perform forward pass, loss computation, and backpropagation for model training/evaluation.
+	
+	Args:
+		epoch (int): Current epoch number (used for model-specific loss weighting).
+		model (torch.nn.Module): The neural network model to train or evaluate.
+		data (torch.Tensor or DataLoader): Input data batch(es) - format depends on model architecture.
+		dataO (torch.Tensor): Original unprocessed data used for loss computation.
+		optimizer (torch.optim.Optimizer): Optimizer for gradient updates during training.
+		scheduler (torch.optim.lr_scheduler): Learning rate scheduler.
+		training (bool, optional): If True, performs backprop and updates weights. If False,
+			computes loss without gradient updates. Default is True.
+	
+	Returns:
+		tuple: A tuple containing:
+			If training=True:
+				- loss (float): Average training loss for the epoch.
+				- learning_rate (float): Current learning rate from optimizer.
+			If training=False:
+				- loss (np.ndarray): Element-wise loss values with shape (num_samples, num_features).
+				- y_pred (np.ndarray): Model predictions with shape (num_samples, num_features).
+			
+	Note:
+		Supports multiple model architectures (DAGMM, Attention, OmniAnomaly, USAD, GDN, MTAD_GAT,
+		MSCRED, CAE_M, GAN, TranAD) with architecture-specific loss computations.
+	"""
 	l = nn.MSELoss(reduction = 'mean' if training else 'none')
 	feats = dataO.shape[1]
 	if 'DAGMM' in model.name:
@@ -336,7 +421,7 @@ if __name__ == '__main__':
 	for i in range(loss.shape[1]):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
 		result, pred = pot_eval(lt, l, ls); preds.append(pred)
-		df = df.append(result, ignore_index=True)
+		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
 	# preds = np.concatenate([i.reshape(-1, 1) + 0 for i in preds], axis=1)
 	# pd.DataFrame(preds, columns=[str(i) for i in range(10)]).to_csv('labels.csv')
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)

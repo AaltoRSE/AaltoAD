@@ -2,24 +2,49 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-import pickle
 import json
 from tranAD.folderconstants import *
-from shutil import copyfile
 
-datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB']
+datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL']
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
 def load_and_save(category, filename, dataset, dataset_folder):
-    temp = np.genfromtxt(os.path.join(dataset_folder, category, filename),
-                         dtype=np.float64,
-                         delimiter=',')
-    print(dataset, category, filename, temp.shape)
-    np.save(os.path.join(output_folder, f"SMD/{dataset}_{category}.npy"), temp)
-    return temp.shape
+	"""Load a CSV file and save as normalized numpy array.
+	
+	Args:
+		category (str): Subdirectory name ('train', 'test', etc.).
+		filename (str): Name of the file to load.
+		dataset (str): Dataset identifier for output filename.
+		dataset_folder (str): Root path to dataset folder.
+	
+	Returns:
+		tuple: Shape of loaded array as (num_samples, num_features).
+	"""
+	temp = np.genfromtxt(os.path.join(dataset_folder, category, filename),
+	                         dtype=np.float64,
+	                         delimiter=',')
+	print(dataset, category, filename, temp.shape)
+	np.save(os.path.join(output_folder, f"SMD/{dataset}_{category}.npy"), temp)
+	return temp.shape
 
 def load_and_save2(category, filename, dataset, dataset_folder, shape):
+	"""Load anomaly labels from interpretation label file and save as binary numpy array.
+	
+	Args:
+		category (str): Label category name.
+		filename (str): Name of the label file to parse.
+		dataset (str): Dataset identifier for output filename.
+		dataset_folder (str): Root path to dataset folder.
+		shape (tuple): Target shape (num_samples, num_features) for labels array.
+	
+	Returns:
+		None. Saves binary label array as '{dataset}_{category}.npy'.
+		
+	File Format Expected:
+		Lines formatted as 'start-end:feature1,feature2,...' where start and end are indices
+		and features are 1-indexed column numbers to mark as anomalous.
+	"""
 	temp = np.zeros(shape)
 	with open(os.path.join(dataset_folder, 'interpretation_label', filename), "r") as f:
 		ls = f.readlines()
@@ -31,22 +56,84 @@ def load_and_save2(category, filename, dataset, dataset_folder, shape):
 	np.save(os.path.join(output_folder, f"SMD/{dataset}_{category}.npy"), temp)
 
 def normalize(a):
+	"""Normalize array to range [0.25, 0.75] using symmetric scaling.
+	
+	Args:
+		a (np.ndarray): Input array of any shape.
+	
+	Returns:
+		np.ndarray: Normalized array with same shape, values in approximately [0.25, 0.75].
+	"""
 	a = a / np.maximum(np.absolute(a.max(axis=0)), np.absolute(a.min(axis=0)))
 	return (a / 2 + 0.5)
 
 def normalize2(a, min_a = None, max_a = None):
+	"""Normalize array to range [0, 1] using min-max scaling.
+	
+	Args:
+		a (np.ndarray): Input array to normalize.
+		min_a (float, optional): Minimum value for scaling. If None, computed from data.
+		max_a (float, optional): Maximum value for scaling. If None, computed from data.
+	
+	Returns:
+		tuple: A tuple containing:
+			- normalized_array (np.ndarray): Normalized values in range [0, 1].
+			- min_a (float): Minimum value used for normalization.
+			- max_a (float): Maximum value used for normalization.
+	"""
 	if min_a is None: min_a, max_a = min(a), max(a)
 	return (a - min_a) / (max_a - min_a), min_a, max_a
 
 def normalize3(a, min_a = None, max_a = None):
+	"""Normalize array to range [0, 1] using per-feature min-max scaling.
+	
+	Args:
+		a (np.ndarray): Input array of shape (num_samples, num_features).
+		min_a (np.ndarray, optional): Per-feature minimum values. If None, computed from data.
+		max_a (np.ndarray, optional): Per-feature maximum values. If None, computed from data.
+	
+	Returns:
+		tuple: A tuple containing:
+			- normalized_array (np.ndarray): Normalized values in range [0, 1].
+			- min_a (np.ndarray): Per-feature minimum values used for normalization.
+			- max_a (np.ndarray): Per-feature maximum values used for normalization.
+	"""
 	if min_a is None: min_a, max_a = np.min(a, axis = 0), np.max(a, axis = 0)
 	return (a - min_a) / (max_a - min_a + 0.0001), min_a, max_a
 
 def convertNumpy(df):
+	"""Convert pandas DataFrame to normalized numpy array, skipping first 3 columns and downsampling.
+	
+	Args:
+		df (pd.DataFrame): Input DataFrame with timestamp/metadata in first 3 columns.
+	
+	Returns:
+		np.ndarray: Normalized feature data with shape (num_samples//10, num_features-3),
+				downsampled by factor of 10 and scaled to [0, 1].
+	"""
 	x = df[df.columns[3:]].values[::10, :]
 	return (x - x.min(0)) / (x.ptp(0) + 1e-4)
 
 def load_data(dataset):
+	"""Load raw dataset and preprocess into normalized train/test/label numpy arrays.
+	
+	Args:
+		dataset (str): Name of the dataset to process. Must be one of:
+			'synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB'
+	
+	Returns:
+		None. Saves three normalized numpy arrays for each dataset:
+			- train.npy: Training data with shape (num_train_samples, num_features)
+			- test.npy: Test data with shape (num_test_samples, num_features)
+			- labels.npy: Binary anomaly labels with same shape as test.npy
+			
+	Data Format (Output):
+		All arrays are float64 normalized to [0, 1] (or approximately for some datasets).
+		Format: (num_samples, num_features) for multivariate, (num_samples, 1) for univariate.
+		
+	Raises:
+		Exception: If dataset name is not in supported list.
+	"""
 	folder = os.path.join(output_folder, dataset)
 	os.makedirs(folder, exist_ok=True)
 	if dataset == 'synthetic':
@@ -196,6 +283,28 @@ def load_data(dataset):
 			labels[ls + i, :] = 1
 		for file in ['train', 'test', 'labels']:
 			np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+	elif dataset == 'TOL':
+		dataset_folder = 'data'
+		df = pd.read_csv(os.path.join(dataset_folder, 'sample_data.csv'))
+		
+		# Group by epoch_time and count number of connections per timestamp
+		connection_counts = df.groupby('epoch_time').size().values.astype(float)
+		
+		# Create train/test split (70/30)
+		split_idx = int(len(connection_counts) * 0.7)
+		train = connection_counts[:split_idx]
+		test = connection_counts[split_idx:]
+		
+		# Normalize using per-feature scaling
+		train, min_a, max_a = normalize3(train.reshape(-1, 1))
+		test, _, _ = normalize3(test.reshape(-1, 1), min_a, max_a)
+		
+		# Create dummy labels (all zeros - no ground truth for this dataset)
+		labels = np.zeros_like(test)
+		
+		# Save files
+		for file in ['train', 'test', 'labels']:
+			np.save(os.path.join(folder, f'{file}.npy'), eval(file).astype('float64'))
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 
