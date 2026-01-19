@@ -4,14 +4,14 @@ import pandas as pd
 import numpy as np
 import json
 import argparse
-from tranAD.folderconstants import *
+from tranAD.folderconstants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
 
 
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL']
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
-def load_and_save(category, filename, dataset, dataset_folder):
+def load_and_save(category, filename, dataset, dataset_folder, output_folder=DEFAULT_OUTPUT_FOLDER):
 	"""Load a CSV file and save as normalized numpy array.
 	
 	Args:
@@ -30,7 +30,7 @@ def load_and_save(category, filename, dataset, dataset_folder):
 	np.save(os.path.join(output_folder, f"SMD/{dataset}_{category}.npy"), temp)
 	return temp.shape
 
-def load_and_save2(category, filename, dataset, dataset_folder, shape):
+def load_and_save2(category, filename, dataset, dataset_folder, shape, output_folder=DEFAULT_OUTPUT_FOLDER):
 	"""Load anomaly labels from interpretation label file and save as binary numpy array.
 	
 	Args:
@@ -116,7 +116,7 @@ def convertNumpy(df):
 	x = df[df.columns[3:]].values[::10, :]
 	return (x - x.min(0)) / (x.ptp(0) + 1e-4)
 
-def load_TOL(folder, csv_path=None):
+def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 	
 	Args:
@@ -129,7 +129,7 @@ def load_TOL(folder, csv_path=None):
 	if csv_path:
 		df = pd.read_csv(csv_path)
 	else:
-		df = pd.read_csv(os.path.join('data', 'sample_data.csv'))
+		df = pd.read_csv(os.path.join(data_folder, 'sample_data.csv'))
 	
 	# Group by first column (assumed to be timestamp) and count occurrences
 	col_name = df.columns[0]
@@ -155,7 +155,7 @@ def load_TOL(folder, csv_path=None):
 		print(f"Processed {csv_path} as TOL -> {folder}/")
 		print(f"  train.npy: {train.shape}, test.npy: {test.shape}, labels.npy: {labels.shape}")
 
-def load_synthetic(folder):
+def load_synthetic(folder, data_folder=DEFAULT_DATA_FOLDER):
 	"""Load and preprocess synthetic dataset.
 	
 	Args:
@@ -180,13 +180,13 @@ def load_synthetic(folder):
 	for file in ['train', 'test', 'labels']:
 		np.save(os.path.join(folder, f'{file}.npy'), eval(file))
 
-def load_UCR(folder):
+def load_UCR(folder, data_folder=DEFAULT_DATA_FOLDER):
 	"""Load and preprocess UCR dataset files.
 
 	Reads all .txt files in data/UCR, parses the header to determine train/test split
 	and creates normalized train/test/labels files named {dnum}_train.npy, etc.
 	"""
-	dataset_folder = 'data/UCR'
+	dataset_folder = os.path.join(data_folder, 'UCR')
 	file_list = os.listdir(dataset_folder)
 	for filename in file_list:
 		if not filename.endswith('.txt'):
@@ -219,7 +219,7 @@ def load_SMD(folder):
 	Args:
 		folder (str): Base output folder where processed/* datasets are saved.
 	"""
-	dataset_folder = os.path.join('data', 'SMD')
+	dataset_folder = os.path.join(DEFAULT_DATA_FOLDER, 'SMD')
 	train_dir = os.path.join(dataset_folder, 'train')
 	test_dir = os.path.join(dataset_folder, 'test')
 
@@ -235,11 +235,9 @@ def load_SMD(folder):
 			load_and_save2('labels', filename, name, dataset_folder, s)
 
 
-def load_NAB(folder):
-	"""
-	Preprocess NAB dataset and save per-file train/test/labels arrays.
-	"""
-	dataset_folder = 'data/NAB'
+
+def load_NAB(folder, data_folder=DEFAULT_DATA_FOLDER):
+	dataset_folder = os.path.join(data_folder, 'NAB')
 	file_list = os.listdir(dataset_folder)
 	with open(dataset_folder + '/labels.json') as f:
 		labeldict = json.load(f)
@@ -261,11 +259,9 @@ def load_NAB(folder):
 			np.save(os.path.join(folder, f'{fn}_{file}.npy'), eval(file))
 
 
-def load_MSDS(folder):
-	"""
-	Preprocess MSDS dataset and save train/test/labels arrays.
-	"""
-	dataset_folder = 'data/MSDS'
+
+def load_MSDS(folder, data_folder=DEFAULT_DATA_FOLDER):
+	dataset_folder = os.path.join(data_folder, 'MSDS')
 	df_train = pd.read_csv(os.path.join(dataset_folder, 'train.csv'))
 	df_test  = pd.read_csv(os.path.join(dataset_folder, 'test.csv'))
 	df_train, df_test = df_train.values[::5, 1:], df_test.values[::5, 1:]
@@ -278,11 +274,9 @@ def load_MSDS(folder):
 		np.save(os.path.join(folder, f'{file}.npy'), eval(file).astype('float64'))
 
 
-def load_SWaT(folder):
-	"""
-	Preprocess SWaT dataset and save train/test/labels arrays.
-	"""
-	dataset_folder = 'data/SWaT'
+
+def load_SWaT(folder, data_folder=DEFAULT_DATA_FOLDER):
+	dataset_folder = os.path.join(data_folder, 'SWaT')
 	file = os.path.join(dataset_folder, 'series.json')
 	df_train = pd.read_json(file, lines=True)[['val']][3000:6000]
 	df_test  = pd.read_json(file, lines=True)[['val']][7000:12000]
@@ -293,15 +287,9 @@ def load_SWaT(folder):
 		np.save(os.path.join(folder, f'{file}.npy'), eval(file))
 
 
-def load_SMAP_MSL(folder, dataset):
-	"""
-	Preprocess SMAP or MSL dataset and save per-channel train/test/labels arrays.
 
-	Args:
-		folder (str): Output folder path where .npy files will be saved.
-		dataset (str): Either 'SMAP' or 'MSL' to choose which spacecraft data to process.
-	"""
-	dataset_folder = 'data/SMAP_MSL'
+def load_SMAP_MSL(folder, dataset, data_folder=DEFAULT_DATA_FOLDER):
+	dataset_folder = os.path.join(data_folder, 'SMAP_MSL')
 	file = os.path.join(dataset_folder, 'labeled_anomalies.csv')
 	values = pd.read_csv(file)
 	values = values[values['spacecraft'] == dataset]
@@ -322,11 +310,9 @@ def load_SMAP_MSL(folder, dataset):
 		np.save(f'{folder}/{fn}_labels.npy', labels)
 
 
-def load_WADI(folder):
-	"""
-	Preprocess WADI dataset and save train/test/labels arrays.
-	"""
-	dataset_folder = 'data/WADI'
+
+def load_WADI(folder, data_folder=DEFAULT_DATA_FOLDER):
+	dataset_folder = os.path.join(data_folder, 'WADI')
 	ls = pd.read_csv(os.path.join(dataset_folder, 'WADI_attacklabels.csv'))
 	train = pd.read_csv(os.path.join(dataset_folder, 'WADI_14days.csv'), skiprows=1000, nrows=2e5)
 	test = pd.read_csv(os.path.join(dataset_folder, 'WADI_attackdata.csv'))
@@ -354,11 +340,9 @@ def load_WADI(folder):
 		np.save(os.path.join(folder, f'{file}.npy'), eval(file))
 
 
-def load_MBA(folder):
-	"""
-	Preprocess MBA dataset and save train/test/labels arrays.
-	"""
-	dataset_folder = 'data/MBA'
+
+def load_MBA(folder, data_folder=DEFAULT_DATA_FOLDER):
+	dataset_folder = os.path.join(data_folder, 'MBA')
 	ls = pd.read_excel(os.path.join(dataset_folder, 'labels.xlsx'))
 	train = pd.read_excel(os.path.join(dataset_folder, 'train.xlsx'))
 	test = pd.read_excel(os.path.join(dataset_folder, 'test.xlsx'))
@@ -373,57 +357,37 @@ def load_MBA(folder):
 		np.save(os.path.join(folder, f'{file}.npy'), eval(file))
 
 
-def load_data(dataset, csv_path=None):
-	"""Load raw dataset and preprocess into normalized train/test/label numpy arrays.
-	
-	Args:
-		dataset (str): Name of the dataset to process. Must be one of:
-			'synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL'
-		csv_path (str, optional): Path to a CSV file to process using the dataset type logic.
-			If provided, the CSV will be processed instead of the default dataset location.
-	
-	Returns:
-		None. Saves three normalized numpy arrays for each dataset:
-			- train.npy: Training data with shape (num_train_samples, num_features)
-			- test.npy: Test data with shape (num_test_samples, num_features)
-			- labels.npy: Binary anomaly labels with same shape as test.npy
-			
-	Data Format (Output):
-		All arrays are float64 normalized to [0, 1] (or approximately for some datasets).
-		Format: (num_samples, num_features) for multivariate, (num_samples, 1) for univariate.
-		
-	Raises:
-		Exception: If dataset name is not in supported list or CSV file not found.
-	"""
-	if csv_path:
-		if not os.path.exists(csv_path):
-			raise Exception(f'CSV file not found: {csv_path}')
 
+def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_folder=DEFAULT_DATA_FOLDER):
 	folder = os.path.join(output_folder, dataset)
 	os.makedirs(folder, exist_ok=True)
+
+	# If a CSV path was provided, ensure the file exists before proceeding
+	if csv_path and not os.path.exists(csv_path):
+		raise Exception(f'CSV file not found: {csv_path}')
 	
 	if dataset == 'TOL':
-		load_TOL(folder, csv_path=csv_path)
+		load_TOL(folder, csv_path=csv_path, data_folder=data_folder)
 	elif csv_path:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
 	elif dataset == 'UCR':
-		load_UCR(folder)
+		load_UCR(folder, data_folder=data_folder)
 	elif dataset == 'synthetic':
-		load_synthetic(folder)
+		load_synthetic(folder, data_folder=data_folder)
 	elif dataset == 'SMD':
 		load_SMD(folder)
 	elif dataset == 'NAB':
-		load_NAB(folder)
+		load_NAB(folder, data_folder=data_folder)
 	elif dataset == 'MSDS':
-		load_MSDS(folder)
+		load_MSDS(folder, data_folder=data_folder)
 	elif dataset == 'SWaT':
-		load_SWaT(folder)
+		load_SWaT(folder, data_folder=data_folder)
 	elif dataset in ['SMAP', 'MSL']:
-		load_SMAP_MSL(folder, dataset)
+		load_SMAP_MSL(folder, dataset, data_folder=data_folder)
 	elif dataset == 'WADI':
-		load_WADI(folder)
+		load_WADI(folder, data_folder=data_folder)
 	elif dataset == 'MBA':
-		load_MBA(folder)
+		load_MBA(folder, data_folder=data_folder)
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 
