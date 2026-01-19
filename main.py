@@ -5,7 +5,7 @@ import warnings
 import tranAD.parser
 from tranAD.parser import parse_arguments
 from tranAD.models import *
-from tranAD.constants import *
+from tranAD import constants
 from tranAD.plotting import *
 from tranAD.pot import *
 from tranAD.utils import *
@@ -58,7 +58,7 @@ def load_dataset(dataset):
 	Raises:
 		Exception: If processed data folder does not exist for the given dataset.
 	"""
-	folder = os.path.join(output_folder, dataset)
+	folder = os.path.join(constants.output_folder, dataset)
 	if not os.path.exists(folder):
 		raise Exception('Processed Data not found.')
 	loader = []
