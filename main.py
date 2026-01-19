@@ -126,7 +126,10 @@ def load_model(modelname, dims):
 	fname = f'checkpoints/{args.model}_{args.dataset}/model.ckpt'
 	if os.path.exists(fname) and (not args.retrain or args.test):
 		print(f"{color.GREEN}Loading pre-trained model: {model.name}{color.ENDC}")
-		checkpoint = torch.load(fname)
+		try:
+			checkpoint = torch.load(fname, weights_only=False)
+		except TypeError:
+			checkpoint = torch.load(fname)
 		model.load_state_dict(checkpoint['model_state_dict'])
 		optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 		scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
@@ -211,8 +214,8 @@ def backprop(epoch, model, data, dataO, optimizer, scheduler, training = True):
 			return np.mean(l1s), optimizer.param_groups[0]['lr']
 		else:
 			ae1s, y_pred = [], []
-			for d in data: 
-				ae1 = model(d)
+			for d in data:
+				ae1, ats = model(d)
 				y_pred.append(ae1[-1])
 				ae1s.append(ae1)
 			ae1s, y_pred = torch.stack(ae1s), torch.stack(y_pred)
