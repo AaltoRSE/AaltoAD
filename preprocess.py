@@ -130,19 +130,49 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER):
 		df = pd.read_csv(csv_path)
 	else:
 		df = pd.read_csv(os.path.join(data_folder, 'sample_data.csv'))
-	
-	# Group by first column (assumed to be timestamp) and count occurrences
+
+	# Determine timestamp and protocol column names
 	col_name = df.columns[0]
-	connection_counts = df.groupby(col_name).size().values.astype(float)
+	protocol_col = df.columns[1] if len(df.columns) > 1 else 'protocol'
+
+	# Normalize protocol values (treat missing as 'unknown') and compute top-5 protocols
+	df[protocol_col] = df[protocol_col].fillna('unknown').astype(str)
+	top_protocols = df[protocol_col].value_counts().index.tolist()[:5]
+
+	# Build per-second, per-protocol counts (rows: timestamp, cols: protocol)
+	grp = df.groupby([col_name, protocol_col]).size().unstack(fill_value=0)
+	grp = grp.sort_index()
+
+	# Create feature matrix with 5 columns for top protocols and 1 column for the rest
+	# Ensure deterministic ordering: top_protocols may be fewer than 5
+	features = []
+	for i in range(5):
+		if i < len(top_protocols):
+			p = top_protocols[i]
+			# use .get to handle protocols that might not appear in grp.columns
+			features.append(grp.get(p, pd.Series(0, index=grp.index)))
+		else:
+			features.append(pd.Series(0, index=grp.index))
+
+	# other = total per-timestamp minus sum of selected top protocol counts
+	total_per_ts = grp.sum(axis=1)
+	selected_sum = pd.concat(features, axis=1).sum(axis=1)
+	other = total_per_ts - selected_sum
+	features.append(other)
+
+	# Combine into a single numpy array (rows sorted by timestamp)
+	features_df = pd.concat(features, axis=1)
+	features_df.columns = [f'proto_top_{i+1}' for i in range(5)] + ['proto_other']
+	connection_counts = features_df.values.astype(float)
 	
 	# Create train/test split (70/30)
 	split_idx = int(len(connection_counts) * 0.7)
-	train = connection_counts[:split_idx]
-	test = connection_counts[split_idx:]
+	train = connection_counts[:split_idx, :]
+	test = connection_counts[split_idx:, :]
 	
-	# Normalize using per-feature scaling
-	train, min_a, max_a = normalize3(train.reshape(-1, 1))
-	test, _, _ = normalize3(test.reshape(-1, 1), min_a, max_a)
+	# Normalize using per-feature scaling (preserve columns/features)
+	train, min_a, max_a = normalize3(train)
+	test, _, _ = normalize3(test, min_a, max_a)
 	
 	# Create dummy labels (all zeros - no ground truth for this dataset)
 	labels = np.zeros_like(test)
