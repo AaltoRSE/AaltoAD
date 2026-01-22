@@ -4,9 +4,10 @@
 
 
 # TranAD
-This repository supplements our paper "TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data" accepted in VLDB 2022. This is a refactored version of the code used for results in the paper for ease of use. Follow the below steps to replicate each cell in the results table. The code is provided as-is. Due to limited resources, we are unable to provide support on any issues you may experience with installing or running the tool.
 
-Our work has been discussed in the PodBean podcast! [See here](https://papersread.ai/e/tranad-deep-transformer-networks-for-anomaly-detection-in-multivariate-time-series-data-1663142096/). 
+This repository updates the original [TranAD repository](https://github.com/AaltoRSE/TranAD) for current Python and libraries in 2026.
+
+The original results were published in ["TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data"](https://doi.org/10.48550/arXiv.2201.07284) accepted in VLDB 2022.
 
 ## Results
 ![Alt text](results/main.PNG?raw=true "results")
