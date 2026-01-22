@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import csv
 from tqdm import tqdm
 import warnings
 import TranAD
@@ -444,6 +445,18 @@ def run_experiment():
 	result.update(ndcg(loss, labels))
 	print(df)
 	pprint(result)
+	# Append benchmark to CSV: model, dataset, precision, recall, AUC, f1
+	try:
+		os.makedirs('results', exist_ok=True)
+		bench_file = os.path.join('results', 'benchmarks.csv')
+		write_header = (not os.path.exists(bench_file)) or os.path.getsize(bench_file) == 0
+		with open(bench_file, 'a', newline='') as csvfile:
+			writer = csv.writer(csvfile)
+			if write_header:
+				writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
+			writer.writerow([args.model, args.dataset, result.get('precision'), result.get('recall'), result.get('ROC/AUC'), result.get('f1')])
+	except Exception as e:
+		print(f"Could not write benchmark CSV: {e}")
 	return result
 
 
@@ -465,6 +478,21 @@ def run_all(models_list=None, datasets_list=None):
 		importlib.reload(TranAD.models)
 		models_list = [name for name in dir(TranAD.models) if name[0].isupper() and callable(getattr(TranAD.models, name))]
 
+	# Load existing benchmark entries to optionally skip already-run experiments
+	bench_file = os.path.join('results', 'benchmarks.csv')
+	existing_runs = set()
+	if os.path.exists(bench_file):
+		try:
+			with open(bench_file, 'r', newline='') as csvfile:
+				reader = csv.DictReader(csvfile)
+				for row in reader:
+					m = row.get('model')
+					d = row.get('dataset')
+					if m and d:
+						existing_runs.add((m, d))
+		except Exception as e:
+			print(f"Warning: could not read benchmark CSV: {e}")
+
 	summary = {}
 	for dataset in datasets_list:
 		TranAD.parser.args.dataset = dataset
@@ -477,6 +505,10 @@ def run_all(models_list=None, datasets_list=None):
 		for modelname in models_list:
 			TranAD.parser.args.model = modelname
 			args = TranAD.parser.args
+			# Skip if this run is already present in the benchmarks CSV and retrain not requested
+			if (modelname, dataset) in existing_runs and not getattr(args, 'retrain', False):
+				print(f"Skipping {modelname} on {dataset}: already in results/benchmarks.csv (use --retrain to override)")
+				continue
 			print(f'Running {modelname} on {dataset}')
 			# reload models to pick any dataset-dependent hyperparams
 			importlib.reload(TranAD.models)
@@ -488,17 +520,27 @@ def run_all(models_list=None, datasets_list=None):
 			summary[(modelname, dataset)] = res
 
 	# Print concise report
-	print('\n=== Summary Report ===')
+	# Build summary DataFrame
+	rows = []
 	for (m, d), r in summary.items():
-		print(f'{m} @ {d}: {r}')
-	return summary
+		if isinstance(r, dict) and 'precision' in r:
+			rows.append({'model': m, 'dataset': d, 'precision': r.get('precision'), 'recall': r.get('recall'), 'AUC': r.get('ROC/AUC'), 'fF1': r.get('f1')})
+		else:
+			rows.append({'model': m, 'dataset': d, 'precision': None, 'recall': None, 'AUC': None, 'fF1': None, 'error': str(r)})
+	report = pd.DataFrame(rows)
+	print('\n=== Summary Report ===')
+	print(report.to_string(index=False))
+	return summary, report
 
 
 if __name__ == '__main__':
 	# Parse command-line arguments at runtime (not on import)
-	TranAD.parser.parse_arguments()
+	parse_arguments()
 	args = TranAD.parser.args
-	if args.model == 'ALL':
-		run_all()
+	# If either model or dataset is 'ALL', run the full sweep
+	if args.model == 'ALL' or args.dataset == 'ALL':
+		models_list = None if args.model == 'ALL' else [args.model]
+		datasets_list = None if args.dataset == 'ALL' else [args.dataset]
+		run_all(models_list=models_list, datasets_list=datasets_list)
 	else:
 		run_experiment()
