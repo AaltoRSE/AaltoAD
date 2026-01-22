@@ -405,7 +405,7 @@ def run_experiment():
 	## Prepare data
 	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
 	trainO, testO = trainD, testD
-	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN'] or 'TranAD' in model.name:
+	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'MERLIN'] or 'TranAD' in model.name:
 		trainD, testD = convert_to_windows(trainD, model), convert_to_windows(testD, model)
 
 	### Training phase
@@ -476,7 +476,7 @@ def run_all(models_list=None, datasets_list=None):
 	# discover model class names if not provided
 	if models_list is None:
 		importlib.reload(TranAD.models)
-		models_list = [name for name in dir(TranAD.models) if name[0].isupper() and callable(getattr(TranAD.models, name))]
+		models_list = [name for name in dir(TranAD.models) if name[0].isupper() and callable(getattr(TranAD.models, name))] + ["MERLIN"]
 
 	# Load existing benchmark entries to optionally skip already-run experiments
 	bench_file = os.path.join('results', 'benchmarks.csv')
@@ -524,9 +524,9 @@ def run_all(models_list=None, datasets_list=None):
 	rows = []
 	for (m, d), r in summary.items():
 		if isinstance(r, dict) and 'precision' in r:
-			rows.append({'model': m, 'dataset': d, 'precision': r.get('precision'), 'recall': r.get('recall'), 'AUC': r.get('ROC/AUC'), 'fF1': r.get('f1')})
+			rows.append({'model': m, 'dataset': d, 'precision': r.get('precision'), 'recall': r.get('recall'), 'AUC': r.get('ROC/AUC'), 'F1': r.get('f1')})
 		else:
-			rows.append({'model': m, 'dataset': d, 'precision': None, 'recall': None, 'AUC': None, 'fF1': None, 'error': str(r)})
+			rows.append({'model': m, 'dataset': d, 'precision': None, 'recall': None, 'AUC': None, 'F1': None, 'error': str(r)})
 	report = pd.DataFrame(rows)
 	print('\n=== Summary Report ===')
 	print(report.to_string(index=False))
