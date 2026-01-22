@@ -7,10 +7,10 @@
 import numpy as np
 from pprint import pprint
 from time import time
-from tranAD.utils import *
-from tranAD.constants import *
-from tranAD.diagnosis import *
-from tranAD.pot import *
+from TranAD.utils import *
+from TranAD.constants import *
+from TranAD.diagnosis import *
+from TranAD.pot import *
 maxint = 200000
 
 # z-normalized euclidean distance

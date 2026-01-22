@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.metrics import ndcg_score
-from tranAD.constants import lm
+from TranAD.constants import lm
 
 def hit_att(ascore, labels, ps = [100, 150]):
 	res = {}

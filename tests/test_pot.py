@@ -1,5 +1,5 @@
 import numpy as np
-import tranAD.pot as pot
+import TranAD.pot as pot
 
 
 def test_adjust_predicts_basic():

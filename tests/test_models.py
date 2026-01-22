@@ -4,7 +4,7 @@ import random
 import numpy as np
 import json
 import pathlib
-from tranAD.models import (
+from TranAD.models import (
     LSTM_Univariate, Attention, LSTM_AD, DAGMM, OmniAnomaly, USAD, MSCRED,
     CAE_M, MTAD_GAT, GDN, MAD_GAN, TranAD_Basic, TranAD_Transformer,
     TranAD_Adversarial, TranAD_SelfConditioning, TranAD

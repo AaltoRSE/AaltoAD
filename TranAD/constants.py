@@ -1,5 +1,5 @@
-from tranAD.parser import *
-from tranAD.folderconstants import *
+from TranAD.parser import *
+from TranAD.folderconstants import *
 
 # Threshold parameters
 lm_d = {

@@ -8,8 +8,8 @@ from torch_geometric.nn import GATConv
 from torch.nn import TransformerEncoder
 from torch.nn import TransformerDecoder
 from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
-from tranAD.dlutils import *
-from tranAD.constants import *
+from TranAD.dlutils import *
+from TranAD.constants import *
 torch.manual_seed(1)
 
 ## Separate LSTM for each variable

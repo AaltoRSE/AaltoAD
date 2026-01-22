@@ -1,7 +1,7 @@
 import numpy as np
 
-from tranAD.spot import SPOT
-from tranAD.constants import *
+from TranAD.spot import SPOT
+from TranAD.constants import *
 from sklearn.metrics import *
 
 def calc_point2point(predict, actual):

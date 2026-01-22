@@ -2,27 +2,25 @@ import os
 import pandas as pd
 from tqdm import tqdm
 import warnings
-import tranAD.parser
-from tranAD.parser import parse_arguments
-from tranAD.models import *
-from tranAD import constants
-from tranAD.plotting import *
-from tranAD.pot import *
-from tranAD.utils import *
-from tranAD.diagnosis import *
-from tranAD.merlin import *
+import TranAD
+from TranAD import models
+from TranAD import constants
+from TranAD import plotting
+from TranAD import pot
+from TranAD.utils import *
+from TranAD.diagnosis import *
+from TranAD.merlin import *
 from torch.utils.data import DataLoader, TensorDataset
-import torch.nn as nn
+import torch
+from torch import nn
 from time import time
 from pprint import pprint
 # from beepy import beep
+import importlib
 
 # Suppress matplotlib font warnings
 warnings.filterwarnings('ignore', message='.*findfont.*')
 
-# Parse command-line arguments
-parse_arguments()
-args = tranAD.parser.args
 
 def convert_to_windows(data, model):
 	"""Convert time series data into sliding windows for model input.
@@ -118,8 +116,7 @@ def load_model(modelname, dims):
 		Attempts to load from checkpoints/{modelname}_{dataset}/model.ckpt if it exists,
 		unless args.retrain is True and args.test is False.
 	"""
-	import tranAD.models
-	model_class = getattr(tranAD.models, modelname)
+	model_class = getattr(models, modelname)
 	model = model_class(dims).double()
 	optimizer = torch.optim.AdamW(model.parameters() , lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
@@ -165,7 +162,7 @@ def backprop(epoch, model, data, dataO, optimizer, scheduler, training = True):
 
 def _backprop_dagmm(epoch, model, data, dataO, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction = 'none')
-	compute = ComputeLoss(model, 0.1, 0.005, 'cpu', model.n_gmm)
+	compute = models.ComputeLoss(model, 0.1, 0.005, 'cpu', model.n_gmm)
 	n = epoch + 1; w_size = model.n_window
 	l1s = []; l2s = []
 	if training:
@@ -390,7 +387,15 @@ def _backprop_default(epoch, model, data, dataO, optimizer, scheduler, training,
 	else:
 		return loss.detach().numpy(), y_pred.detach().numpy()
 
-if __name__ == '__main__':
+
+
+def run_experiment():
+	"""Run a single experiment using the current module-level `args`.
+
+	Returns:
+		dict: result dictionary produced at the end of the experiment.
+	"""
+	preds = []
 	train_loader, test_loader, labels = load_dataset(args.dataset)
 	if args.model in ['MERLIN']:
 		eval(f'run_{args.model.lower()}(test_loader, labels, args.dataset)')
@@ -399,7 +404,7 @@ if __name__ == '__main__':
 	## Prepare data
 	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
 	trainO, testO = trainD, testD
-	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN'] or 'TranAD' in model.name: 
+	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN'] or 'TranAD' in model.name:
 		trainD, testD = convert_to_windows(trainD, model), convert_to_windows(testD, model)
 
 	### Training phase
@@ -421,24 +426,79 @@ if __name__ == '__main__':
 
 	### Plot curves
 	if not args.test:
-		if 'TranAD' in model.name: testO = torch.roll(testO, 1, 0) 
-		plotter(f'{args.model}_{args.dataset}', testO, y_pred, loss, labels)
+		if 'TranAD' in model.name: testO = torch.roll(testO, 1, 0)
+		plotting.plotter(f'{args.model}_{args.dataset}', testO, y_pred, loss, labels)
 
 	### Scores
 	df = pd.DataFrame()
 	lossT, _ = backprop(0, model, trainD, trainO, optimizer, scheduler, training=False)
 	for i in range(loss.shape[1]):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
-		result, pred = pot_eval(lt, l, ls); preds.append(pred)
+		result, pred = pot.pot_eval(lt, l, ls); preds.append(pred)
 		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
-	# preds = np.concatenate([i.reshape(-1, 1) + 0 for i in preds], axis=1)
-	# pd.DataFrame(preds, columns=[str(i) for i in range(10)]).to_csv('labels.csv')
+
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
-	result, _ = pot_eval(lossTfinal, lossFinal, labelsFinal)
+	result, _ = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(hit_att(loss, labels))
 	result.update(ndcg(loss, labels))
 	print(df)
 	pprint(result)
-	# pprint(getresults2(df, result))
-	# beep(4)
+	return result
+
+
+def run_all(models_list=None, datasets_list=None):
+	"""Run all models on all datasets and print a summary report.
+
+	The function updates `TranAD.parser.args` and reloads dependent modules so
+	per-dataset/model constants are applied.
+	"""
+	# discover datasets from processed output folder if not provided
+	if datasets_list is None:
+		folder = os.path.join(TranAD.folderconstants.output_folder)
+		if not os.path.exists(folder):
+			raise Exception(f'Processed data folder not found: {folder}')
+		datasets_list = sorted([d for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))])
+
+	# discover model class names if not provided
+	if models_list is None:
+		importlib.reload(TranAD.models)
+		models_list = [name for name in dir(TranAD.models) if name[0].isupper() and callable(getattr(TranAD.models, name))]
+
+	summary = {}
+	for dataset in datasets_list:
+		TranAD.parser.args.dataset = dataset
+		# reflect new dataset in module-level args
+		global args
+		args = TranAD.parser.args
+		# reload constants and models so they pick up new args
+		importlib.reload(TranAD.constants)
+		importlib.reload(TranAD.models)
+		for modelname in models_list:
+			TranAD.parser.args.model = modelname
+			args = TranAD.parser.args
+			print(f'Running {modelname} on {dataset}')
+			# reload models to pick any dataset-dependent hyperparams
+			importlib.reload(TranAD.models)
+			# run and collect result
+			try:
+				res = run_experiment()
+			except Exception as e:
+				res = {'error': str(e)}
+			summary[(modelname, dataset)] = res
+
+	# Print concise report
+	print('\n=== Summary Report ===')
+	for (m, d), r in summary.items():
+		print(f'{m} @ {d}: {r}')
+	return summary
+
+
+if __name__ == '__main__':
+	# Parse command-line arguments at runtime (not on import)
+	TranAD.parser.parse_arguments()
+	args = TranAD.parser.args
+	if args.model == 'ALL':
+		run_all()
+	else:
+		run_experiment()

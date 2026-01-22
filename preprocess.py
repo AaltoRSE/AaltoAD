@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 import argparse
-from tranAD.folderconstants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
+from TranAD.folderconstants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
 
 
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL']
@@ -149,7 +149,6 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER):
 	for i in range(5):
 		if i < len(top_protocols):
 			p = top_protocols[i]
-			# use .get to handle protocols that might not appear in grp.columns
 			features.append(grp.get(p, pd.Series(0, index=grp.index)))
 		else:
 			features.append(pd.Series(0, index=grp.index))

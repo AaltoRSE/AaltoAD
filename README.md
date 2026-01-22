@@ -2,6 +2,7 @@
 ![Python 3.7, 3.8](https://img.shields.io/badge/python-3.7%20%7C%203.8-blue.svg)
 [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fimperial-qore%2FTranAD&count_bg=%23FFC401&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
 
+
 # TranAD
 This repository supplements our paper "TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data" accepted in VLDB 2022. This is a refactored version of the code used for results in the paper for ease of use. Follow the below steps to replicate each cell in the results table. The code is provided as-is. Due to limited resources, we are unable to provide support on any issues you may experience with installing or running the tool.
 
@@ -33,7 +34,8 @@ where `<model>` can be either of 'TranAD', 'GDN', 'MAD_GAN', 'MTAD_GAT', 'MSCRED
 ```bash
 python3 main.py --model <model> --dataset <dataset> --retrain --less
 ```
-You can use the parameters in `src/params.json` to set values in `src/constants.py` for each file. 
+You can use the parameters in `src/params.json` to set values in `src/constants.py` for each file.
+
 
 > Note: to reproduce exact results of baselines, use their original codebases (links given in our paper) as the ones implemented in this repository are *not* the ones used in the paper, which used the original versions. The versions provided here are for use of initial comparison and may not be identical to the original versions.
 

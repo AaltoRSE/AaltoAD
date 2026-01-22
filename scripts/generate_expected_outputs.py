@@ -7,7 +7,7 @@ random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
 
-from tranAD import models as _models_module
+from TranAD import models as _models_module
 
 MODEL_LIST = [
     ("LSTM_Univariate", (5, 5, 1)),

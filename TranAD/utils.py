@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import os
-from tranAD.constants import *
+from TranAD.constants import *
 import pandas as pd 
 import numpy as np
 
