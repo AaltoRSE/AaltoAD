@@ -138,6 +138,24 @@ def load_model(modelname, dims):
 		epoch = -1; accuracy_list = []
 	return model, optimizer, scheduler, epoch, accuracy_list
 
+
+def append_benchmark_row(model_name, dataset_name, result_dict, bench_path=os.path.join('results', 'benchmarks.csv')):
+	"""Append a single benchmark row to CSV, creating file/header if needed.
+
+	Args:
+		model_name (str), dataset_name (str), result_dict (dict), bench_path (str)
+	"""
+	try:
+		os.makedirs(os.path.dirname(bench_path) or '.', exist_ok=True)
+		write_header = (not os.path.exists(bench_path)) or os.path.getsize(bench_path) == 0
+		with open(bench_path, 'a', newline='') as csvfile:
+			writer = csv.writer(csvfile)
+			if write_header:
+				writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
+			writer.writerow([model_name, dataset_name, result_dict.get('precision'), result_dict.get('recall'), result_dict.get('ROC/AUC'), result_dict.get('f1')])
+	except Exception as e:
+		print(f"Could not write benchmark CSV: {e}")
+
 def backprop(epoch, model, data, dataO, optimizer, scheduler, training = True):
 	"""Dispatcher for model-specific backprop/eval routines.
 
@@ -399,7 +417,10 @@ def run_experiment():
 	preds = []
 	train_loader, test_loader, labels = load_dataset(args.dataset)
 	if args.model in ['MERLIN']:
-		eval(f'run_{args.model.lower()}(test_loader, labels, args.dataset)')
+		# Call MERLIN's runner and append its result to benchmarks CSV
+		res = run_merlin(test_loader, labels, args.dataset)
+		append_benchmark_row(args.model, args.dataset, res)
+		return res
 	model, optimizer, scheduler, epoch, accuracy_list = load_model(args.model, labels.shape[1])
 
 	## Prepare data
@@ -446,17 +467,7 @@ def run_experiment():
 	print(df)
 	pprint(result)
 	# Append benchmark to CSV: model, dataset, precision, recall, AUC, f1
-	try:
-		os.makedirs('results', exist_ok=True)
-		bench_file = os.path.join('results', 'benchmarks.csv')
-		write_header = (not os.path.exists(bench_file)) or os.path.getsize(bench_file) == 0
-		with open(bench_file, 'a', newline='') as csvfile:
-			writer = csv.writer(csvfile)
-			if write_header:
-				writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
-			writer.writerow([args.model, args.dataset, result.get('precision'), result.get('recall'), result.get('ROC/AUC'), result.get('f1')])
-	except Exception as e:
-		print(f"Could not write benchmark CSV: {e}")
+	append_benchmark_row(args.model, args.dataset, result)
 	return result
 
 
