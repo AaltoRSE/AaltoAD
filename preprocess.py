@@ -422,17 +422,16 @@ def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Preprocess datasets for anomaly detection')
-	parser.add_argument('dataset', nargs='?', help='Dataset type to preprocess (required)')
-	parser.add_argument('--csv', type=str, help='Path to CSV file to preprocess (optional, uses dataset type for processing)')
+	parser.add_argument('datasets', nargs='+', help='One or more dataset types to preprocess (e.g. SMAP SMD SWaT)')
+	parser.add_argument('--csv', type=str, help='Path to CSV file to preprocess (optional, only used for TOL)')
 	args = parser.parse_args()
-	
-	if not args.dataset:
-		print("Usage: python preprocess.py <dataset_type>")
-		print(f"       where <dataset_type> is one of {datasets}")
-		print()
-		print("Or:    python preprocess.py <dataset_type> --csv <path_to_csv>")
-		print("       where <path_to_csv> is path to a CSV file, processed using <dataset_type> logic")
-		sys.exit(1)
-	
-	# Call load_data with optional csv_path
-	load_data(args.dataset, csv_path=args.csv)
+
+	# Iterate over provided dataset names and process each
+	for ds in args.datasets:
+		if ds not in datasets:
+			print(f"Skipping unknown dataset '{ds}'. Supported: {datasets}")
+			continue
+		try:
+			load_data(ds, csv_path=args.csv)
+		except Exception as e:
+			print(f"Error processing {ds}: {e}")
