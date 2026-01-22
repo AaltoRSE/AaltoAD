@@ -98,4 +98,7 @@ BSD-3-Clause.
 Copyright (c) 2022, Shreshth Tuli.
 All rights reserved.
 
+Copyright (c) 2026, Jarno Rantaharju
+All rights reserved.
+
 See License file for more details.
