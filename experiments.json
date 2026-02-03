@@ -1,0 +1,95 @@
+{
+  "description": "Experiment configurations. Each experiment is numbered and fully self-contained. Change the index to force rerun. Results are saved with the index.",
+  "experiments": [
+    {
+      "index": 1,
+      "dataset": "TOL",
+      "model": "TranAD",
+      "lr": 0.0001,
+      "batch": 128,
+      "n_window": 10,
+      "notes": "TranAD baseline"
+    },
+    {
+      "index": 2,
+      "dataset": "TOL",
+      "model": "TranAD",
+      "lr": 0.0005,
+      "batch": 128,
+      "n_window": 10,
+      "notes": "TranAD higher LR"
+    },
+    {
+      "index": 3,
+      "dataset": "TOL",
+      "model": "TranAD",
+      "lr": 0.001,
+      "batch": 64,
+      "n_window": 10,
+      "notes": "TranAD smaller batch"
+    },
+    {
+      "index": 4,
+      "dataset": "TOL",
+      "model": "GDN",
+      "lr": 0.0001,
+      "n_hidden": 16,
+      "n_window": 5,
+      "notes": "GDN baseline"
+    },
+    {
+      "index": 5,
+      "dataset": "TOL",
+      "model": "GDN",
+      "lr": 0.0005,
+      "n_hidden": 16,
+      "n_window": 5,
+      "notes": "GDN higher LR"
+    },
+    {
+      "index": 6,
+      "dataset": "TOL",
+      "model": "LSTM_AD",
+      "lr": 0.002,
+      "notes": "LSTM_AD baseline"
+    },
+    {
+      "index": 7,
+      "dataset": "TOL",
+      "model": "DAGMM",
+      "lr": 0.0001,
+      "beta": 0.01,
+      "n_hidden": 16,
+      "n_latent": 8,
+      "n_window": 5,
+      "notes": "DAGMM baseline"
+    },
+    {
+      "index": 8,
+      "dataset": "TOL",
+      "model": "OmniAnomaly",
+      "lr": 0.002,
+      "beta": 0.01,
+      "n_hidden": 32,
+      "n_latent": 8,
+      "notes": "OmniAnomaly baseline"
+    },
+    {
+      "index": 9,
+      "dataset": "TOL",
+      "model": "USAD",
+      "lr": 0.0001,
+      "n_hidden": 16,
+      "n_latent": 5,
+      "n_window": 5,
+      "notes": "USAD baseline"
+    },
+    {
+      "index": 10,
+      "dataset": "TOL",
+      "model": "MSCRED",
+      "lr": 0.0001,
+      "notes": "MSCRED baseline"
+    }
+  ]
+}

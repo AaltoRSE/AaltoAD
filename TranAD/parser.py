@@ -1,18 +1,38 @@
 import argparse
 
-parser = argparse.ArgumentParser(description='Time-Series Anomaly Detection')
+parser = argparse.ArgumentParser(
+	description='Time-Series Anomaly Detection - Unified Runner',
+	formatter_class=argparse.RawDescriptionHelpFormatter,
+	epilog="""
+Examples:
+  # Single run with command-line arguments
+  python main.py --model TranAD --dataset TOL
+  
+  # Run all models or datasets
+  python main.py --model ALL --dataset TOL
+  
+  # Run experiment from file by index
+  python main.py --experiment 5
+  python main.py --experiment 5 --experiment-file experiments_TOL.json
+  
+  # List experiments in file
+  python main.py --experiment-file experiments_TOL.json --list
+	"""
+)
+
+# Single run arguments
 parser.add_argument('--dataset', 
 					metavar='-d', 
 					type=str, 
 					required=False,
 					default='synthetic',
-                    help="dataset from ['synthetic', 'SMD']")
+                    help="Dataset name (or 'ALL' for all datasets)")
 parser.add_argument('--model', 
 					metavar='-m', 
 					type=str, 
 					required=False,
 					default='LSTM_Multivariate',
-                    help="model name")
+                    help="Model name (or 'ALL' for all models)")
 parser.add_argument('--test', 
 					action='store_true', 
 					help="test the model")
@@ -22,6 +42,30 @@ parser.add_argument('--retrain',
 parser.add_argument('--less', 
 					action='store_true', 
 					help="train using less data")
+parser.add_argument('--experiment-index',
+					type=int,
+					default=None,
+					help="experiment index for tracking/caching")
+parser.add_argument('--hyperparams',
+					type=str,
+					default=None,
+					help="JSON string or file with hyperparameters to apply")
+
+# Experiment file arguments
+parser.add_argument('--experiment', 
+					type=int, 
+					default=None,
+					help="Run specific experiment by index from experiment file")
+parser.add_argument('--experiment-file', 
+					type=str, 
+					default='experiments.json',
+					help="Path to experiment configuration JSON file (default: experiments.json)")
+parser.add_argument('--list', 
+					action='store_true',
+					help="List experiments in experiment file")
+parser.add_argument('--status', 
+					action='store_true',
+					help="Show status of experiments in file")
 
 def parse_arguments():
 	"""Parse command-line arguments and return the args object."""
