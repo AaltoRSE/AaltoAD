@@ -25,7 +25,8 @@ from TranAD import constants
 from TranAD import plotting
 from TranAD import pot
 from TranAD import merlin
-import TranAD.utils as util
+from TranAD import diagnosis
+from TranAD import utils
 
 
 def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str):
@@ -81,16 +82,16 @@ def load_model(modelname: str, dims: int, dataset_name: str, model_name_full: st
 	
 	# Load and apply hyperparameters
 	# Priority: command-line args > config file > model defaults
-	hyperparams = util.load_hyperparameters(dataset_name, modelname)
-	cmd_hyperparams = util.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
+	hyperparams = utils.load_hyperparameters(dataset_name, modelname)
+	cmd_hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
 	hyperparams.update(cmd_hyperparams)  # Command-line overrides config
-	applied_hyperparams = util.apply_hyperparameters(model, hyperparams)
+	applied_hyperparams = utils.apply_hyperparameters(model, hyperparams)
 	
 	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
 	fname = f'checkpoints/{model_name_full}/model.ckpt'
 	if os.path.exists(fname) and (not retrain or test):
-		print(f"{color.GREEN}Loading pre-trained model: {model.name}{color.ENDC}")
+		print(f"{utils.color.GREEN}Loading pre-trained model: {model.name}{utils.color.ENDC}")
 		try:
 			checkpoint = torch.load(fname, weights_only=False)
 		except TypeError:
@@ -101,7 +102,7 @@ def load_model(modelname: str, dims: int, dataset_name: str, model_name_full: st
 		epoch = checkpoint['epoch']
 		accuracy_list = checkpoint['accuracy_list']
 	else:
-		print(f"{color.GREEN}Creating new model: {model.name}{color.ENDC}")
+		print(f"{utils.color.GREEN}Creating new model: {model.name}{utils.color.ENDC}")
 		epoch = -1
 		accuracy_list = []
 	return model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams
@@ -409,7 +410,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		model_name_full = f'{model_name}_{dataset_name}'
 
 	preds = []
-	train_loader, test_loader, labels = util.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+	train_loader, test_loader, labels = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
 		res = merlin.run_merlin(test_loader, labels, dataset_name)
@@ -424,25 +425,25 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
 	trainO, testO = trainD, testD
 	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'MERLIN'] or 'TranAD' in model.name:
-		trainD, testD = util.convert_to_windows(trainD, model, model_name), util.convert_to_windows(testD, model, model_name)
+		trainD, testD = utils.convert_to_windows(trainD, model, model_name), utils.convert_to_windows(testD, model, model_name)
 
 	### Training phase
 	if not test:
-		print(f'{color.HEADER}Training {model_name} on {dataset_name}{color.ENDC}')
+		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
 		num_epochs = 5
 		e = epoch + 1
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
 			lossT, lr = backprop(e, model, trainD, trainO, optimizer, scheduler)
 			accuracy_list.append((lossT, lr))
-		print(color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+' s'+color.ENDC)
+		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name)
-		plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
+		utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
 
 	### Testing phase
 	torch.zero_grad = True
 	model.eval()
-	print(f'{color.HEADER}Testing {model_name} on {dataset_name}{color.ENDC}')
+	print(f'{utils.color.HEADER}Testing {model_name} on {utils.color.ENDC}')
 	loss, y_pred = backprop(0, model, testD, testO, optimizer, scheduler, training=False)
 
 	### Plot curves
@@ -463,11 +464,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
 	result, _ = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
-	result.update(hit_att(loss, labels))
-	result.update(ndcg(loss, labels))
+	result.update(diagnosis.hit_att(loss, labels))
+	result.update(diagnosis.ndcg(loss, labels))
 	
 	# Add metadata to results
-	result['git_hash'] = util.get_git_hash()
+	result['git_hash'] = utils.get_git_hash()
 	result['model'] = model_name
 	result['dataset'] = dataset_name
 	result['applied_hyperparameters'] = applied_hyperparams

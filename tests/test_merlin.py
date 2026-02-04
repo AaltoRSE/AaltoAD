@@ -14,8 +14,8 @@ def test_dist_and_getsub():
 
 def test_check_returns_labels_and_matrix(monkeypatch):
     # make merlin module's constants deterministic for this test
-    monkeypatch.setattr(merlin_mod, 'cvp', 3)
-    monkeypatch.setattr(merlin_mod, 'percentile_merlin', 50)
+    monkeypatch.setattr(const, 'cvp', 3)
+    monkeypatch.setattr(const, 'percentile_merlin', 50)
 
     # simple 2-column time series with one column noisy
     t = np.array([[0.0, 0.0],

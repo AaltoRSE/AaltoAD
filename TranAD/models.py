@@ -1,15 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 from torch_geometric.data import Data
 from torch_geometric.utils import add_self_loops
 from torch_geometric.nn import GATConv
 from torch.nn import TransformerEncoder
 from torch.nn import TransformerDecoder
 from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
-from TranAD.dlutils import *
-from TranAD.constants import *
+import numpy as np
+import math
+from TranAD import dlutils
+from TranAD import constants
 torch.manual_seed(1)
 
 ## Separate LSTM for each variable
@@ -221,9 +222,9 @@ class MSCRED(nn.Module):
 		self.n_feats = feats
 		self.n_window = feats
 		self.encoder = nn.ModuleList([
-			ConvLSTM(1, 32, (3, 3), 1, True, True, False),
-			ConvLSTM(32, 64, (3, 3), 1, True, True, False),
-			ConvLSTM(64, 128, (3, 3), 1, True, True, False),
+			dlutils.ConvLSTM(1, 32, (3, 3), 1, True, True, False),
+			dlutils.ConvLSTM(32, 64, (3, 3), 1, True, True, False),
+			dlutils.ConvLSTM(64, 128, (3, 3), 1, True, True, False),
 			]
 		)
 		self.decoder = nn.Sequential(
@@ -386,12 +387,12 @@ class TranAD_Basic(nn.Module):
 	def __init__(self, feats):
 		super(TranAD_Basic, self).__init__()
 		self.name = 'TranAD_Basic'
-		self.lr = lr
+		self.lr = constants.lr
 		self.batch = 128
 		self.n_feats = feats
 		self.n_window = 10
 		self.n = self.n_feats * self.n_window
-		self.pos_encoder = PositionalEncoding(feats, 0.1, self.n_window)
+		self.pos_encoder = dlutils.PositionalEncoding(feats, 0.1, self.n_window)
 		encoder_layers = TransformerEncoderLayer(d_model=feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
 		decoder_layers = TransformerDecoderLayer(d_model=feats, nhead=feats, dim_feedforward=16, dropout=0.1)
@@ -414,7 +415,7 @@ class TranAD_Transformer(nn.Module):
 	def __init__(self, feats):
 		super(TranAD_Transformer, self).__init__()
 		self.name = 'TranAD_Transformer'
-		self.lr = lr
+		self.lr = constants.lr
 		self.batch = 128
 		self.n_feats = feats
 		self.n_hidden = 8
@@ -459,12 +460,12 @@ class TranAD_Adversarial(nn.Module):
 	def __init__(self, feats):
 		super(TranAD_Adversarial, self).__init__()
 		self.name = 'TranAD_Adversarial'
-		self.lr = lr
+		self.lr = constants.lr
 		self.batch = 128
 		self.n_feats = feats
 		self.n_window = 10
 		self.n = self.n_feats * self.n_window
-		self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
+		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
 		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
 		decoder_layers = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
@@ -499,12 +500,12 @@ class TranAD_SelfConditioning(nn.Module):
 	def __init__(self, feats):
 		super(TranAD_SelfConditioning, self).__init__()
 		self.name = 'TranAD_SelfConditioning'
-		self.lr = lr
+		self.lr = constants.lr
 		self.batch = 128
 		self.n_feats = feats
 		self.n_window = 10
 		self.n = self.n_feats * self.n_window
-		self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
+		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
 		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
 		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
@@ -539,12 +540,12 @@ class TranAD(nn.Module):
 	def __init__(self, feats):
 		super(TranAD, self).__init__()
 		self.name = 'TranAD'
-		self.lr = lr
+		self.lr = constants.lr
 		self.batch = 128
 		self.n_feats = feats
 		self.n_window = 10
 		self.n = self.n_feats * self.n_window
-		self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
+		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
 		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
 		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)

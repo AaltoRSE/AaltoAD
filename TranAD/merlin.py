@@ -7,10 +7,10 @@
 import numpy as np
 from pprint import pprint
 from time import time
-from TranAD.utils import *
-from TranAD.constants import *
-from TranAD.diagnosis import *
-from TranAD.pot import *
+from TranAD import utils
+from TranAD import constants
+from TranAD import diagnosis
+from TranAD import pot
 maxint = 200000
 
 # z-normalized euclidean distance
@@ -46,6 +46,8 @@ def csa(t, L, r):
 def check(t, pred):
 	labels = [];
 	for i in range(t.shape[1]):
+		cvp = constants.cvp
+		percentile_merlin = constants.percentile_merlin
 		new = np.convolve(t[:, i], np.ones(cvp)/cvp, mode='same')
 		scores = np.abs(new - t[:,i])
 		labels.append((scores > np.percentile(scores, percentile_merlin)) + 0)
@@ -117,7 +119,7 @@ def merlin(t, minL, maxL):
 	return DFinal[dmin], DFinal
 
 def get_result(pred, labels):
-	p_t = calc_point2point(pred, labels)
+	p_t = pot.calc_point2point(pred, labels)
 	result = {
         'f1': p_t[0],
         'precision': p_t[1],
@@ -143,10 +145,10 @@ def run_merlin(test, labels, dset):
 	print(t.shape, pred.shape, labels.shape)
 	result = get_result(pred, labels)
 	if dset in ['SMD', 'MSDS']:
-		result.update(hit_att(predAll, labelsAll))
-		result.update(ndcg(predAll, labelsAll))
+		result.update(diagnosis.hit_att(predAll, labelsAll))
+		result.update(diagnosis.ndcg(predAll, labelsAll))
 	pprint(result)
-	print(color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+' s'+color.ENDC)
+	print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+' s'+utils.color.ENDC)
 	return result
 
 if __name__ == '__main__':

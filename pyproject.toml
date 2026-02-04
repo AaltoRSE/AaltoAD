@@ -15,7 +15,8 @@ dependencies = [
     "scikit-learn",
     "openpyxl",
     "pytest",
-    "torch"
+    "torch",
+    "scienceplots",
 ]
 
 [tool.setuptools]
