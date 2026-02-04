@@ -504,7 +504,7 @@ def run_all(models_list=None, datasets_list=None, args_obj=None):
 	"""
 	# discover datasets from processed output folder if not provided
 	if datasets_list is None:
-		folder = os.path.join(TranAD.folderconstants.output_folder)
+		folder = os.path.join(TranAD.constants.output_folder)
 		if not os.path.exists(folder):
 			raise Exception(f'Processed data folder not found: {folder}')
 		datasets_list = sorted([d for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))])

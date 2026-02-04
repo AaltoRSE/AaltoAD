@@ -1,8 +1,8 @@
 import numpy as np
 
 from TranAD.spot import SPOT
-from TranAD.constants import *
-from sklearn.metrics import *
+from TranAD import constants
+from sklearn import metrics
 
 def calc_point2point(predict, actual):
     """
@@ -19,7 +19,7 @@ def calc_point2point(predict, actual):
     recall = TP / (TP + FN + 0.00001)
     f1 = 2 * precision * recall / (precision + recall + 0.00001)
     try:
-        roc_auc = roc_auc_score(actual, predict)
+        roc_auc = metrics.roc_auc_score(actual, predict)
     except:
         roc_auc = 0
     return f1, precision, recall, TP, TN, FP, FN, roc_auc
@@ -131,7 +131,7 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
     Returns:
         dict: pot result dict
     """
-    lms = lm[0]
+    lms = constants.lm[0]
     while True:
         try:
             s = SPOT(q)  # SPOT object
@@ -142,9 +142,9 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
     ret = s.run(dynamic=False)  # run
     # print(len(ret['alarms']))
     # print(len(ret['thresholds']))
-    pot_th = np.mean(ret['thresholds']) * lm[1]
-    # pot_th = np.percentile(score, 100 * lm[0])
-    # np.percentile(score, 100 * lm[0])
+    pot_th = np.mean(ret['thresholds']) * constants.lm[1]
+    # pot_th = np.percentile(score, 100 * constants.lm[0])
+    # np.percentile(score, 100 * constants.lm[0])
     pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)
     # DEBUG - np.save(f'{debug}.npy', np.array(pred))
     # DEBUG - print(np.argwhere(np.array(pred)))

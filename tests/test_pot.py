@@ -1,5 +1,14 @@
+import pytest
 import numpy as np
 import TranAD.pot as pot
+import TranAD.constants
+
+
+@pytest.fixture(autouse=True)
+def initialize_constants():
+    # Initialize constants for testing
+    TranAD.constants.initialize(dataset='synthetic', model='TranAD')
+    yield
 
 
 def test_adjust_predicts_basic():

@@ -1,4 +1,8 @@
-from TranAD.folderconstants import *
+# Data folders
+DEFAULT_OUTPUT_FOLDER = 'processed'
+DEFAULT_DATA_FOLDER = 'data'
+output_folder = DEFAULT_OUTPUT_FOLDER
+data_folder = DEFAULT_DATA_FOLDER
 
 # These dictionaries define dataset-specific configuration values
 _LM_D = {
