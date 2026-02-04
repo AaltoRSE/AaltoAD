@@ -1,10 +1,9 @@
 import os
-import sys
 import pandas as pd
 import numpy as np
 import json
 import argparse
-from TranAD.folderconstants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
+from TranAD.constants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
 
 
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL']
