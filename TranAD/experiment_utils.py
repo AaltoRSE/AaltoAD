@@ -1,9 +1,5 @@
 """
 Utility functions for running experiments.
-
-This module contains functions that are needed by both main.py and external
-scripts like run_experiments.py. These functions should NOT depend on the
-global args object from parser.
 """
 
 import os
