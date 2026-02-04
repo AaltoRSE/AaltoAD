@@ -2,8 +2,6 @@
 Experiment running functions.
 
 This module contains functions for running individual and multiple experiments.
-These functions can be imported and called programmatically without requiring
-command-line argument parsing.
 """
 
 import os
@@ -11,7 +9,7 @@ import pandas as pd
 import csv
 import json
 import importlib
-from typing import Dict, Tuple
+from typing import Dict
 from time import time
 from pprint import pprint
 
@@ -26,13 +24,8 @@ from TranAD import models
 from TranAD import constants
 from TranAD import plotting
 from TranAD import pot
-from TranAD.utils import *
-from TranAD.diagnosis import *
-from TranAD.merlin import *
-from TranAD.experiment_utils import (
-	get_git_hash, load_hyperparameters, apply_hyperparameters,
-	load_hyperparams_from_string, convert_to_windows, load_dataset
-)
+from TranAD import merlin
+import TranAD.utils as util
 
 
 def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str):
@@ -88,10 +81,10 @@ def load_model(modelname: str, dims: int, dataset_name: str, model_name_full: st
 	
 	# Load and apply hyperparameters
 	# Priority: command-line args > config file > model defaults
-	hyperparams = load_hyperparameters(dataset_name, modelname)
-	cmd_hyperparams = load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
+	hyperparams = util.load_hyperparameters(dataset_name, modelname)
+	cmd_hyperparams = util.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
 	hyperparams.update(cmd_hyperparams)  # Command-line overrides config
-	applied_hyperparams = apply_hyperparameters(model, hyperparams)
+	applied_hyperparams = util.apply_hyperparameters(model, hyperparams)
 	
 	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
@@ -416,10 +409,10 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		model_name_full = f'{model_name}_{dataset_name}'
 
 	preds = []
-	train_loader, test_loader, labels = load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+	train_loader, test_loader, labels = util.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
-		res = run_merlin(test_loader, labels, dataset_name)
+		res = merlin.run_merlin(test_loader, labels, dataset_name)
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
 	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams = load_model(
@@ -431,7 +424,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
 	trainO, testO = trainD, testD
 	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'MERLIN'] or 'TranAD' in model.name:
-		trainD, testD = convert_to_windows(trainD, model, model_name), convert_to_windows(testD, model, model_name)
+		trainD, testD = util.convert_to_windows(trainD, model, model_name), util.convert_to_windows(testD, model, model_name)
 
 	### Training phase
 	if not test:
@@ -474,7 +467,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	result.update(ndcg(loss, labels))
 	
 	# Add metadata to results
-	result['git_hash'] = get_git_hash()
+	result['git_hash'] = util.get_git_hash()
 	result['model'] = model_name
 	result['dataset'] = dataset_name
 	result['applied_hyperparameters'] = applied_hyperparams
