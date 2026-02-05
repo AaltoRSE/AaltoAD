@@ -9,7 +9,7 @@ import pandas as pd
 import csv
 import json
 import importlib
-from typing import Dict
+from typing import Dict, Tuple
 from time import time
 from pprint import pprint
 
@@ -29,7 +29,7 @@ from TranAD import diagnosis
 from TranAD import utils
 
 
-def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str):
+def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str, root_path: str = ''):
 	"""Save model checkpoint including state dicts and training metadata.
 	
 	Args:
@@ -44,7 +44,7 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: st
 	Returns:
 		None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/model.ckpt
 	"""
-	folder = f'checkpoints/{model_name}_{dataset_name}/'
+	folder = f'{root_path}checkpoints/{model_name}_{dataset_name}/'
 	os.makedirs(folder, exist_ok=True)
 	file_path = f'{folder}/model.ckpt'
 	torch.save({
@@ -55,18 +55,25 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: st
         'accuracy_list': accuracy_list}, file_path)
 
 
-def load_model(modelname: str, dims: int, dataset_name: str, model_name_full: str, 
-               hyperparams_str: str = None, retrain: bool = False, test: bool = False):
+def load_model(
+		modelname: str,
+		dims: int,
+		dataset_name: str,
+        hyperparams_str: str = None,
+		retrain: bool = False,
+		test: bool = False,
+		root_path: str = ''
+	):
 	"""Load or create a model with optimizer and scheduler, resuming from checkpoint if available.
 	
 	Args:
 		modelname (str): Name of the model class to instantiate (e.g., 'TranAD', 'USAD', 'DAGMM').
 		dims (int): Number of features/dimensions in the input data.
 		dataset_name (str): Dataset name for loading hyperparameters and checkpoint path.
-		model_name_full (str): Full model name including variant (e.g., 'TranAD_MBA').
 		hyperparams_str (str): JSON string or file path with hyperparameters to apply.
 		retrain (bool): Force retrain (don't load checkpoint).
 		test (bool): Test mode flag.
+		root_path (str): Root path for loading checkpoints.
 	
 	Returns:
 		tuple: A tuple containing:
@@ -80,16 +87,12 @@ def load_model(modelname: str, dims: int, dataset_name: str, model_name_full: st
 	model_class = getattr(models, modelname)
 	model = model_class(dims).double()
 	
-	# Load and apply hyperparameters
-	# Priority: command-line args > config file > model defaults
-	hyperparams = utils.load_hyperparameters(dataset_name, modelname)
-	cmd_hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
-	hyperparams.update(cmd_hyperparams)  # Command-line overrides config
+	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
 	applied_hyperparams = utils.apply_hyperparameters(model, hyperparams)
 	
 	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
-	fname = f'checkpoints/{model_name_full}/model.ckpt'
+	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/model.ckpt'
 	if os.path.exists(fname) and (not retrain or test):
 		print(f"{utils.color.GREEN}Loading pre-trained model: {model.name}{utils.color.ENDC}")
 		try:

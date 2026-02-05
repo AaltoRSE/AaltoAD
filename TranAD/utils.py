@@ -60,36 +60,6 @@ def get_git_hash():
 		return 'unknown'
 
 
-def load_hyperparameters(dataset: str, model_name: str, config_path: str = 'hyperparameters.json') -> Dict:
-	"""Load hyperparameters from config file.
-	
-	Args:
-		dataset (str): Dataset name
-		model_name (str): Model name
-		config_path (str): Path to hyperparameter config file
-		
-	Returns:
-		dict: Hyperparameters for the model/dataset combination
-	"""
-	try:
-		if not os.path.isabs(config_path):
-			config_path = os.path.join(os.path.dirname(__file__), '..', config_path)
-		
-		with open(config_path, 'r') as f:
-			config = json.load(f)
-		
-		# Check dataset-specific sweep first, then fall back to defaults
-		if 'sweeps' in config and dataset in config['sweeps'] and model_name in config['sweeps'][dataset]:
-			return config['sweeps'][dataset][model_name]
-		elif 'defaults' in config and model_name in config['defaults']:
-			return config['defaults'][model_name]
-		else:
-			return {}
-	except Exception as e:
-		print(f'Warning: Could not load hyperparameters from {config_path}: {e}')
-		return {}
-
-
 def apply_hyperparameters(model: torch.nn.Module, hyperparams: Dict) -> Dict:
 	"""Apply hyperparameters to model instance.
 	
