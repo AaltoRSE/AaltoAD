@@ -136,26 +136,26 @@ def backprop(epoch, model, data, dataO, optimizer, scheduler, training=True):
 	"""
 	feats = dataO.shape[1]
 	if 'DAGMM' in model.name:
-		return _backprop_dagmm(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_dagmm(epoch, model, data, optimizer, scheduler, training, feats)
 	if 'Attention' in model.name:
-		return _backprop_attention(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_attention(epoch, model, data, optimizer, scheduler, training, feats)
 	if 'OmniAnomaly' in model.name:
-		return _backprop_omni(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_omni(epoch, model, data, optimizer, scheduler, training, feats)
 	if 'USAD' in model.name:
-		return _backprop_usad(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_usad(epoch, model, data, optimizer, scheduler, training, feats)
 	if model.name in ['GDN', 'MTAD_GAT', 'MSCRED', 'CAE_M']:
-		return _backprop_simple(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_simple(epoch, model, data, optimizer, scheduler, training, feats)
 	if 'GAN' in model.name:
-		return _backprop_gan(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_gan(epoch, model, data, optimizer, scheduler, training, feats)
 	if 'TranAD' in model.name:
-		return _backprop_tranad(epoch, model, data, dataO, optimizer, scheduler, training, feats)
-	return _backprop_default(epoch, model, data, dataO, optimizer, scheduler, training, feats)
+		return _backprop_tranad(epoch, model, data, optimizer, scheduler, training, feats)
+	return _backprop_default(epoch, model, data, optimizer, scheduler, training, feats)
 
 
-def _backprop_dagmm(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_dagmm(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
-	compute = models.ComputeLoss(model, 0.1, 0.005, 'cpu', model.n_gmm)
-	n = epoch + 1
+	#compute = models.ComputeLoss(model, 0.1, 0.005, 'cpu', model.n_gmm)
+	#n = epoch + 1
 	l1s = []
 	l2s = []
 	if training:
@@ -182,9 +182,9 @@ def _backprop_dagmm(epoch, model, data, dataO, optimizer, scheduler, training, f
 		return loss.detach().numpy(), y_pred.detach().numpy()
 
 
-def _backprop_attention(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_attention(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
-	n = epoch + 1
+	#n = epoch + 1
 	l1s = []
 	if training:
 		for d in data:
@@ -209,7 +209,7 @@ def _backprop_attention(epoch, model, data, dataO, optimizer, scheduler, trainin
 		return loss.detach().numpy(), y_pred.detach().numpy()
 
 
-def _backprop_omni(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_omni(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
 	if training:
 		mses, klds = [], []
@@ -236,7 +236,7 @@ def _backprop_omni(epoch, model, data, dataO, optimizer, scheduler, training, fe
 		return MSE.detach().numpy(), y_pred.detach().numpy()
 
 
-def _backprop_usad(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_usad(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
 	n = epoch + 1
 	l1s, l2s = [], []
@@ -268,7 +268,7 @@ def _backprop_usad(epoch, model, data, dataO, optimizer, scheduler, training, fe
 		return loss.detach().numpy(), y_pred.detach().numpy()
 
 
-def _backprop_simple(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_simple(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
 	n = epoch + 1
 	l1s = []
@@ -300,7 +300,7 @@ def _backprop_simple(epoch, model, data, dataO, optimizer, scheduler, training, 
 		return loss.detach().numpy(), y_pred.detach().numpy()
 
 
-def _backprop_gan(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_gan(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
 	bcel = nn.BCELoss(reduction='mean')
 	msel = nn.MSELoss(reduction='mean')
@@ -340,7 +340,7 @@ def _backprop_gan(epoch, model, data, dataO, optimizer, scheduler, training, fea
 		return loss.detach().numpy(), y_pred.detach().numpy()
 
 
-def _backprop_tranad(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_tranad(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='none')
 	data_x = torch.DoubleTensor(data)
 	dataset = TensorDataset(data_x, data_x)
@@ -376,7 +376,7 @@ def _backprop_tranad(epoch, model, data, dataO, optimizer, scheduler, training, 
 		return loss.detach().numpy(), z.detach().numpy()[0]
 
 
-def _backprop_default(epoch, model, data, dataO, optimizer, scheduler, training, feats):
+def _backprop_default(epoch, model, data, optimizer, scheduler, training, feats):
 	l = nn.MSELoss(reduction='mean' if training else 'none')
 	y_pred = model(data)
 	loss = l(y_pred, data)
