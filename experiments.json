@@ -4,92 +4,161 @@
     {
       "index": 1,
       "dataset": "TOL",
-      "model": "TranAD",
-      "lr": 0.0001,
-      "batch": 128,
-      "n_window": 10,
-      "notes": "TranAD baseline"
+      "model": "LSTM_Univariate",
+      "lr": [0.001, 0.002, 0.003],
+      "batch": [128, 64],
+      "n_hidden": [1,4,8,16],
+      "n_layers": [1,2,4],
+      "notes": "LSTM_Univariate"
     },
     {
       "index": 2,
       "dataset": "TOL",
-      "model": "TranAD",
-      "lr": 0.0005,
-      "batch": 128,
-      "n_window": 10,
+      "model": "Attention",
+      "lr": [0.00005, 0.0001, 0.0002],
+      "batch": [64,128],
+      "n_window": [10,20],
       "notes": "TranAD higher LR"
     },
     {
       "index": 3,
       "dataset": "TOL",
-      "model": "TranAD",
-      "lr": 0.001,
-      "batch": 64,
-      "n_window": 10,
-      "notes": "TranAD smaller batch"
+      "model": "LSTM_AD",
+      "lr": [0.001],
+      "batch": [64,128],
+      "n_window": [5,10],
+      "n_layers": [1,2],
+      "n_hidden": [16,32],
+      "notes": "LSTM_AD"
     },
     {
       "index": 4,
       "dataset": "TOL",
-      "model": "GDN",
-      "lr": 0.0001,
-      "n_hidden": 16,
-      "n_window": 5,
-      "notes": "GDN baseline"
+      "model": "DAGMM",
+      "lambda_energy": [1, 0.1, 0.01],
+      "lambda_cov": [0.05, 0.005, 0.0005],
+      "n_latent": [8, 16],
+      "n_hidden": [16, 32],
+      "n_window": [5, 10],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "DAGMM"
     },
     {
       "index": 5,
       "dataset": "TOL",
-      "model": "GDN",
-      "lr": 0.0005,
-      "n_hidden": 16,
-      "n_window": 5,
-      "notes": "GDN higher LR"
+      "model": "OmniAnomaly",
+      "lr": [0.0002, 0.0005, 0.001],
+      "beta": [0.0002, 0.01, 0.1],
+      "n_hidden": [16, 32],
+      "n_latent": [8, 16],
+      "n_window": [5, 10],
+      "notes": "OmniAnomaly"
     },
     {
       "index": 6,
       "dataset": "TOL",
-      "model": "LSTM_AD",
-      "lr": 0.002,
-      "notes": "LSTM_AD baseline"
+      "model": "USAD",
+      "lr": [0.00005, 0.0001, 0.0002],
+      "n_hidden": [16, 32],
+      "n_latent": [5, 8],
+      "n_window": [5, 10],
+      "notes": "USAD"
     },
     {
       "index": 7,
       "dataset": "TOL",
-      "model": "DAGMM",
-      "lr": 0.0001,
-      "beta": 0.01,
-      "n_hidden": 16,
-      "n_latent": 8,
-      "n_window": 5,
-      "notes": "DAGMM baseline"
+      "model": "MSCRED",
+      "lr": [0.00005, 0.0001, 0.0002],
+      "n_window": [5, 10, 0],
+      "notes": "MSCRED"
     },
     {
       "index": 8,
       "dataset": "TOL",
-      "model": "OmniAnomaly",
-      "lr": 0.002,
-      "beta": 0.01,
-      "n_hidden": 32,
-      "n_latent": 8,
-      "notes": "OmniAnomaly baseline"
+      "model": "CAE_M",
+      "lr": [0.00005, 0.0001, 0.0002],
+      "n_window": [5, 10, 0],
+      "notes": "CAE_M"
     },
     {
       "index": 9,
       "dataset": "TOL",
-      "model": "USAD",
-      "lr": 0.0001,
-      "n_hidden": 16,
-      "n_latent": 5,
-      "n_window": 5,
-      "notes": "USAD baseline"
+      "model": "MTAD_GAT",
+      "lr": [0.00005, 0.0001, 0.0002],
+      "n_hidden": [16, 32, 64, 0],
+      "notes": "MTAD_GAT"
     },
     {
       "index": 10,
       "dataset": "TOL",
-      "model": "MSCRED",
-      "lr": 0.0001,
-      "notes": "MSCRED baseline"
+      "model": "GDN",
+      "lr": [0.00005, 0.0001, 0.0002],
+      "n_window": [5, 10],
+      "n_hidden": [16, 32],
+      "notes": "GDN"
+    },
+    {
+      "index": 11,
+      "dataset": "TOL",
+      "model": "MAD_GAN",
+      "n_window": [5, 10],
+      "n_hidden": [16, 32],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "MAD_GAN"
+    },
+    {
+      "index": 12,
+      "dataset": "TOL",
+      "model": "TranAD_Basic",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_Basic"
+    },
+    {
+      "index": 13,
+      "dataset": "TOL",
+      "model": "TranAD_Transformer",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "n_hidden": [16, 32],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_Transformer"
+    },
+    {
+      "index": 14,
+      "dataset": "TOL",
+      "model": "TranAD_Adversarial",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_Adversarial"
+    },
+    {
+      "index": 15,
+      "dataset": "TOL",
+      "model": "TranAD_SelfConditioning",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_SelfConditioning"
+    },
+    { 
+      "index": 16,
+      "dataset": "TOL",
+      "model": "TranAD",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "lr": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD"
     }
   ]
 }

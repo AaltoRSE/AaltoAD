@@ -274,13 +274,13 @@ class CAE_M(nn.Module):
 
 ## MTAD_GAT Model (ICDM 20)
 class MTAD_GAT(nn.Module):
-	def __init__(self, feats, n_window=None, learning_rate=0.0001):
+	def __init__(self, feats, n_window=None, n_hidden=None, learning_rate=0.0001):
 		super(MTAD_GAT, self).__init__()
 		self.name = 'MTAD_GAT'
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = feats if n_window is None else n_window
-		self.n_hidden = feats * feats
+		self.n_hidden = feats * feats if n_hidden is None else n_hidden
 		edge_index = torch.tensor([list(range(1, feats+1)), [0]*feats], dtype=torch.long)
 		edge_index, _ = add_self_loops(edge_index)
 		self.g = Data(edge_index=edge_index)
@@ -382,18 +382,19 @@ class MAD_GAN(nn.Module):
 
 # Proposed Model (VLDB 22)
 class TranAD_Basic(nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size=128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD_Basic, self).__init__()
 		self.name = 'TranAD_Basic'
 		self.lr = constants.lr if learning_rate is None else learning_rate
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
+		self.nheads = nheads if nheads is not None else feats
 		self.n = self.n_feats * self.n_window
 		self.pos_encoder = dlutils.PositionalEncoding(feats, 0.1, self.n_window)
-		encoder_layers = TransformerEncoderLayer(d_model=feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		encoder_layers = TransformerEncoderLayer(d_model=feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-		decoder_layers = TransformerDecoderLayer(d_model=feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		decoder_layers = TransformerDecoderLayer(d_model=feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_decoder = TransformerDecoder(decoder_layers, 1)
 		self.fcn = nn.Sigmoid()
 		self.pos_encoder = self.pos_encoder.double()
@@ -455,7 +456,7 @@ class TranAD_Transformer(nn.Module):
 
 # Proposed Model + Self Conditioning + MAML (VLDB 22)
 class TranAD_Adversarial(nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD_Adversarial, self).__init__()
 		self.name = 'TranAD_Adversarial'
 		self.lr = constants.lr if learning_rate is None else learning_rate
@@ -463,10 +464,11 @@ class TranAD_Adversarial(nn.Module):
 		self.n_feats = feats
 		self.n_window = n_window
 		self.n = self.n_feats * self.n_window
+		self.nheads = nheads if nheads is not None else feats
 		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
-		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-		decoder_layers = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		decoder_layers = TransformerDecoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_decoder = TransformerDecoder(decoder_layers, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 		self.pos_encoder = self.pos_encoder.double()
@@ -495,7 +497,7 @@ class TranAD_Adversarial(nn.Module):
 
 # Proposed Model + Adversarial + MAML (VLDB 22)
 class TranAD_SelfConditioning(nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD_SelfConditioning, self).__init__()
 		self.name = 'TranAD_SelfConditioning'
 		self.lr = constants.lr if learning_rate is None else learning_rate
@@ -503,12 +505,13 @@ class TranAD_SelfConditioning(nn.Module):
 		self.n_feats = feats
 		self.n_window = n_window
 		self.n = self.n_feats * self.n_window
+		self.nheads = nheads if nheads is not None else feats
 		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
-		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_decoder1 = TransformerDecoder(decoder_layers1, 1)
-		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 		self.pos_encoder = self.pos_encoder.double()
@@ -535,7 +538,7 @@ class TranAD_SelfConditioning(nn.Module):
 
 # Proposed Model + Self Conditioning + Adversarial + MAML (VLDB 22)
 class TranAD(nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD, self).__init__()
 		self.name = 'TranAD'
 		self.lr = constants.lr if learning_rate is None else learning_rate
@@ -543,12 +546,13 @@ class TranAD(nn.Module):
 		self.n_feats = feats
 		self.n_window = n_window
 		self.n = self.n_feats * self.n_window
+		self.nheads = nheads if nheads is not None else feats
 		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
-		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_decoder1 = TransformerDecoder(decoder_layers1, 1)
-		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=dim_feedforward, dropout=dropout)
+		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=self.nheads, dim_feedforward=dim_feedforward, dropout=dropout)
 		self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 		self.pos_encoder = self.pos_encoder.double()
