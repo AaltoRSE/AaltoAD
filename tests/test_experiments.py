@@ -356,11 +356,11 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
     
-    # Run with experiment_index
-    result = run_experiment.run_experiment('TranAD', 'TOL', experiment_index=42, test=True)
+    # Run with experiment_id
+    result = run_experiment.run_experiment('TranAD', 'TOL', experiment_id=42, test=True)
     
-    # Verify experiment_index is in result
-    assert result['experiment_index'] == 42
+    # Verify experiment_id is in result
+    assert result['experiment_id'] == 42
     
     # Verify results file includes experiment index in filename
     results_file = tmp_path / 'results' / 'TOL' / 'TranAD_exp42_results.json'
