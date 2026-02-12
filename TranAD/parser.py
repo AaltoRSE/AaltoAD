@@ -15,8 +15,15 @@ Examples:
   python main.py --experiment 5
   python main.py --experiment 5 --experiment-file experiments_TOL.json
   
-  # List experiments in file
+  # List experiments and their sub-experiments
   python main.py --experiment-file experiments_TOL.json --list
+  
+  # Check status of experiments
+  python main.py --experiment-file experiments_TOL.json --status
+  
+  # Array job mode (for SLURM/PBS array jobs)
+  python main.py --array-index $SLURM_ARRAY_TASK_ID
+  sbatch --array=0-99 run_array.sh  # Runs 100 incomplete sub-experiments
 	"""
 )
 
@@ -53,13 +60,17 @@ parser.add_argument('--hyperparams',
 
 # Experiment file arguments
 parser.add_argument('--experiment', 
-					type=int, 
+					type=int,
 					default=None,
 					help="Run specific experiment by index from experiment file")
 parser.add_argument('--experiment-file', 
 					type=str, 
-					default='experiments.json',
+					default=None,
 					help="Path to experiment configuration JSON file (default: experiments.json)")
+parser.add_argument('--array-index',
+					type=int,
+					default=None,
+					help="Array job index for SLURM/PBS array jobs (maps to incomplete sub-experiments)")
 parser.add_argument('--list', 
 					action='store_true',
 					help="List experiments in experiment file")
