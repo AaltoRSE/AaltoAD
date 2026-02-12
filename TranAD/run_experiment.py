@@ -392,7 +392,7 @@ def _backprop_default(epoch, model, data, optimizer, scheduler, training, feats)
 
 
 def run_experiment(model_name: str, dataset_name: str, model_name_full: str = None,
-                   hyperparams_str: str = None, experiment_index: int = None,
+                   hyperparams_str: str = None, experiment_id: str = None,
                    less: bool = False, test: bool = False, retrain: bool = False) -> Dict:
 	"""Run a single experiment with specified parameters.
 
@@ -401,7 +401,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		dataset_name (str): Name of the dataset (e.g., 'TOL')
 		model_name_full (str): Full model name for checkpoints (e.g., 'TranAD_TOL'), defaults to f'{model_name}_{dataset_name}'
 		hyperparams_str (str): JSON string or file path with hyperparameters
-		experiment_index (int): Optional experiment index for tracking
+		experiment_id (str): Optional experiment identifier for tracking
 		less (bool): Whether to train using less data
 		test (bool): Test mode (skip training)
 		retrain (bool): Force retrain
@@ -420,7 +420,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
 	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams = load_model(
-		model_name, labels.shape[1], dataset_name, model_name_full,
+		model_name, labels.shape[1], dataset_name,
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
@@ -475,16 +475,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	result['model'] = model_name
 	result['dataset'] = dataset_name
 	result['applied_hyperparameters'] = applied_hyperparams
-	if experiment_index is not None:
-		result['experiment_index'] = experiment_index
+	if experiment_id is not None:
+		result['experiment_id'] = experiment_id
 	
 	# Save detailed results with metadata to JSON
 	results_dir = os.path.join('results', dataset_name)
 	os.makedirs(results_dir, exist_ok=True)
 	
-	# Include experiment index in filename if provided
-	if experiment_index is not None:
-		results_file = os.path.join(results_dir, f'{model_name}_exp{experiment_index}_results.json')
+	# Include experiment id in filename if provided
+	if experiment_id is not None:
+		results_file = os.path.join(results_dir, f'{model_name}_exp{experiment_id}_results.json')
 	else:
 		results_file = os.path.join(results_dir, f'{model_name}_results.json')
 	
