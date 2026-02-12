@@ -26,8 +26,8 @@ class LSTM_Univariate(nn.Module):
 		self.lstm = self.lstm.double()
 
 	def forward(self, x):
-		hidden = [(torch.rand(1, 1, self.n_hidden, dtype=torch.float64), 
-			torch.randn(1, 1, self.n_hidden, dtype=torch.float64)) for i in range(self.n_feats)]
+		hidden = [(torch.rand(self.n_layers, 1, self.n_hidden, dtype=torch.float64), 
+			torch.randn(self.n_layers, 1, self.n_hidden, dtype=torch.float64)) for i in range(self.n_feats)]
 		outputs = []
 		for i, g in enumerate(x):
 			multivariate_output = []
@@ -69,12 +69,12 @@ class LSTM_AD(nn.Module):
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
 		self.lstm = nn.LSTM(feats, self.n_hidden, n_layers)
-		self.fcn = nn.Sequential(nn.Linear(self.n_feats, self.n_feats), nn.Sigmoid())
+		self.fcn = nn.Sequential(nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid())
 		self.lstm = self.lstm.double()
 		self.fcn = self.fcn.double()
 
 	def forward(self, x):
-		hidden = (torch.rand(1, 1, self.n_hidden, dtype=torch.float64), torch.randn(1, 1, self.n_hidden, dtype=torch.float64))
+		hidden = (torch.rand(self.n_layers, 1, self.n_hidden, dtype=torch.float64), torch.randn(self.n_layers, 1, self.n_hidden, dtype=torch.float64))
 		outputs = []
 		for i, g in enumerate(x):
 			out, hidden = self.lstm(g.view(1, 1, -1), hidden)
