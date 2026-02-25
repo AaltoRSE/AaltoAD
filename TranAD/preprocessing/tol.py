@@ -61,14 +61,23 @@ def event_count_per_ip(df, timestamp_col, ip_col, start=None, end=None):
 	if ip_col not in df.columns:
 		raise KeyError(f"ip column '{ip_col}' not found in dataframe")
 
-	# Parse timestamps robustly
-	ts = pd.to_datetime(df[timestamp_col], errors='coerce')
-	if ts.isna().all():
-		# try treating numeric values as epoch seconds
-		try:
-			ts = pd.to_datetime(df[timestamp_col].astype(float), unit='s', errors='coerce')
-		except Exception:
-			pass
+	# Parse timestamps robustly. Try the default parse and also an epoch-seconds parse,
+	# preferring whichever yields more non-null timestamps. This handles numeric
+	# epoch-second columns (floats like 1769718106.090484).
+	series = df[timestamp_col]
+	ts_default = pd.to_datetime(series, errors='coerce')
+	ts_unit = None
+	try:
+		if pd.api.types.is_numeric_dtype(series) or series.dropna().astype(str).str.match(r'^\d+(\.\d+)?$').mean() > 0.5:
+			# try interpreting as epoch seconds
+			ts_unit = pd.to_datetime(series.astype(float), unit='s', errors='coerce')
+	except Exception:
+		ts_unit = None
+	# pick the parse with more non-null values
+	if ts_unit is not None and ts_unit.notna().sum() > ts_default.notna().sum():
+		ts = ts_unit
+	else:
+		ts = ts_default
 	if ts.isna().all():
 		raise ValueError('Unable to parse any timestamps from column: ' + timestamp_col)
 
@@ -108,7 +117,35 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 	else:
 		df = pd.read_csv(data_folder + '/sample_data.csv')
 
-	col_name = df.columns[0]
+	# Try to detect a timestamp-like column instead of assuming first column
+	timestamp_candidates = ['timestamp', 'time', 'ts', 'date', 'datetime']
+	timestamp_col = None
+	for name in timestamp_candidates:
+		for c in df.columns:
+			if c.lower() == name:
+				timestamp_col = c
+				break
+		if timestamp_col is not None:
+			break
+	# If not found, pick the column that best parses to datetimes
+	if timestamp_col is None:
+		best_col = None
+		best_non_na = 0
+		for c in df.columns:
+			try:
+				ts_try = pd.to_datetime(df[c], errors='coerce')
+				non_na = ts_try.notna().sum()
+				# prefer columns that parse and have multiple unique times
+				if non_na > best_non_na:
+					best_non_na = non_na
+					best_col = c
+			except Exception:
+				continue
+		if best_col is not None and best_non_na > 0:
+			timestamp_col = best_col
+	# fallback to first column if nothing else
+	if timestamp_col is None:
+		timestamp_col = df.columns[0]
 	src_col = 'src_ip' if 'src_ip' in df.columns else None
 	dst_col = 'dst_ip' if 'dst_ip' in df.columns else None
 	if src_col is None or dst_col is None:
@@ -120,18 +157,18 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 				if src_col is None and 'ip' in c.lower(): src_col = c
 				if dst_col is None and 'ip' in c.lower(): dst_col = c
 
-	ts = pd.to_datetime(df[col_name], errors='coerce')
+	ts = pd.to_datetime(df[timestamp_col], errors='coerce')
 	if ts.isna().all():
 		try:
-			ts = pd.to_datetime(df[col_name].astype(float), unit='s', errors='coerce')
+			ts = pd.to_datetime(df[timestamp_col].astype(float), unit='s', errors='coerce')
 		except Exception:
 			pass
 	if ts.isna().all():
 		raise ValueError('Unable to parse timestamps from first column for TOL preprocessing')
 	start, end = ts.dt.floor('s').min(), ts.dt.floor('s').max()
 
-	grp_out = event_count_per_ip(df, col_name, src_col, start=start, end=end)
-	grp_in = event_count_per_ip(df, col_name, dst_col, start=start, end=end)
+	grp_out = event_count_per_ip(df, timestamp_col, src_col, start=start, end=end)
+	grp_in = event_count_per_ip(df, timestamp_col, dst_col, start=start, end=end)
 
 	# Compute per-IP mention counts (clean strings) to select top_k
 	s = pd.concat([
@@ -144,6 +181,8 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 	if counts.empty:
 		raise ValueError('No IP addresses found in source/destination columns')
 	most_common_ip = counts.idxmax()
+	# print number of unique IPs found
+	print('TOL: total unique IPs', len(counts))
 	internal_prefix = most_common_ip.split('.')[0]
 	print('TOL: most common IP', most_common_ip, '=> internal prefix', internal_prefix)
 
