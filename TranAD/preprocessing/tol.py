@@ -7,6 +7,86 @@ from TranAD.constants import DEFAULT_DATA_FOLDER
 from TranAD.preprocessing.utils import normalize3
 
 
+def parse_timestamp_column(series):
+	"""Parse a timestamp column and return integer unix-seconds (nullable Int64).
+
+	Rules:
+	- If values are numeric, detect scale (s, ms, us, ns) by magnitude and
+	  normalize to seconds, floored to integers.
+	- If values are datetime strings, parse to datetimes and convert to integer seconds.
+	- Returns a pandas Series of dtype `Int64` with unix seconds or NA.
+	"""
+	non_na = series.dropna()
+	if non_na.empty:
+		raise ValueError('Timestamp column contains only nulls')
+	first = non_na.iloc[0]
+	try:
+		is_numeric = isinstance(first, (int, float, np.integer, np.floating))
+		if not is_numeric:
+			fs = str(first).strip()
+			is_numeric = bool(re.match(r'^\d+(\.\d+)?$', fs))
+	except Exception:
+		is_numeric = False
+	if is_numeric:
+		numeric = pd.to_numeric(series, errors='coerce').astype(float)
+		if numeric.dropna().empty:
+			# produce nullable Int64 of NAs
+			numeric_seconds = pd.Series([pd.NA] * len(numeric), index=numeric.index, dtype='Int64')
+		else:
+			maxv = numeric.dropna().abs().max()
+			if maxv > 1e17:
+				div = 1e9
+			elif maxv > 1e14:
+				div = 1e6
+			elif maxv > 1e11:
+				div = 1e3
+			else:
+				div = 1.0
+			secs = np.floor(numeric / div)
+			numeric_seconds = pd.Series(secs, index=numeric.index).where(~pd.isna(secs)).astype('Int64')
+	else:
+		dt = pd.to_datetime(series, errors='coerce')
+		if dt.isna().all():
+			raise ValueError('Unable to parse timestamps from column')
+		# convert ns -> seconds integer
+		numeric_seconds = pd.Series((dt.view('int64') // 1_000_000_000), index=dt.index).astype('Int64')
+	return numeric_seconds
+
+
+def find_timestamp_column(df, timestamp_candidates=None):
+	"""Find the most likely timestamp column name in `df`.
+
+	Strategy:
+	- If any common candidate names are present (case-insensitive), return it.
+	- Otherwise, pick the column that yields the most non-null datetimes
+	  when parsed with `pd.to_datetime`.
+	- Fallback: return the first column name.
+	"""
+	if timestamp_candidates is None:
+		timestamp_candidates = ['timestamp', 'time', 'ts', 'date', 'datetime']
+	# exact name match (case-insensitive)
+	for name in timestamp_candidates:
+		for c in df.columns:
+			if c.lower() == name:
+				return c
+	# otherwise, pick the column that best parses to datetimes
+	best_col = None
+	best_non_na = 0
+	for c in df.columns:
+		try:
+			ts_try = pd.to_datetime(df[c], errors='coerce')
+			non_na = ts_try.notna().sum()
+			if non_na > best_non_na:
+				best_non_na = non_na
+				best_col = c
+		except Exception:
+			continue
+	if best_col is not None and best_non_na > 0:
+		return best_col
+	# fallback to first column
+	return df.columns[0]
+
+
 def list_unique_ips(df, src_col='src_ip', dst_col='dst_ip'):
 	"""Return sorted list of unique IPs found in DataFrame across src/dst columns.
 
@@ -108,35 +188,8 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 	else:
 		df = pd.read_csv(data_folder + '/sample_data.csv')
 
-	# Try to detect a timestamp-like column instead of assuming first column
-	timestamp_candidates = ['timestamp', 'time', 'ts', 'date', 'datetime']
-	timestamp_col = None
-	for name in timestamp_candidates:
-		for c in df.columns:
-			if c.lower() == name:
-				timestamp_col = c
-				break
-		if timestamp_col is not None:
-			break
-	# If not found, pick the column that best parses to datetimes
-	if timestamp_col is None:
-		best_col = None
-		best_non_na = 0
-		for c in df.columns:
-			try:
-				ts_try = pd.to_datetime(df[c], errors='coerce')
-				non_na = ts_try.notna().sum()
-				# prefer columns that parse and have multiple unique times
-				if non_na > best_non_na:
-					best_non_na = non_na
-					best_col = c
-			except Exception:
-				continue
-		if best_col is not None and best_non_na > 0:
-			timestamp_col = best_col
-	# fallback to first column if nothing else
-	if timestamp_col is None:
-		timestamp_col = df.columns[0]
+	# find timestamp column
+	timestamp_col = find_timestamp_column(df)
 	src_col = 'src_ip' if 'src_ip' in df.columns else None
 	dst_col = 'dst_ip' if 'dst_ip' in df.columns else None
 	if src_col is None or dst_col is None:
@@ -150,54 +203,7 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 
 	# Robust parsing for timestamp column: inspect the first non-null value and
 	# decide whether to treat the column as epoch-seconds or datetime strings.
-	series = df[timestamp_col]
-	non_na = series.dropna()
-	if non_na.empty:
-		raise ValueError('Timestamp column contains only nulls: ' + timestamp_col)
-	first = non_na.iloc[0]
-	try:
-		is_numeric = isinstance(first, (int, float, np.integer, np.floating))
-		if not is_numeric:
-			fs = str(first).strip()
-			is_numeric = bool(re.match(r'^\d+(\.\d+)?$', fs))
-	except Exception:
-		is_numeric = False
-	if is_numeric:
-		# interpret as epoch timestamps in numeric form. Detect scale
-		# (seconds, milliseconds, microseconds, nanoseconds) by magnitude
-		numeric = pd.to_numeric(series, errors='coerce').astype(float)
-		if numeric.dropna().empty:
-			# no numeric values present -> produce nullable Int64 series of NAs
-			numeric_seconds = pd.Series([pd.NA] * len(numeric), index=numeric.index, dtype='Int64')
-		else:
-			maxv = numeric.dropna().abs().max()
-			# thresholds based on approximate epoch magnitudes
-			if maxv > 1e17:
-				# values are likely in nanoseconds
-				div = 1e9
-			elif maxv > 1e14:
-				# values are likely in microseconds
-				div = 1e6
-			elif maxv > 1e11:
-				# values are likely in milliseconds
-				div = 1e3
-			else:
-				# already in seconds
-				div = 1.0
-			secs = np.floor(numeric / div)
-			# floor to integer seconds and keep NA via nullable Int64
-			numeric_seconds = pd.Series(secs, index=numeric.index).where(~pd.isna(secs)).astype('Int64')
-	else:
-		# interpret as datetime strings and convert to numeric unix seconds
-		dt = pd.to_datetime(series, errors='coerce')
-		if dt.isna().all():
-			raise ValueError('Unable to parse timestamps from first column for TOL preprocessing')
-		# dt is in ns resolution; convert to integer seconds (nullable Int64)
-		numeric_seconds = pd.Series((dt.view('int64') // 1_000_000_000), index=dt.index).astype('Int64')
-	if pd.Series(numeric_seconds).isna().all():
-		raise ValueError('Unable to obtain numeric unix-seconds from timestamp column')
-	# store numeric unix-seconds in dataframe for downstream processing
-	df['timestamp'] = numeric_seconds
+	df['timestamp'] = parse_timestamp_column(df[timestamp_col])
 
 	grp_out = event_count_per_ip(df, src_col, timestamp_col="timestamp")
 	grp_in = event_count_per_ip(df, dst_col, timestamp_col="timestamp")
