@@ -265,6 +265,20 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 
 	features_df = pd.concat(features, axis=1)
 	features_df.columns = feature_names
+	
+	# Diagnostic: print counts for the first second to allow direct comparison
+	if len(features_df) > 0:
+		first_dt = features_df.index[0]
+		# datetime -> unix seconds
+		try:
+			first_unix = int(first_dt.value // 1_000_000_000)
+		except Exception:
+			first_unix = None
+		print('TOL: first second datetime', first_dt, 'unix', first_unix)
+		print('TOL: first second counts:')
+		row = features_df.iloc[0]
+		for n in feature_names:
+			print(' ', n, ':', int(row.get(n, 0)))
 	connection_counts = features_df.values.astype(float)
 	print('TOL: feature columns', feature_names)
 
