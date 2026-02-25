@@ -1,8 +1,7 @@
 import os
-import pandas as pd
 import numpy as np
-
 from TranAD.constants import  DEFAULT_OUTPUT_FOLDER
+
 
 def load_and_save(category, filename, dataset, dataset_folder, output_folder=DEFAULT_OUTPUT_FOLDER):
 	"""Load a CSV file and save as normalized numpy array.
