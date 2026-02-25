@@ -40,7 +40,7 @@ def count_unique_ips(df, src_col='src_ip', dst_col='dst_ip'):
 	return len(list_unique_ips(df, src_col=src_col, dst_col=dst_col))
 
 
-def event_count_per_ip(df, timestamp_col, ip_col, start=None, end=None):
+def event_count_per_ip(df, ip_col, timestamp_col="timestamp"):
 	"""Compute per-second event counts for each IP.
 
 	This bins events to 1-second resolution (flooring timestamps to seconds)
@@ -50,8 +50,6 @@ def event_count_per_ip(df, timestamp_col, ip_col, start=None, end=None):
 		df (pd.DataFrame): Input dataframe containing timestamp and IP columns.
 		timestamp_col (str): Name of the timestamp column.
 		ip_col (str): Name of the column containing the IP for which to count events.
-		start (pd.Timestamp or None): Optional start time for full index range.
-		end (pd.Timestamp or None): Optional end time for full index range.
 
 	Returns:
 		pd.DataFrame: Index is per-second timestamps (pd.DatetimeIndex), columns are IPs,
@@ -62,31 +60,17 @@ def event_count_per_ip(df, timestamp_col, ip_col, start=None, end=None):
 	if ip_col not in df.columns:
 		raise KeyError(f"ip column '{ip_col}' not found in dataframe")
 
-	# Prefer a pre-parsed timestamp column if present (set by load_TOL as
-	# `parsed_timestamp`). This avoids reparsing the same strings/numbers.
-	if 'timestamp' not in df.columns:
-		raise KeyError("Expected 'timestamp' column not found in dataframe. Ensure load_TOL is used to parse timestamps first.")
-		
+	# Expect the dataframe to already contain numeric unix-seconds in
+	# `timestamp_col`. Convert those numeric seconds to datetimes for
+	# grouping/indexing. Do not attempt to parse arbitrary datetime strings here.
 	series = df[timestamp_col]
-	non_na = series.dropna()
-	if non_na.empty:
-		raise ValueError('Timestamp column contains only nulls: ' + timestamp_col)
-	first = non_na.iloc[0]
-	try:
-		is_numeric = isinstance(first, (int, float, np.integer, np.floating))
-		if not is_numeric:
-			fs = str(first).strip()
-			is_numeric = bool(re.match(r'^\d+(\.\d+)?$', fs))
-	except Exception:
-		is_numeric = False
-	if is_numeric:
-		# interpret as epoch seconds
-		ts = pd.to_datetime(series.astype(float), unit='s', errors='coerce')
-	else:
-		# interpret as datetime strings
-		ts = pd.to_datetime(series, errors='coerce')
+	numeric = pd.to_numeric(series, errors='coerce')
+	if numeric.isna().all():
+		raise ValueError('timestamp column must contain numeric unix-seconds (float/int): ' + timestamp_col)
+	# convert numeric seconds to datetimes
+	ts = pd.to_datetime(numeric, unit='s', errors='coerce')
 	if ts.isna().all():
-		raise ValueError('Unable to parse any timestamps from column: ' + timestamp_col)
+		raise ValueError('Unable to convert numeric timestamp column to datetimes: ' + timestamp_col)
 
 	# floor to seconds
 	ts = ts.dt.floor('s')
@@ -97,8 +81,8 @@ def event_count_per_ip(df, timestamp_col, ip_col, start=None, end=None):
 	grp = working.groupby(['__ts', ip_col]).size().unstack(fill_value=0).sort_index()
 
 	# ensure full continuous second-range index
-	_start = pd.to_datetime(start) if start is not None else grp.index.min()
-	_end = pd.to_datetime(end) if end is not None else grp.index.max()
+	_start = grp.index.min()
+	_end = grp.index.max()
 	full_idx = pd.date_range(_start, _end, freq='s')
 	grp = grp.reindex(full_idx, fill_value=0)
 
@@ -179,19 +163,44 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 	except Exception:
 		is_numeric = False
 	if is_numeric:
-		# interpret as epoch seconds
-		ts = pd.to_datetime(series.astype(float), unit='s', errors='coerce')
+		# interpret as epoch timestamps in numeric form. Detect scale
+		# (seconds, milliseconds, microseconds, nanoseconds) by magnitude
+		numeric = pd.to_numeric(series, errors='coerce').astype(float)
+		if numeric.dropna().empty:
+			# no numeric values present -> produce nullable Int64 series of NAs
+			numeric_seconds = pd.Series([pd.NA] * len(numeric), index=numeric.index, dtype='Int64')
+		else:
+			maxv = numeric.dropna().abs().max()
+			# thresholds based on approximate epoch magnitudes
+			if maxv > 1e17:
+				# values are likely in nanoseconds
+				div = 1e9
+			elif maxv > 1e14:
+				# values are likely in microseconds
+				div = 1e6
+			elif maxv > 1e11:
+				# values are likely in milliseconds
+				div = 1e3
+			else:
+				# already in seconds
+				div = 1.0
+			secs = np.floor(numeric / div)
+			# floor to integer seconds and keep NA via nullable Int64
+			numeric_seconds = pd.Series(secs, index=numeric.index).where(~pd.isna(secs)).astype('Int64')
 	else:
-		# interpret as datetime strings
-		ts = pd.to_datetime(series, errors='coerce')
-	if ts.isna().all():
-		raise ValueError('Unable to parse timestamps from first column for TOL preprocessing')
-	# store parsed timestamps in the dataframe for downstream use
-	df['timestamp'] = ts
-	start, end = ts.dt.floor('s').min(), ts.dt.floor('s').max()
+		# interpret as datetime strings and convert to numeric unix seconds
+		dt = pd.to_datetime(series, errors='coerce')
+		if dt.isna().all():
+			raise ValueError('Unable to parse timestamps from first column for TOL preprocessing')
+		# dt is in ns resolution; convert to integer seconds (nullable Int64)
+		numeric_seconds = pd.Series((dt.view('int64') // 1_000_000_000), index=dt.index).astype('Int64')
+	if pd.Series(numeric_seconds).isna().all():
+		raise ValueError('Unable to obtain numeric unix-seconds from timestamp column')
+	# store numeric unix-seconds in dataframe for downstream processing
+	df['timestamp'] = numeric_seconds
 
-	grp_out = event_count_per_ip(df, timestamp_col, src_col, start=start, end=end)
-	grp_in = event_count_per_ip(df, timestamp_col, dst_col, start=start, end=end)
+	grp_out = event_count_per_ip(df, src_col, timestamp_col="timestamp")
+	grp_in = event_count_per_ip(df, dst_col, timestamp_col="timestamp")
 
 	# Compute per-IP mention counts (clean strings) to select top_k
 	s = pd.concat([
