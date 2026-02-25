@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import re
 
 from TranAD.constants import DEFAULT_DATA_FOLDER
 from TranAD.preprocessing.utils import normalize3
@@ -61,23 +62,29 @@ def event_count_per_ip(df, timestamp_col, ip_col, start=None, end=None):
 	if ip_col not in df.columns:
 		raise KeyError(f"ip column '{ip_col}' not found in dataframe")
 
-	# Parse timestamps robustly. Try the default parse and also an epoch-seconds parse,
-	# preferring whichever yields more non-null timestamps. This handles numeric
-	# epoch-second columns (floats like 1769718106.090484).
+	# Prefer a pre-parsed timestamp column if present (set by load_TOL as
+	# `parsed_timestamp`). This avoids reparsing the same strings/numbers.
+	if 'timestamp' not in df.columns:
+		raise KeyError("Expected 'timestamp' column not found in dataframe. Ensure load_TOL is used to parse timestamps first.")
+		
 	series = df[timestamp_col]
-	ts_default = pd.to_datetime(series, errors='coerce')
-	ts_unit = None
+	non_na = series.dropna()
+	if non_na.empty:
+		raise ValueError('Timestamp column contains only nulls: ' + timestamp_col)
+	first = non_na.iloc[0]
 	try:
-		if pd.api.types.is_numeric_dtype(series) or series.dropna().astype(str).str.match(r'^\d+(\.\d+)?$').mean() > 0.5:
-			# try interpreting as epoch seconds
-			ts_unit = pd.to_datetime(series.astype(float), unit='s', errors='coerce')
+		is_numeric = isinstance(first, (int, float, np.integer, np.floating))
+		if not is_numeric:
+			fs = str(first).strip()
+			is_numeric = bool(re.match(r'^\d+(\.\d+)?$', fs))
 	except Exception:
-		ts_unit = None
-	# pick the parse with more non-null values
-	if ts_unit is not None and ts_unit.notna().sum() > ts_default.notna().sum():
-		ts = ts_unit
+		is_numeric = False
+	if is_numeric:
+		# interpret as epoch seconds
+		ts = pd.to_datetime(series.astype(float), unit='s', errors='coerce')
 	else:
-		ts = ts_default
+		# interpret as datetime strings
+		ts = pd.to_datetime(series, errors='coerce')
 	if ts.isna().all():
 		raise ValueError('Unable to parse any timestamps from column: ' + timestamp_col)
 
@@ -157,14 +164,30 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 				if src_col is None and 'ip' in c.lower(): src_col = c
 				if dst_col is None and 'ip' in c.lower(): dst_col = c
 
-	ts = pd.to_datetime(df[timestamp_col], errors='coerce')
-	if ts.isna().all():
-		try:
-			ts = pd.to_datetime(df[timestamp_col].astype(float), unit='s', errors='coerce')
-		except Exception:
-			pass
+	# Robust parsing for timestamp column: inspect the first non-null value and
+	# decide whether to treat the column as epoch-seconds or datetime strings.
+	series = df[timestamp_col]
+	non_na = series.dropna()
+	if non_na.empty:
+		raise ValueError('Timestamp column contains only nulls: ' + timestamp_col)
+	first = non_na.iloc[0]
+	try:
+		is_numeric = isinstance(first, (int, float, np.integer, np.floating))
+		if not is_numeric:
+			fs = str(first).strip()
+			is_numeric = bool(re.match(r'^\d+(\.\d+)?$', fs))
+	except Exception:
+		is_numeric = False
+	if is_numeric:
+		# interpret as epoch seconds
+		ts = pd.to_datetime(series.astype(float), unit='s', errors='coerce')
+	else:
+		# interpret as datetime strings
+		ts = pd.to_datetime(series, errors='coerce')
 	if ts.isna().all():
 		raise ValueError('Unable to parse timestamps from first column for TOL preprocessing')
+	# store parsed timestamps in the dataframe for downstream use
+	df['timestamp'] = ts
 	start, end = ts.dt.floor('s').min(), ts.dt.floor('s').max()
 
 	grp_out = event_count_per_ip(df, timestamp_col, src_col, start=start, end=end)
