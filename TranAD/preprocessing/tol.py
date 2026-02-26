@@ -135,7 +135,7 @@ def _shannon_entropy(series):
 
 
 
-def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
+def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, test_seconds=120, calibration_seconds=60, valid_seconds=120):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 
 	Groups by integer unix-second and IP to produce per-second per-IP features:
@@ -253,19 +253,19 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 			print(' ', n, ':', row[n])
 
 	# Train/test split and normalization
-	connection_counts = features_df.values.astype(float)
-	n_rows = connection_counts.shape[0]
-	split_idx = max(1, int(n_rows * 0.7))
-	train = connection_counts[:split_idx]
-	test  = connection_counts[split_idx:]
+	features = features_df.values.astype(float)
+	train = features[:train_seconds]
+	test  = features[train_seconds:train_seconds + test_seconds]
+	calib = features[train_seconds + test_seconds:train_seconds + test_seconds + calibration_seconds]
+	valid = features[train_seconds + test_seconds + calibration_seconds:]
 	if train.size == 0:
 		raise ValueError('Training partition is empty after split; cannot normalize')
 	train, min_a, max_a = normalize3(train)
 	if test.size != 0:
 		test, _, _ = normalize3(test, min_a, max_a)
 	labels = np.zeros_like(test)
-	for name, arr in [('train', train), ('test', test), ('labels', labels)]:
+	for name, arr in [('train', train), ('test', test), ('calib', calib), ('valid', valid), ('labels', labels)]:
 		np.save(os.path.join(folder, f'{name}.npy'), arr.astype('float64'))
 	if csv_path:
 		print(f"Processed {csv_path} as TOL -> {folder}/")
-		print(f"  train.npy: {train.shape}, test.npy: {test.shape}, labels.npy: {labels.shape}")
+		print(f"  train.npy: {train.shape}, test.npy: {test.shape}, calib.npy: {calib.shape}, valid.npy: {valid.shape}, labels.npy: {labels.shape}")
