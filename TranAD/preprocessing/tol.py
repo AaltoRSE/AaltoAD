@@ -120,75 +120,36 @@ def count_unique_ips(df, src_col='src_ip', dst_col='dst_ip'):
 	return len(list_unique_ips(df, src_col=src_col, dst_col=dst_col))
 
 
-def event_count_per_ip(df, ip_col, timestamp_col="timestamp"):
-	"""Compute per-second event counts for each IP.
-
-	This bins events to 1-second resolution (flooring timestamps to seconds)
-	and returns a DataFrame indexed by second timestamps with one column per IP.
-
-	Args:
-		df (pd.DataFrame): Input dataframe containing timestamp and IP columns.
-		timestamp_col (str): Name of the timestamp column.
-		ip_col (str): Name of the column containing the IP for which to count events.
-
-	Returns:
-		pd.DataFrame: Index is per-second timestamps (pd.DatetimeIndex), columns are IPs,
-		values are integer event counts per second.
-	"""
-	if timestamp_col not in df.columns:
-		raise KeyError(f"timestamp column '{timestamp_col}' not found in dataframe")
-	if ip_col not in df.columns:
-		raise KeyError(f"ip column '{ip_col}' not found in dataframe")
-
-	# Expect the dataframe to already contain numeric unix-seconds in
-	# `timestamp_col`. Convert those numeric seconds to datetimes for
-	# grouping/indexing. Do not attempt to parse arbitrary datetime strings here.
-	series = df[timestamp_col]
-	numeric = pd.to_numeric(series, errors='coerce')
-	if numeric.isna().all():
-		raise ValueError('timestamp column must contain numeric unix-seconds (float/int): ' + timestamp_col)
-	# convert numeric seconds to datetimes
-	ts = pd.to_datetime(numeric, unit='s', errors='coerce')
-	if ts.isna().all():
-		raise ValueError('Unable to convert numeric timestamp column to datetimes: ' + timestamp_col)
-
-	# floor to seconds
-	ts = ts.dt.floor('s')
-	working = df[[ip_col]].copy()
-	working['__ts'] = ts.values
-
-	# group by second + ip and unstack into wide format
-	grp = working.groupby(['__ts', ip_col]).size().unstack(fill_value=0).sort_index()
-
-	# ensure full continuous second-range index
-	_start = grp.index.min()
-	_end = grp.index.max()
-	full_idx = pd.date_range(_start, _end, freq='s')
-	grp = grp.reindex(full_idx, fill_value=0)
-
-	# cast to integer counts
-	grp = grp.astype(int)
-	grp.index.name = 'timestamp'
-	return grp
+def _detect_column(df, candidates):
+	"""Return first column whose lower-cased name is in candidates, else None."""
+	for c in df.columns:
+		if c.lower() in candidates:
+			return c
+	return None
 
 
+def _shannon_entropy(series):
+	"""Shannon entropy (bits) of a categorical Series."""
+	p = series.value_counts(normalize=True)
+	return -(p * np.log2(p + 1e-10)).sum()
 
 
 
 def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
-	
-	This function is extracted from the original `preprocess.py` and mirrors
-	the behavior expected by the rest of the codebase. It creates per-second,
-	per-IP incoming/outgoing features and aggregates non-top IPs into
-	internal/external buckets (separate in/out columns).
+
+	Groups by integer unix-second and IP to produce per-second per-IP features:
+	- in/out event counts, bytes in/out, rw ratio, port entropy,
+	  num unique destinations, num unique sources.
+	Non-top-k IPs are replaced by 'other_internal' or 'other_external' before
+	grouping, so they naturally aggregate in a single groupby pass.
 	"""
 	if csv_path:
 		df = pd.read_csv(csv_path)
 	else:
 		df = pd.read_csv(data_folder + '/sample_data.csv')
 
-	# find timestamp column
+	# Detect columns
 	timestamp_col = find_timestamp_column(df)
 	src_col = 'src_ip' if 'src_ip' in df.columns else None
 	dst_col = 'dst_ip' if 'dst_ip' in df.columns else None
@@ -200,109 +161,111 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10):
 			for c in df.columns:
 				if src_col is None and 'ip' in c.lower(): src_col = c
 				if dst_col is None and 'ip' in c.lower(): dst_col = c
+	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets'])
+	src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
 
-	# Robust parsing for timestamp column: inspect the first non-null value and
-	# decide whether to treat the column as epoch-seconds or datetime strings.
-	df['timestamp'] = parse_timestamp_column(df[timestamp_col])
+	# Parse timestamp → integer unix seconds
+	df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
+	df = df.dropna(subset=['ts_sec'])
+	df['ts_sec'] = df['ts_sec'].astype(int)
 
-	grp_out = event_count_per_ip(df, src_col, timestamp_col="timestamp")
-	grp_in = event_count_per_ip(df, dst_col, timestamp_col="timestamp")
-
-	# Compute per-IP mention counts (clean strings) to select top_k
-	s = pd.concat([
-		df[src_col].dropna().astype(str),
-		df[dst_col].dropna().astype(str)
+	# Find top-k IPs by combined occurrence count
+	all_ips = pd.concat([
+		df[src_col].dropna().astype(str).str.strip(),
+		df[dst_col].dropna().astype(str).str.strip(),
 	])
-	s = s.str.strip()
-	s = s[s != '']
-	counts = s.value_counts()
+	all_ips = all_ips[all_ips != '']
+	counts = all_ips.value_counts()
 	if counts.empty:
 		raise ValueError('No IP addresses found in source/destination columns')
 	most_common_ip = counts.idxmax()
-	# print number of unique IPs found
-	print('TOL: total unique IPs', len(counts))
 	internal_prefix = most_common_ip.split('.')[0]
+	top_ips = set(counts.head(top_k).index)
+	print('TOL: total unique IPs', len(counts))
 	print('TOL: most common IP', most_common_ip, '=> internal prefix', internal_prefix)
+	print(f'TOL: selecting top_{top_k} IPs (keeps {len(top_ips)})')
 
-	selected_ips = counts.index.tolist()[:top_k]
-	print(f'TOL: selecting top_{top_k} IPs (keeps {len(selected_ips)})')
+	# Replace non-top-k IPs with 'other_internal' / 'other_external'
+	def _classify(ip_str):
+		ip_str = str(ip_str).strip()
+		if ip_str in top_ips:
+			return ip_str
+		return 'other_internal' if ip_str.startswith(internal_prefix + '.') else 'other_external'
 
-	features = []
-	feature_names = []
-	index = grp_out.index
-	for ip in selected_ips:
-		if ip in grp_in.columns:
-			features.append(grp_in[ip])
-		else:
-			features.append(pd.Series(0, index=index))
-		feature_names.append(f'{ip}_in')
-		if ip in grp_out.columns:
-			features.append(grp_out[ip])
-		else:
-			features.append(pd.Series(0, index=index))
-		feature_names.append(f'{ip}_out')
+	df[src_col] = df[src_col].astype(str).str.strip().map(_classify)
+	df[dst_col] = df[dst_col].astype(str).str.strip().map(_classify)
 
-	# aggregate remaining IPs into internal/external, keeping separate in/out
-	remaining_ips = [ip for ip in counts.index if ip not in selected_ips]
-	other_internal_in = pd.Series(0, index=index, dtype=float)
-	other_internal_out = pd.Series(0, index=index, dtype=float)
-	other_external_in = pd.Series(0, index=index, dtype=float)
-	other_external_out = pd.Series(0, index=index, dtype=float)
-	for ip in remaining_ips:
-		if ip in grp_in.columns:
-			if str(ip).startswith(internal_prefix + '.'):
-				other_internal_in = other_internal_in + grp_in[ip]
-			else:
-				other_external_in = other_external_in + grp_in[ip]
-		if ip in grp_out.columns:
-			if str(ip).startswith(internal_prefix + '.'):
-				other_internal_out = other_internal_out + grp_out[ip]
-			else:
-				other_external_out = other_external_out + grp_out[ip]
+	# Global rows-per-second
+	rows_per_second = df.groupby('ts_sec').size().rename('rows_per_second')
 
-	features.append(other_internal_in)
-	feature_names.append('other_internal_in')
-	features.append(other_internal_out)
-	feature_names.append('other_internal_out')
-	features.append(other_external_in)
-	feature_names.append('other_external_in')
-	features.append(other_external_out)
-	feature_names.append('other_external_out')
+	# Outgoing aggregation: group by (ts_sec, src_ip)
+	out_grp = df.groupby(['ts_sec', src_col])
+	out_agg = pd.DataFrame({'out_count': out_grp.size()})
+	if bytes_col:
+		out_agg['bytes_out'] = out_grp[bytes_col].sum()
+	out_agg['num_dsts'] = out_grp[dst_col].nunique()
+	if src_port_col:
+		out_agg['port_entropy'] = out_grp[src_port_col].apply(_shannon_entropy)
 
-	features_df = pd.concat(features, axis=1)
-	features_df.columns = feature_names
-	
-	# Diagnostic: print counts for the first second to allow direct comparison
+	# Incoming aggregation: group by (ts_sec, dst_ip)
+	in_grp = df.groupby(['ts_sec', dst_col])
+	in_agg = pd.DataFrame({'in_count': in_grp.size()})
+	if bytes_col:
+		in_agg['bytes_in'] = in_grp[bytes_col].sum()
+	in_agg['num_srcs'] = in_grp[src_col].nunique()
+
+	# Unstack IP level → wide format; flatten MultiIndex columns to "{ip}_{metric}"
+	out_wide = out_agg.unstack(level=src_col, fill_value=0)
+	out_wide.columns = [f'{ip}_{metric}' for metric, ip in out_wide.columns]
+	in_wide = in_agg.unstack(level=dst_col, fill_value=0)
+	in_wide.columns = [f'{ip}_{metric}' for metric, ip in in_wide.columns]
+
+	# Build full contiguous second-range index and join everything
+	ts_min, ts_max = df['ts_sec'].min(), df['ts_sec'].max()
+	full_idx = np.arange(ts_min, ts_max + 1)
+
+	features_df = (
+		out_wide.reindex(full_idx, fill_value=0)
+		.join(in_wide.reindex(full_idx, fill_value=0), how='outer')
+		.join(rows_per_second.reindex(full_idx, fill_value=0), how='outer')
+		.fillna(0)
+	)
+	features_df.index.name = 'ts_sec'
+
+	# Derive rw_ratio per IP
+	if bytes_col:
+		for ip in list(top_ips) + ['other_internal', 'other_external']:
+			b_in_col  = f'{ip}_bytes_in'
+			b_out_col = f'{ip}_bytes_out'
+			if b_in_col in features_df.columns and b_out_col in features_df.columns:
+				b_in  = features_df[b_in_col]
+				b_out = features_df[b_out_col]
+				features_df[f'{ip}_rw_ratio'] = b_in / (b_in + b_out + 1e-10)
+
+	# Diagnostic: first-second summary
+	feature_names = features_df.columns.tolist()
+	print('TOL: feature columns', feature_names)
 	if len(features_df) > 0:
-		first_dt = features_df.index[0]
-		# datetime -> unix seconds
-		try:
-			first_unix = int(first_dt.value // 1_000_000_000)
-		except Exception:
-			first_unix = None
-		print('TOL: first second datetime', first_dt, 'unix', first_unix)
+		print('TOL: first second ts_sec', features_df.index[0])
 		print('TOL: first second counts:')
 		row = features_df.iloc[0]
 		for n in feature_names:
-			print(' ', n, ':', int(row.get(n, 0)))
-	connection_counts = features_df.values.astype(float)
-	print('TOL: feature columns', feature_names)
+			print(' ', n, ':', row[n])
 
-	# train/test split and normalization preserved for backwards compatibility
+	# Train/test split and normalization
+	connection_counts = features_df.values.astype(float)
 	n_rows = connection_counts.shape[0]
-	split_idx = int(n_rows * 0.7)
-	if split_idx == 0 and n_rows > 0:
-		split_idx = 1
-	train = connection_counts[:split_idx, :]
-	test = connection_counts[split_idx:, :]
+	split_idx = max(1, int(n_rows * 0.7))
+	train = connection_counts[:split_idx]
+	test  = connection_counts[split_idx:]
 	if train.size == 0:
 		raise ValueError('Training partition is empty after split; cannot normalize')
 	train, min_a, max_a = normalize3(train)
 	if test.size != 0:
 		test, _, _ = normalize3(test, min_a, max_a)
 	labels = np.zeros_like(test)
-	for file in ['train', 'test', 'labels']:
-		np.save(os.path.join(folder, f'{file}.npy'), eval(file).astype('float64'))
+	for name, arr in [('train', train), ('test', test), ('labels', labels)]:
+		np.save(os.path.join(folder, f'{name}.npy'), arr.astype('float64'))
 	if csv_path:
 		print(f"Processed {csv_path} as TOL -> {folder}/")
 		print(f"  train.npy: {train.shape}, test.npy: {test.shape}, labels.npy: {labels.shape}")
