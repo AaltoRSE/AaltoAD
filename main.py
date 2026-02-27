@@ -141,34 +141,41 @@ def get_incomplete_subexperiments(all_subexps: List[Tuple[str, str, str, Dict]])
 
 
 def map_array_index_to_subexperiment(
-	experiments: List[Dict], 
-	array_index: int
+	experiments: List[Dict],
+	array_index: int,
+	retrain: bool = False,
 ) -> Optional[Tuple[str, str, str, Dict]]:
-	"""Map array job index to an incomplete sub-experiment.
-	
-	This function:
-	1. Expands all experiments to sub-experiments
-	2. Filters to incomplete sub-experiments (determined at function call time)
-	3. Maps the array_index to one incomplete sub-experiment
-	
+	"""Map array job index to a sub-experiment.
+
+	By default the mapping targets only incomplete sub-experiments so that
+	array jobs are assigned remaining work. If `retrain=True` the mapping
+	covers the full expanded list (useful when you want to re-run everything).
+
 	Args:
 		experiments: List of experiment configurations from JSON file
 		array_index: Array job index (0-based)
-		
+		retrain: If True, map into the full set instead of only incomplete ones
+
 	Returns:
 		Tuple of (exp_id, dataset, model, hyperparams) or None if index is out of range
 	"""
 	# Collect all sub-experiments
 	all_subexps = collect_all_subexperiments(experiments)
-	
+
 	# Filter to incomplete ones
 	incomplete = get_incomplete_subexperiments(all_subexps)
-	
-	print(f"Array job mapping: {len(incomplete)} incomplete sub-experiments out of {len(all_subexps)} total")
-	
+
+	# Choose which list to map into
+	if retrain:
+		subs = all_subexps
+		print(f"Array job mapping (retrain=True): using all {len(all_subexps)} sub-experiments")
+	else:
+		subs = incomplete if incomplete else all_subexps
+		print(f"Array job mapping: {len(incomplete)} incomplete sub-experiments out of {len(all_subexps)} total; using {len(subs)} for indexing")
+
 	# Map array index
-	if 0 <= array_index < len(incomplete):
-		return incomplete[array_index]
+	if 0 <= array_index < len(subs):
+		return subs[array_index]
 	else:
 		return None
 
@@ -380,7 +387,7 @@ def handle_experiment_file(args):
 	
 	# Array job mode
 	if args.array_index is not None:
-		result = map_array_index_to_subexperiment(experiments, args.array_index)
+		result = map_array_index_to_subexperiment(experiments, args.array_index, retrain=args.retrain)
 		
 		if result is None:
 			print(f"Array index {args.array_index} out of range (no incomplete sub-experiments at this index)")
