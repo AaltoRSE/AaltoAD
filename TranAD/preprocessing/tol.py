@@ -161,7 +161,7 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 			for c in df.columns:
 				if src_col is None and 'ip' in c.lower(): src_col = c
 				if dst_col is None and 'ip' in c.lower(): dst_col = c
-	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets'])
+	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
 	src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
 
 	# Parse timestamp → integer unix seconds
@@ -198,6 +198,13 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 	# Global rows-per-second
 	rows_per_second = df.groupby('ts_sec').size().rename('rows_per_second')
 
+	# Empty-row count (rows with no src/dst IP)
+	empty_mask = (
+		(df[src_col].isna() | (df[src_col].astype(str).str.strip() == '')) &
+		(df[dst_col].isna() | (df[dst_col].astype(str).str.strip() == ''))
+	)
+	empty_rows = df[empty_mask].groupby('ts_sec').size().rename('empty_rows')
+
 	# Outgoing aggregation: group by (ts_sec, src_ip)
 	out_grp = df.groupby(['ts_sec', src_col])
 	out_agg = pd.DataFrame({'out_count': out_grp.size()})
@@ -228,6 +235,7 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 		out_wide.reindex(full_idx, fill_value=0)
 		.join(in_wide.reindex(full_idx, fill_value=0), how='outer')
 		.join(rows_per_second.reindex(full_idx, fill_value=0), how='outer')
+		.join(empty_rows.reindex(full_idx, fill_value=0), how='outer')
 		.fillna(0)
 	)
 	features_df.index.name = 'ts_sec'
