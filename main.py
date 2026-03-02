@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
 from itertools import product
+import re
 
 import TranAD
 from TranAD.parser import parser
@@ -209,11 +210,22 @@ def has_matching_result(dataset: str, model: str, exp_id: str) -> Optional[str]:
 		try:
 			with open(result_path, 'r') as f:
 				data = json.load(f)
-				stored_id = str(data.get('experiment_id', ''))
-				if stored_id == str(exp_id):
+				stored_id = data.get('experiment_id')
+				# If experiment_id present in JSON, compare
+				if stored_id is not None and str(stored_id) == str(exp_id):
 					return result_path
-		except:
-			pass
+				# Fallback: try to extract id from filename if JSON lacks it
+				fname = Path(result_path).name
+				m = re.search(r'_exp(?P<id>[^_]+)_results\.json$', fname)
+				if m and m.group('id') == str(exp_id):
+					return result_path
+		except Exception as e:
+			# If JSON is corrupted/truncated, remove it so it can be overwritten by new runs
+			try:
+				os.remove(result_path)
+			except Exception:
+				pass
+			print(f"Warning: removed corrupted result file {result_path} ({e})")
 	return None
 
 
