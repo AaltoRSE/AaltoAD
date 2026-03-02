@@ -28,6 +28,10 @@ from TranAD import merlin
 from TranAD import diagnosis
 from TranAD import utils
 
+import tempfile
+import shutil
+import re
+
 
 def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str, root_path: str = ''):
 	"""Save model checkpoint including state dicts and training metadata.
@@ -478,18 +482,75 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	if experiment_id is not None:
 		result['experiment_id'] = experiment_id
 	
-	# Save detailed results with metadata to JSON
+	# Save detailed results with metadata to JSON (atomic write + numpy/pandas type handling)
+	def _convert_json_types(obj):
+		# Convert numpy and pandas types to native Python types for JSON
+		try:
+			import numpy as _np
+			import pandas as _pd
+		except Exception:
+			_np = None
+			_pd = None
+
+		# numpy scalar
+		if _np is not None and isinstance(obj, (_np.integer, _np.floating)):
+			return obj.item()
+		# numpy ndarray
+		if _np is not None and isinstance(obj, _np.ndarray):
+			return obj.tolist()
+		# pandas types
+		if _pd is not None:
+			if isinstance(obj, _pd.Timestamp):
+				return obj.isoformat()
+			if isinstance(obj, (_pd.Series, _pd.DataFrame)):
+				return obj.to_dict(orient='records')
+
+		# Fallback: try to convert common Python numeric types
+		if isinstance(obj, (int, float, str, bool)):
+			return obj
+
+		# Last resort: stringify
+		return str(obj)
+
+	def _safe_write_json(path: str, data: Dict):
+		tmp_fd, tmp_path = tempfile.mkstemp(suffix='.tmp', prefix='tmp_result_', dir=os.path.dirname(path))
+		os.close(tmp_fd)
+		try:
+			with open(tmp_path, 'w') as tf:
+				json.dump(data, tf, indent=2, default=_convert_json_types)
+				tf.flush()
+				os.fsync(tf.fileno())
+			# Atomic replace
+			shutil.move(tmp_path, path)
+		finally:
+			if os.path.exists(tmp_path):
+				try:
+					os.remove(tmp_path)
+				except Exception:
+					pass
+
+
 	results_dir = os.path.join('results', dataset_name)
 	os.makedirs(results_dir, exist_ok=True)
-	
+
 	# Include experiment id in filename if provided
 	if experiment_id is not None:
 		results_file = os.path.join(results_dir, f'{model_name}_exp{experiment_id}_results.json')
 	else:
 		results_file = os.path.join(results_dir, f'{model_name}_results.json')
-	
-	with open(results_file, 'w') as f:
-		json.dump(result, f, indent=2)
+
+	try:
+		_safe_write_json(results_file, result)
+	except Exception as e:
+		# If write fails, ensure no truncated file left and raise
+		print(f"Warning: failed to write results file {results_file}: {e}")
+		# Attempt to remove incomplete file
+		try:
+			if os.path.exists(results_file):
+				os.remove(results_file)
+		except Exception:
+			pass
+		raise
 	
 	print(df)
 	pprint(result)
