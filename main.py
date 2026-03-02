@@ -163,21 +163,28 @@ def map_array_index_to_subexperiment(
 	# Collect all sub-experiments
 	all_subexps = collect_all_subexperiments(experiments)
 
-	# Filter to incomplete ones
-	incomplete = get_incomplete_subexperiments(all_subexps)
+	if not all_subexps:
+		return None
 
-	# Choose which list to map into
+	# When retrain is requested, map directly into the full expanded list
 	if retrain:
-		subs = all_subexps
-		print(f"Array job mapping (retrain=True): using all {len(all_subexps)} sub-experiments")
-	else:
-		subs = incomplete if incomplete else all_subexps
-		print(f"Array job mapping: {len(incomplete)} incomplete sub-experiments out of {len(all_subexps)} total; using {len(subs)} for indexing")
+		if 0 <= array_index < len(all_subexps):
+			print(f"Array job mapping (retrain=True): using all {len(all_subexps)} sub-experiments; assigned index {array_index}")
+			return all_subexps[array_index]
+		else:
+			print(f"Array index {array_index} out of range for {len(all_subexps)} total sub-experiments (retrain)")
+			return None
 
-	# Map array index
-	if 0 <= array_index < len(subs):
-		return subs[array_index]
+	# For normal runs, map into the list of incomplete sub-experiments
+	incomplete = get_incomplete_subexperiments(all_subexps)
+	if not incomplete:
+		return None
+
+	if 0 <= array_index < len(incomplete):
+		print(f"Array job mapping: {len(incomplete)} incomplete sub-experiments; assigned index {array_index}")
+		return incomplete[array_index]
 	else:
+		print(f"Array index {array_index} out of range for {len(incomplete)} incomplete sub-experiments")
 		return None
 
 
