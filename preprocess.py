@@ -19,7 +19,7 @@ def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_
 		raise Exception(f'CSV file not found: {csv_path}')
 	
 	if dataset == 'TOL':
-		TranAD.preprocessing.load_TOL(folder, csv_path=csv_path, data_folder=data_folder, extended_features=False)
+		TranAD.preprocessing.load_TOL(folder, top_k=100, csv_path=csv_path, data_folder=data_folder, extended_features=False)
 	elif csv_path:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
 	elif dataset == 'UCR':
