@@ -59,7 +59,8 @@ VARIATIONS = {
         "learning_rate": [0.0001, 0.001],
     },
     "MTAD_GAT": {
-        "n_window": [5, 10],
+        # n_window must equal feats due to time_gat architecture (GATConv(feats, feats))
+        "n_window": [5],
         "n_hidden": [16, 25],
         "learning_rate": [0.0001, 0.001],
     },
@@ -165,9 +166,14 @@ def test_model_parametrized_variations(ModelClass, param_name, param_value):
     model = _instantiate_or_skip(ModelClass, feats, overrides)
     if param_name == "n_window":
         if isinstance(input_shape[0], tuple):
-            input_shape = ((input_shape[0][0], param_value * feats, *input_shape[0][2:]),
-                           (input_shape[1][0], param_value * feats, *input_shape[1][2:]))
+            # Transformer models: input is (n_window, batch, feats)
+            input_shape = ((param_value, *input_shape[0][1:]),
+                           (param_value, *input_shape[1][1:]))
+        elif name in ("Attention",):
+            # Attention: input is (n_window, feats)
+            input_shape = (param_value, *input_shape[1:])
         else:
+            # Flat models: input is (batch, n_window * feats)
             input_shape = (input_shape[0], param_value * feats, *input_shape[2:])
 
     # forward
@@ -221,6 +227,27 @@ def test_model_parametrized_variations(ModelClass, param_name, param_value):
         assert len(grads) > 0
         assert any((g.abs().sum() > 0) for g in grads)
 
+
+@pytest.mark.parametrize("feats", [3, 5, 8])
+def test_mtad_gat_feature_variations(feats):
+    """MTAD_GAT requires n_window == feats; test with different feature counts."""
+    model = MTAD_GAT(feats)
+    input_shape = (1, feats * feats)
+
+    model.eval()
+    with torch.no_grad():
+        x = torch.randn(*input_shape, dtype=torch.float64)
+        out = model(x)
+    assert isinstance(out[0], torch.Tensor)
+
+    model.train()
+    x = torch.randn(*input_shape, dtype=torch.float64, requires_grad=True)
+    out = model(x)
+    loss = out[0].view(-1).sum()
+    loss.backward()
+    grads = [p.grad for p in model.parameters() if p.grad is not None]
+    assert len(grads) > 0
+    assert any((g.abs().sum() > 0) for g in grads)
 
 
 @pytest.mark.parametrize("ModelClass, input_shape", [
