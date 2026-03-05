@@ -135,12 +135,14 @@ def _shannon_entropy(series):
 
 
 
-def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, test_seconds=120, calibration_seconds=60, valid_seconds=120):
+def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, test_seconds=120, calibration_seconds=60, valid_seconds=120, extended_features=False):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 
-	Groups by integer unix-second and IP to produce per-second per-IP features:
-	- in/out event counts, bytes in/out, rw ratio, port entropy,
-	  num unique destinations, num unique sources.
+	Groups by integer unix-second and IP to produce per-second per-IP features.
+	By default only num unique sources and destinations per IP are included.
+	Set extended_features=True to also include in/out event counts, bytes
+	in/out, rw ratio, port entropy, rows_per_second, and empty_rows.
+
 	Non-top-k IPs are replaced by 'other_internal' or 'other_external' before
 	grouping, so they naturally aggregate in a single groupby pass.
 	"""
@@ -195,31 +197,34 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 	df[src_col] = df[src_col].astype(str).str.strip().map(_classify)
 	df[dst_col] = df[dst_col].astype(str).str.strip().map(_classify)
 
-	# Global rows-per-second
-	rows_per_second = df.groupby('ts_sec').size().rename('rows_per_second')
+	if extended_features:
+		# Global rows-per-second
+		rows_per_second = df.groupby('ts_sec').size().rename('rows_per_second')
 
-	# Empty-row count (rows with no src/dst IP)
-	empty_mask = (
-		(df[src_col].isna() | (df[src_col].astype(str).str.strip() == '')) &
-		(df[dst_col].isna() | (df[dst_col].astype(str).str.strip() == ''))
-	)
-	empty_rows = df[empty_mask].groupby('ts_sec').size().rename('empty_rows')
+		# Empty-row count (rows with no src/dst IP)
+		empty_mask = (
+			(df[src_col].isna() | (df[src_col].astype(str).str.strip() == '')) &
+			(df[dst_col].isna() | (df[dst_col].astype(str).str.strip() == ''))
+		)
+		empty_rows = df[empty_mask].groupby('ts_sec').size().rename('empty_rows')
 
 	# Outgoing aggregation: group by (ts_sec, src_ip)
 	out_grp = df.groupby(['ts_sec', src_col])
-	out_agg = pd.DataFrame({'out_count': out_grp.size()})
-	if bytes_col:
-		out_agg['bytes_out'] = out_grp[bytes_col].sum()
-	out_agg['num_dsts'] = out_grp[dst_col].nunique()
-	if src_port_col:
-		out_agg['port_entropy'] = out_grp[src_port_col].apply(_shannon_entropy)
+	out_agg = pd.DataFrame({'num_dsts': out_grp[dst_col].nunique()})
+	if extended_features:
+		out_agg['out_count'] = out_grp.size()
+		if bytes_col:
+			out_agg['bytes_out'] = out_grp[bytes_col].sum()
+		if src_port_col:
+			out_agg['port_entropy'] = out_grp[src_port_col].apply(_shannon_entropy)
 
 	# Incoming aggregation: group by (ts_sec, dst_ip)
 	in_grp = df.groupby(['ts_sec', dst_col])
-	in_agg = pd.DataFrame({'in_count': in_grp.size()})
-	if bytes_col:
-		in_agg['bytes_in'] = in_grp[bytes_col].sum()
-	in_agg['num_srcs'] = in_grp[src_col].nunique()
+	in_agg = pd.DataFrame({'num_srcs': in_grp[src_col].nunique()})
+	if extended_features:
+		in_agg['in_count'] = in_grp.size()
+		if bytes_col:
+			in_agg['bytes_in'] = in_grp[bytes_col].sum()
 
 	# Unstack IP level → wide format; flatten MultiIndex columns to "{ip}_{metric}"
 	out_wide = out_agg.unstack(level=src_col, fill_value=0)
@@ -234,14 +239,19 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 	features_df = (
 		out_wide.reindex(full_idx, fill_value=0)
 		.join(in_wide.reindex(full_idx, fill_value=0), how='outer')
-		.join(rows_per_second.reindex(full_idx, fill_value=0), how='outer')
-		.join(empty_rows.reindex(full_idx, fill_value=0), how='outer')
 		.fillna(0)
 	)
+	if extended_features:
+		features_df = (
+			features_df
+			.join(rows_per_second.reindex(full_idx, fill_value=0), how='outer')
+			.join(empty_rows.reindex(full_idx, fill_value=0), how='outer')
+			.fillna(0)
+		)
 	features_df.index.name = 'ts_sec'
 
 	# Derive rw_ratio per IP
-	if bytes_col:
+	if extended_features and bytes_col:
 		for ip in list(top_ips) + ['other_internal', 'other_external']:
 			b_in_col  = f'{ip}_bytes_in'
 			b_out_col = f'{ip}_bytes_out'
