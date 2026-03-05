@@ -14,6 +14,215 @@ spec_path = pathlib.Path(__file__).parent / "expected_model_outputs.json"
 with open(spec_path, "r") as f:
     EXPECTED_MODEL_OUTPUTS = json.load(f)
 
+# One-at-a-time variations for model constructor hyperparameters.
+# Each entry lists values to test (include default and at least one alternative).
+VARIATIONS = {
+    "LSTM_Univariate": {
+        "n_hidden": [1, 4, 8],
+        "n_layers": [1, 2],
+        "learning_rate": [0.002, 0.01],
+    },
+    "Attention": {
+        "n_window": [5, 3, 10],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "LSTM_AD": {
+        "n_hidden": [64, 32, 128],
+        "n_layers": [1, 2],
+        "learning_rate": [0.002, 0.01],
+    },
+    "DAGMM": {
+        "n_hidden": [16, 8, 32],
+        "n_latent": [8, 4, 16],
+        "n_window": [5, 3, 10],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "OmniAnomaly": {
+        "n_hidden": [32, 16, 64],
+        "n_latent": [8, 4, 16],
+        "n_layers": [2, 1, 3],
+        "beta": [0.01, 0.001, 0.1],
+        "learning_rate": [0.002, 0.01],
+    },
+    "USAD": {
+        "n_hidden": [16, 8, 32],
+        "n_latent": [5, 3, 10],
+        "n_window": [5, 3, 10],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "MSCRED": {
+        "n_window": [5, 10],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "CAE_M": {
+        "n_window": [5, 10],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "MTAD_GAT": {
+        "n_window": [5, 10],
+        "n_hidden": [16, 25],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "GDN": {
+        "n_window": [5, 3, 10],
+        "n_hidden": [16, 8, 32],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "MAD_GAN": {
+        "n_window": [5, 3, 10],
+        "n_hidden": [16, 8, 32],
+        "learning_rate": [0.0001, 0.001],
+    },
+    "TranAD_Basic": {
+        "n_window": [10, 5],
+        "batch_size": [128, 32],
+        "dim_feedforward": [16, 32],
+        "dropout": [0.1, 0.0, 0.2],
+        "nheads": [1, 5],
+    },
+    "TranAD_Transformer": {
+        "n_window": [10, 5],
+        "batch_size": [128, 32],
+        "n_hidden": [8, 16],
+    },
+    "TranAD_Adversarial": {
+        "n_window": [10, 5],
+        "batch_size": [128, 32],
+        "dim_feedforward": [16, 32],
+        "dropout": [0.1, 0.0],
+        "nheads": [1, 5],
+    },
+    "TranAD_SelfConditioning": {
+        "n_window": [10, 5],
+        "batch_size": [128, 32],
+        "dim_feedforward": [16, 32],
+        "dropout": [0.1, 0.0],
+        "nheads": [1, 5],
+    },
+    "TranAD": {
+        "n_window": [10, 5],
+        "batch_size": [128, 32],
+        "dim_feedforward": [16, 32],
+        "dropout": [0.1, 0.0],
+        "nheads": [1, 5],
+    },
+}
+
+# Map model class name to a small input shape for forward/backward checks.
+MODEL_INPUT_SHAPES = {
+    "LSTM_Univariate": (5, 5, 1),
+    "Attention": (5, 5),
+    "LSTM_AD": (5, 5),
+    "DAGMM": (1, 25),
+    "OmniAnomaly": (5,),
+    "USAD": (1, 25),
+    "MSCRED": (1, 25),
+    "CAE_M": (1, 25),
+    "MTAD_GAT": (1, 25),
+    "GDN": (1, 25),
+    "MAD_GAN": (1, 25),
+    "TranAD_Basic": ((10, 5, 5), (10, 5, 5)),
+    "TranAD_Transformer": ((10, 5, 5), (10, 5, 5)),
+    "TranAD_Adversarial": ((10, 5, 5), (10, 5, 5)),
+    "TranAD_SelfConditioning": ((10, 5, 5), (10, 5, 5)),
+    "TranAD": ((10, 5, 5), (10, 5, 5)),
+}
+
+# Build parametrization cases: (ModelClass, param_name, param_value)
+PARAM_TEST_CASES = []
+for cls in [LSTM_Univariate, Attention, LSTM_AD, DAGMM, OmniAnomaly, USAD, MSCRED,
+            CAE_M, MTAD_GAT, GDN, MAD_GAN, TranAD_Basic, TranAD_Transformer,
+            TranAD_Adversarial, TranAD_SelfConditioning, TranAD]:
+    name = cls.__name__
+    if name not in VARIATIONS:
+        continue
+    for param_name, values in VARIATIONS[name].items():
+        for v in values:
+            PARAM_TEST_CASES.append((cls, param_name, v))
+
+
+def _instantiate_or_skip(ModelClass, feats, overrides):
+    """Try to instantiate ModelClass(feats, **overrides) or skip if kwargs unsupported."""
+    try:
+        return ModelClass(feats, **overrides)
+    except TypeError as e:
+        pytest.skip(f"Constructor for {ModelClass.__name__} rejected kwargs {overrides}: {e}")
+
+
+@pytest.mark.parametrize("ModelClass,param_name,param_value", PARAM_TEST_CASES)
+def test_model_parametrized_variations(ModelClass, param_name, param_value):
+    """One-at-a-time hyperparameter variation: ensure no runtime errors and numeric outputs.
+
+    For each (model, param, value) we instantiate with that single override and run
+    a forward and backward pass (if applicable). If the constructor doesn't accept
+    the kwarg, the test is skipped for that case.
+    """
+    name = ModelClass.__name__
+    overrides = {param_name: param_value}
+    input_shape = MODEL_INPUT_SHAPES.get(name)
+    feats = 5
+
+    model = _instantiate_or_skip(ModelClass, feats, overrides)
+    if param_name == "n_window":
+        if isinstance(input_shape[0], tuple):
+            input_shape = ((input_shape[0][0], param_value * feats, *input_shape[0][2:]),
+                           (input_shape[1][0], param_value * feats, *input_shape[1][2:]))
+        else:
+            input_shape = (input_shape[0], param_value * feats, *input_shape[2:])
+
+    # forward
+    model.eval()
+    with torch.no_grad():
+        if isinstance(input_shape, tuple) and isinstance(input_shape[0], tuple):
+            src = torch.randn(*input_shape[0], dtype=torch.float64)
+            tgt = torch.randn(*input_shape[1], dtype=torch.float64)
+            out = model(src, tgt)
+        else:
+            x = torch.randn(*input_shape, dtype=torch.float64)
+            out = model(x)
+
+    # basic numeric checks: output should be tensor or nested tensors
+    def _contains_tensor(o):
+        if isinstance(o, torch.Tensor):
+            return True
+        if isinstance(o, (list, tuple)):
+            return any(_contains_tensor(x) for x in o)
+        return False
+
+    assert _contains_tensor(out), f"Output for {name} with {param_name}={param_value} contains no tensors"
+
+    # backward pass: ensure gradients flow for at least one param (if trainable params exist)
+    model.train()
+    if isinstance(input_shape, tuple) and isinstance(input_shape[0], tuple):
+        src = torch.randn(*input_shape[0], dtype=torch.float64, requires_grad=True)
+        tgt = torch.randn(*input_shape[1], dtype=torch.float64, requires_grad=True)
+        out = model(src, tgt)
+    else:
+        x = torch.randn(*input_shape, dtype=torch.float64, requires_grad=True)
+        out = model(x)
+
+    # reduce to scalar
+    if isinstance(out, (tuple, list)):
+        loss = 0
+        for o in out:
+            if isinstance(o, (tuple, list)):
+                for p in o:
+                    loss = loss + p.view(-1).sum()
+            else:
+                loss = loss + o.view(-1).sum()
+    else:
+        loss = out.view(-1).sum()
+
+    # backward
+    loss.backward()
+    grads = [p.grad for p in model.parameters() if p.grad is not None]
+    # If model has trainable params, ensure at least one has a non-zero grad
+    if len(list(model.parameters())) > 0:
+        assert len(grads) > 0
+        assert any((g.abs().sum() > 0) for g in grads)
+
+
+
 @pytest.mark.parametrize("ModelClass, input_shape", [
     (LSTM_Univariate, (5, 5, 1)),      # feats=1, batch=5, seq_len=5
     (Attention, (5, 5)),               # seq_len=5, feats=5
