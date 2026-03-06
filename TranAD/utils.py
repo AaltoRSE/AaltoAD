@@ -80,13 +80,10 @@ def load_hyperparams_from_string(hyperparams_str: str) -> Dict:
 	
 	# Try to load as file
 	if os.path.exists(hyperparams_str):
-		try:
-			with open(hyperparams_str) as f:
-				return json.load(f)
-		except:
-			pass
-	
-	return {}
+		with open(hyperparams_str) as f:
+			return json.load(f)
+
+	raise ValueError(f"Could not parse hyperparameters: not valid JSON and not an existing file path: {hyperparams_str!r}")
 
 
 def convert_to_windows(data: torch.Tensor, model_obj, model_name: str) -> torch.Tensor:
