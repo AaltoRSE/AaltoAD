@@ -89,10 +89,10 @@ def load_model(
 			- applied_hyperparams (dict): Hyperparameters that were applied to the model.
 	"""
 	model_class = getattr(models, modelname)
-	model = model_class(dims).double()
-	
+
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
-	applied_hyperparams = utils.apply_hyperparameters(model, hyperparams)
+	model = model_class(dims, **hyperparams).double()
+	applied_hyperparams = hyperparams
 	
 	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)

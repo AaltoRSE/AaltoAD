@@ -60,24 +60,6 @@ def get_git_hash():
 		return 'unknown'
 
 
-def apply_hyperparameters(model: torch.nn.Module, hyperparams: Dict) -> Dict:
-	"""Apply hyperparameters to model instance.
-	
-	Args:
-		model (torch.nn.Module): Model instance
-		hyperparams (dict): Hyperparameters to apply
-		
-	Returns:
-		dict: The hyperparameters that were actually applied
-	"""
-	applied = {}
-	for key, value in hyperparams.items():
-		if hasattr(model, key):
-			setattr(model, key, value)
-			applied[key] = value
-	return applied
-
-
 def load_hyperparams_from_string(hyperparams_str: str) -> Dict:
 	"""Load hyperparameters from a JSON string or file path.
 	
