@@ -62,7 +62,7 @@
       "dataset": "TOL",
       "model": "MSCRED",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10, 0],
+      "n_window": [5, 10, null],
       "notes": "MSCRED"
     },
     {
@@ -70,7 +70,7 @@
       "dataset": "TOL",
       "model": "CAE_M",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10, 0],
+      "n_window": [5, 10, null],
       "notes": "CAE_M"
     },
     {
