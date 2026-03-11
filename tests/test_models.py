@@ -228,6 +228,52 @@ def test_model_parametrized_variations(ModelClass, param_name, param_value):
         assert any((g.abs().sum() > 0) for g in grads)
 
 
+@pytest.mark.parametrize("n_hidden", [1, 4, 16])
+@pytest.mark.parametrize("feats", [3, 5])
+def test_lstm_univariate_output_shape_matches_input(n_hidden, feats):
+    """LSTM_Univariate output shape must match input regardless of n_hidden.
+
+    Regression test: with n_hidden > 1, the output was (batch, feats * n_hidden)
+    instead of (batch, feats) because the LSTM hidden output was not reduced
+    to a single value per feature before concatenation.
+    """
+    n_window = 5
+    model = LSTM_Univariate(feats, n_hidden=n_hidden, n_layers=1)
+    model.eval()
+    x = torch.randn(n_window, feats, 1, dtype=torch.float64)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (n_window, feats), (
+        f"Expected output shape ({n_window}, {feats}) but got {out.shape} "
+        f"with n_hidden={n_hidden}"
+    )
+
+
+def test_backprop_omni_scalar_loss():
+    """OmniAnomaly backprop must produce a scalar loss with reduction='none'.
+
+    Regression test: the loss was computed as MSE + beta * KLD without reducing
+    to a scalar first, causing 'grad can be implicitly created only for scalar
+    outputs' when calling loss.backward().
+    """
+    from TranAD.run_experiment import _backprop_omni
+
+    feats = 5
+    n_window = 5
+    model = OmniAnomaly(feats, n_hidden=32, n_latent=16, beta=0.01)
+    data = torch.randn(10, feats, dtype=torch.float64)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
+
+    # This should not raise "grad can be implicitly created only for scalar outputs"
+    result = _backprop_omni(epoch=0, model=model, data=data,
+                            optimizer=optimizer, scheduler=scheduler,
+                            training=True, feats=feats)
+    loss_val, lr = result
+    assert isinstance(loss_val, float), f"Loss should be a float scalar, got {type(loss_val)}"
+    assert isinstance(lr, float)
+
+
 @pytest.mark.parametrize("feats", [3, 5, 8])
 def test_mtad_gat_feature_variations(feats):
     """MTAD_GAT requires n_window == feats; test with different feature counts."""

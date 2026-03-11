@@ -34,7 +34,7 @@ class LSTM_Univariate(nn.Module):
 			for j in range(self.n_feats):
 				univariate_input = g.view(-1)[j].view(1, 1, -1).to(torch.float64)
 				out, hidden[j] = self.lstm[j](univariate_input, hidden[j])
-				multivariate_output.append(2 * out.view(-1))
+				multivariate_output.append(2 * out[:, :, -1].view(-1))
 			output = torch.cat(multivariate_output)
 			outputs.append(output)
 		return torch.stack(outputs)
