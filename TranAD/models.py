@@ -218,7 +218,7 @@ class MSCRED(nn.Module):
 		self.name = 'MSCRED'
 		self.lr = learning_rate
 		self.n_feats = feats
-		self.n_window = feats if n_window is None else n_window
+		self.n_window = n_window or feats
 		self.encoder = nn.ModuleList([
 			dlutils.ConvLSTM(1, 32, (3, 3), 1, True, True, False),
 			dlutils.ConvLSTM(32, 64, (3, 3), 1, True, True, False),
@@ -250,7 +250,7 @@ class CAE_M(nn.Module):
 		self.name = 'CAE_M'
 		self.lr = learning_rate
 		self.n_feats = feats
-		self.n_window = feats if n_window is None else n_window
+		self.n_window = n_window or feats
 		self.encoder = nn.Sequential(
 			nn.Conv2d(1, 8, (3, 3), 1, 1), nn.Sigmoid(),
 			nn.Conv2d(8, 16, (3, 3), 1, 1), nn.Sigmoid(),
@@ -279,7 +279,7 @@ class MTAD_GAT(nn.Module):
 		self.name = 'MTAD_GAT'
 		self.lr = learning_rate
 		self.n_feats = feats
-		self.n_window = feats if n_window is None else n_window
+		self.n_window = n_window or feats
 		self.n_hidden = feats * feats if n_hidden is None else n_hidden
 		edge_index = torch.tensor([list(range(1, feats+1)), [0]*feats], dtype=torch.long)
 		edge_index, _ = add_self_loops(edge_index)

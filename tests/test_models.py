@@ -274,6 +274,27 @@ def test_backprop_omni_scalar_loss():
     assert isinstance(lr, float)
 
 
+@pytest.mark.parametrize("ModelClass", [MSCRED, CAE_M])
+@pytest.mark.parametrize("n_window", [0, None])
+def test_conv_models_fallback_on_falsy_n_window(ModelClass, n_window):
+    """Models with convolutions must handle n_window=0 or None gracefully.
+
+    Regression test: n_window=0 was passed from the experiment config, but the
+    model only checked for None, so 0 was used as the actual window size,
+    causing 'Kernel size can't be greater than actual input size' in Conv layers.
+    """
+    feats = 5
+    model = ModelClass(feats, n_window=n_window)
+    assert model.n_window == feats, (
+        f"Expected n_window to fall back to feats={feats}, got {model.n_window}"
+    )
+    model.eval()
+    x = torch.randn(1, model.n_window * feats, dtype=torch.float64)
+    with torch.no_grad():
+        out = model(x)
+    assert out is not None
+
+
 @pytest.mark.parametrize("feats", [3, 5, 8])
 def test_mtad_gat_feature_variations(feats):
     """MTAD_GAT requires n_window == feats; test with different feature counts."""
