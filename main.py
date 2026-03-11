@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import traceback
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
 from itertools import product
@@ -283,7 +284,8 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 			print(f"✗ ERROR  Exp {exp_id}: Result file not created")
 			return False
 	except Exception as e:
-		print(f"✗ ERROR  Exp {exp_id}: {str(e)[:200]}")
+		print(f"✗ ERROR  Exp {exp_id}: {e}")
+		traceback.print_exc()
 		return False
 
 
