@@ -221,7 +221,7 @@ def _backprop_omni(epoch, model, data, optimizer, scheduler, training, feats):
 			y_pred, mu, logvar, hidden = model(d, hidden if i else None)
 			MSE = l(y_pred, d)
 			KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=0)
-			loss = MSE + model.beta * KLD
+			loss = torch.mean(MSE) + model.beta * torch.mean(KLD)
 			mses.append(torch.mean(MSE).item())
 			klds.append(model.beta * torch.mean(KLD).item())
 			optimizer.zero_grad()
