@@ -135,7 +135,7 @@ def _shannon_entropy(series):
 
 
 
-def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, test_seconds=240, calibration_seconds=60, valid_seconds=120, extended_features=False, anomaly_start_sec=480, anomaly_duration_sec=None):
+def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, calibration_seconds=60, test_seconds=240, valid_seconds=120, extended_features=False, anomaly_start_sec=480, anomaly_duration_sec=None):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 
 	Groups by integer unix-second and IP to produce per-second per-IP features.
