@@ -10,7 +10,7 @@ datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'M
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
 
-def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_folder=DEFAULT_DATA_FOLDER):
+def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_folder=DEFAULT_DATA_FOLDER, anomaly_start_sec=480, anomaly_duration_sec=None):
 	folder = os.path.join(output_folder, dataset)
 	os.makedirs(folder, exist_ok=True)
 
@@ -19,7 +19,7 @@ def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_
 		raise Exception(f'CSV file not found: {csv_path}')
 	
 	if dataset == 'TOL':
-		TranAD.preprocessing.load_TOL(folder, top_k=100, csv_path=csv_path, data_folder=data_folder, extended_features=False)
+		TranAD.preprocessing.load_TOL(folder, top_k=100, csv_path=csv_path, data_folder=data_folder, extended_features=False, anomaly_start_sec=anomaly_start_sec, anomaly_duration_sec=anomaly_duration_sec)
 	elif csv_path:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
 	elif dataset == 'UCR':
@@ -47,6 +47,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Preprocess datasets for anomaly detection')
 	parser.add_argument('datasets', nargs='+', help='One or more dataset types to preprocess (e.g. SMAP SMD SWaT)')
 	parser.add_argument('--csv', type=str, help='Path to CSV file to preprocess (optional, only used for TOL)')
+	parser.add_argument('--anomaly-start', type=int, default=480, help='Absolute second when anomaly begins (default: 480, i.e. minute 8)')
+	parser.add_argument('--anomaly-duration', type=int, default=None, help='Anomaly duration in seconds (default: None = until end of data)')
 	args = parser.parse_args()
 
 	# Iterate over provided dataset names and process each
@@ -55,6 +57,6 @@ if __name__ == '__main__':
 			print(f"Skipping unknown dataset '{ds}'. Supported: {datasets}")
 			continue
 		try:
-			load_data(ds, csv_path=args.csv)
+			load_data(ds, csv_path=args.csv, anomaly_start_sec=args.anomaly_start, anomaly_duration_sec=args.anomaly_duration)
 		except Exception as e:
 			print(f"Error processing {ds}: {e}")

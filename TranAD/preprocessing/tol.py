@@ -135,7 +135,7 @@ def _shannon_entropy(series):
 
 
 
-def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, test_seconds=120, calibration_seconds=60, valid_seconds=120, extended_features=False):
+def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, test_seconds=240, calibration_seconds=60, valid_seconds=120, extended_features=False, anomaly_start_sec=480, anomaly_duration_sec=None):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 
 	Groups by integer unix-second and IP to produce per-second per-IP features.
@@ -270,19 +270,40 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 		for n in feature_names:
 			print(' ', n, ':', row[n])
 
-	# Train/test split and normalization
+	# Partition order: train → calib → test → valid
+	# Calib comes before test to ensure it uses only normal (pre-anomaly) data.
 	features = features_df.values.astype(float)
 	train = features[:train_seconds]
-	test  = features[train_seconds:train_seconds + test_seconds]
-	calib = features[train_seconds + test_seconds:train_seconds + test_seconds + calibration_seconds]
-	valid = features[train_seconds + test_seconds + calibration_seconds:]
+	calib = features[train_seconds:train_seconds + calibration_seconds]
+	test_start = train_seconds + calibration_seconds
+	test  = features[test_start:test_start + test_seconds]
+	valid = features[test_start + test_seconds:test_start + test_seconds + valid_seconds]
 	if train.size == 0:
 		raise ValueError('Training partition is empty after split; cannot normalize')
 	train, min_a, max_a = normalize3(train)
 	if test.size != 0:
 		test, _, _ = normalize3(test, min_a, max_a)
+
+	# Generate anomaly labels for test and validation partitions
 	labels = np.zeros_like(test)
-	for name, arr in [('train', train), ('test', test), ('calib', calib), ('valid', valid), ('labels', labels)]:
+	valid_labels = np.zeros_like(valid)
+	if anomaly_start_sec is not None:
+		anomaly_end_sec = anomaly_start_sec + anomaly_duration_sec if anomaly_duration_sec is not None else len(features)
+		# Test labels: convert absolute seconds to test-relative indices
+		label_start = max(0, anomaly_start_sec - test_start)
+		label_end = max(0, anomaly_end_sec - test_start)
+		if label_start < labels.shape[0]:
+			labels[label_start:label_end] = 1
+		# Validation labels: convert absolute seconds to valid-relative indices
+		valid_start = test_start + test_seconds
+		vlabel_start = max(0, anomaly_start_sec - valid_start)
+		vlabel_end = max(0, anomaly_end_sec - valid_start)
+		if vlabel_start < valid_labels.shape[0]:
+			valid_labels[vlabel_start:vlabel_end] = 1
+		n_feat = max(labels.shape[1], 1)
+		print(f"  Anomaly labels: {int(labels.sum() / n_feat)}/{labels.shape[0]} test rows, {int(valid_labels.sum() / n_feat)}/{valid_labels.shape[0]} valid rows (absolute seconds {anomaly_start_sec}-{anomaly_end_sec})")
+
+	for name, arr in [('train', train), ('test', test), ('calib', calib), ('valid', valid), ('labels', labels), ('valid_labels', valid_labels)]:
 		np.save(os.path.join(folder, f'{name}.npy'), arr.astype('float64'))
 	if csv_path:
 		print(f"Processed {csv_path} as TOL -> {folder}/")

@@ -137,7 +137,11 @@ data/WADI/table_WADI.pdf
 data/WADI/WADI_14days.csv
 data/WADI/WADI_attackdata.csv
 
+slurm*.out
 
+# IDEs
+.vscode
+.map
 AGENTS.md
 
 data/sample_data.csv
