@@ -5,6 +5,7 @@ This module contains functions for running individual and multiple experiments.
 """
 
 import os
+import hashlib
 import pandas as pd
 import csv
 import json
@@ -33,9 +34,24 @@ import shutil
 import re
 
 
-def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str, root_path: str = ''):
+def _hyperparams_hash(hyperparams: dict) -> str:
+	"""Return a short hash (first 8 chars of SHA256) of the sorted JSON representation of hyperparams.
+
+	Args:
+		hyperparams (dict): Hyperparameter dictionary to hash.
+
+	Returns:
+		str: 8-character hex string, or "default" if hyperparams is empty or None.
+	"""
+	if not hyperparams:
+		return 'default'
+	serialized = json.dumps(hyperparams, sort_keys=True)
+	return hashlib.sha256(serialized.encode()).hexdigest()[:8]
+
+
+def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str, root_path: str = '', hyperparams: dict = None, metadata: dict = None):
 	"""Save model checkpoint including state dicts and training metadata.
-	
+
 	Args:
 		model (torch.nn.Module): The neural network model to save.
 		optimizer (torch.optim.Optimizer): The optimizer state to save (e.g., AdamW).
@@ -44,11 +60,16 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: st
 		accuracy_list (list): List of tuples containing (loss, learning_rate) for each epoch.
 		model_name (str): Name of the model for checkpoint path.
 		dataset_name (str): Name of the dataset for checkpoint path.
-	
+		root_path (str): Root path prefix for the checkpoints directory.
+		hyperparams (dict): Hyperparameters used to train the model; included in the hash subdir.
+		metadata (dict): Additional metadata to save (e.g., data shapes, dataset info).
+
 	Returns:
-		None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/model.ckpt
+		None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/{hash}/model.ckpt
+		with hyperparams.json and metadata.json alongside it.
 	"""
-	folder = f'{root_path}checkpoints/{model_name}_{dataset_name}/'
+	hp_hash = _hyperparams_hash(hyperparams)
+	folder = f'{root_path}checkpoints/{model_name}_{dataset_name}/{hp_hash}/'
 	os.makedirs(folder, exist_ok=True)
 	file_path = f'{folder}/model.ckpt'
 	torch.save({
@@ -57,6 +78,11 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: st
         'optimizer_state_dict': optimizer.state_dict(),
         'scheduler_state_dict': scheduler.state_dict(),
         'accuracy_list': accuracy_list}, file_path)
+	with open(f'{folder}/hyperparams.json', 'w') as hf:
+		json.dump(hyperparams if hyperparams else {}, hf, indent=2)
+	if metadata:
+		with open(f'{folder}/metadata.json', 'w') as mf:
+			json.dump(metadata, mf, indent=2)
 
 
 def load_model(
@@ -87,16 +113,18 @@ def load_model(
 			- epoch (int): Starting epoch (-1 if new model, otherwise loaded epoch from checkpoint).
 			- accuracy_list (list): List of training metrics from checkpoint or empty list for new model.
 			- applied_hyperparams (dict): Hyperparameters that were applied to the model.
+			- hp_hash (str): Short hash of the applied hyperparameters, used in checkpoint paths.
 	"""
 	model_class = getattr(models, modelname)
 
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
 	model = model_class(dims, **hyperparams).double()
 	applied_hyperparams = hyperparams
-	
+	hp_hash = _hyperparams_hash(applied_hyperparams)
+
 	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
-	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/model.ckpt'
+	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/{hp_hash}/model.ckpt'
 	if os.path.exists(fname) and (not retrain or test):
 		print(f"{utils.color.GREEN}Loading pre-trained model: {model.name}{utils.color.ENDC}")
 		try:
@@ -112,7 +140,7 @@ def load_model(
 		print(f"{utils.color.GREEN}Creating new model: {model.name}{utils.color.ENDC}")
 		epoch = -1
 		accuracy_list = []
-	return model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams
+	return model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams, hp_hash
 
 
 def append_benchmark_row(model_name, dataset_name, result_dict, bench_path=os.path.join('results', 'benchmarks.csv')):
@@ -423,7 +451,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		res = merlin.run_merlin(test_loader, labels, dataset_name)
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
-	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams = load_model(
+	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams, hp_hash = load_model(
 		model_name, labels.shape[1], dataset_name,
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
@@ -444,7 +472,14 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			lossT, lr = backprop(e, model, trainD, trainO, optimizer, scheduler)
 			accuracy_list.append((lossT, lr))
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
-		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name)
+		data_metadata = {
+			'dataset': dataset_name,
+			'train_shape': list(trainO.shape),
+			'test_shape': list(testO.shape),
+			'labels_shape': list(labels.shape),
+			'num_features': int(trainO.shape[1]),
+		}
+		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name, hyperparams=applied_hyperparams, metadata=data_metadata)
 		utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
 
 	### Testing phase
