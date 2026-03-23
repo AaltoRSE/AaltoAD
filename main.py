@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Optional, List, Tuple
 from itertools import product
 import re
+import time
 
 import TranAD
 from TranAD.parser import parser
@@ -237,6 +238,52 @@ def has_matching_result(dataset: str, model: str, exp_id: str) -> Optional[str]:
 	return None
 
 
+def get_claim_path(dataset: str, model: str, exp_id: str) -> str:
+	"""Get claim file path for a sub-experiment."""
+	results_dir = Path('results') / dataset
+	results_dir.mkdir(parents=True, exist_ok=True)
+	return str(results_dir / f".claim_{model}_exp{exp_id}")
+
+
+def try_claim_task(dataset: str, model: str, exp_id: str) -> bool:
+	"""Atomically claim a task using exclusive file creation.
+
+	Returns True if successfully claimed, False if already claimed.
+	"""
+	claim_path = get_claim_path(dataset, model, exp_id)
+	try:
+		fd = os.open(claim_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+		worker_id = os.environ.get('SLURM_ARRAY_TASK_ID', str(os.getpid()))
+		os.write(fd, f"{worker_id}\n{time.time()}\n".encode())
+		os.close(fd)
+		return True
+	except FileExistsError:
+		return False
+
+
+def release_claim(dataset: str, model: str, exp_id: str):
+	"""Remove claim file for a task."""
+	claim_path = get_claim_path(dataset, model, exp_id)
+	try:
+		os.remove(claim_path)
+	except FileNotFoundError:
+		pass
+
+
+def is_stale_claim(dataset: str, model: str, exp_id: str, max_age_hours: float = 13.0) -> bool:
+	"""Check if a claim file is stale (older than max_age_hours) and remove it if so."""
+	claim_path = get_claim_path(dataset, model, exp_id)
+	try:
+		mtime = os.path.getmtime(claim_path)
+		if time.time() - mtime > max_age_hours * 3600:
+			os.remove(claim_path)
+			print(f"Removed stale claim: {claim_path}")
+			return True
+	except FileNotFoundError:
+		pass
+	return False
+
+
 def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Dict) -> bool:
 	"""Run one experiment or sub-experiment from experiment file.
 	
@@ -287,6 +334,55 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 		print(f"✗ ERROR  Exp {exp_id}: {e}")
 		traceback.print_exc()
 		return False
+
+
+def run_worker_loop(experiments: list, retrain: bool = False):
+	"""Run a worker loop that claims and executes tasks until none remain.
+
+	Each iteration scans all sub-experiments, skips completed and claimed ones,
+	and tries to claim and run the next available task.
+	"""
+	all_subexps = collect_all_subexperiments(experiments)
+	worker_id = os.environ.get('SLURM_ARRAY_TASK_ID', str(os.getpid()))
+	print(f"Worker {worker_id} starting. Total sub-experiments: {len(all_subexps)}")
+
+	completed = 0
+	failed = 0
+
+	while True:
+		claimed_any = False
+
+		for exp_id, dataset, model, hyperparams in all_subexps:
+			# Skip if already has results
+			if not retrain and has_matching_result(dataset, model, exp_id):
+				continue
+
+			# Clean up stale claims
+			is_stale_claim(dataset, model, exp_id)
+
+			# Try to claim this task
+			if not try_claim_task(dataset, model, exp_id):
+				continue
+
+			claimed_any = True
+			print(f"Worker {worker_id} claimed Exp {exp_id}: {model} on {dataset}")
+
+			try:
+				success = run_single_experiment(dataset, model, exp_id, hyperparams)
+				if success:
+					completed += 1
+				else:
+					failed += 1
+			finally:
+				release_claim(dataset, model, exp_id)
+
+			# Break to rescan from the beginning
+			break
+
+		if not claimed_any:
+			break
+
+	print(f"\nWorker {worker_id} finished. Completed: {completed}, Failed: {failed}")
 
 
 def handle_single_run(args):
@@ -406,6 +502,11 @@ def handle_experiment_file(args):
 		
 		return 0
 	
+	# Worker loop mode
+	if args.worker:
+		run_worker_loop(experiments, retrain=args.retrain)
+		return 0
+
 	# Array job mode
 	if args.array_index is not None:
 		result = map_array_index_to_subexperiment(experiments, args.array_index, retrain=args.retrain)

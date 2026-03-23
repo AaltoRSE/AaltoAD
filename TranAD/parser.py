@@ -77,6 +77,9 @@ parser.add_argument('--list',
 parser.add_argument('--status', 
 					action='store_true',
 					help="Show status of experiments in file")
+parser.add_argument('--worker',
+					action='store_true',
+					help="Run as a worker that loops claiming and running tasks until none remain")
 
 def parse_arguments():
 	"""Parse command-line arguments and return the args object."""
