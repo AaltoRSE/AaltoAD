@@ -7,8 +7,10 @@ from torch_geometric.nn import GATConv
 from torch.nn import TransformerEncoder
 from torch.nn import TransformerDecoder
 from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
+from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 import math
+from tqdm import tqdm
 from TranAD import dlutils
 from TranAD import constants
 torch.manual_seed(1)
@@ -39,6 +41,22 @@ class LSTM_Univariate(nn.Module):
 			outputs.append(output)
 		return torch.stack(outputs)
 
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='mean' if training else 'none')
+		y_pred = self(data)
+		loss = l(y_pred, data)
+		if training:
+			tqdm.write(f'Epoch {epoch},\tMSE = {loss}')
+			optimizer.zero_grad()
+			loss.backward()
+			optimizer.step()
+			scheduler.step()
+			return loss.item(), optimizer.param_groups[0]['lr']
+		else:
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
+
+
 ## Simple Multi-Head Self-Attention Model
 class Attention(nn.Module):
 	def __init__(self, feats, n_window=5, learning_rate=0.0001):
@@ -56,8 +74,35 @@ class Attention(nn.Module):
 	def forward(self, g):
 		for at in self.atts:
 			ats = at(g.view(-1)).reshape(self.n_feats, self.n_feats)
-			g = torch.matmul(g, ats)	
+			g = torch.matmul(g, ats)
 		return g, ats
+
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		#n = epoch + 1
+		l1s = []
+		if training:
+			for d in data:
+				ae, ats = self(d)
+				l1 = l(ae, d)
+				l1s.append(torch.mean(l1).item())
+				loss = torch.mean(l1)
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			scheduler.step()
+			tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			ae1s, y_pred = [], []
+			for d in data:
+				ae1, ats = self(d)
+				y_pred.append(ae1[-1])
+				ae1s.append(ae1)
+			ae1s, y_pred = torch.stack(ae1s), torch.stack(y_pred)
+			loss = torch.mean(l(ae1s, data), axis=1)
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
 
 ## LSTM_AD Model
 class LSTM_AD(nn.Module):
@@ -81,6 +126,20 @@ class LSTM_AD(nn.Module):
 			out = self.fcn(out.view(-1))
 			outputs.append(2 * out.view(-1))
 		return torch.stack(outputs)
+
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='mean' if training else 'none')
+		y_pred = self(data)
+		loss = l(y_pred, data)
+		if training:
+			tqdm.write(f'Epoch {epoch},\tMSE = {loss}')
+			optimizer.zero_grad()
+			loss.backward()
+			optimizer.step()
+			scheduler.step()
+			return loss.item(), optimizer.param_groups[0]['lr']
+		else:
+			return loss.detach().numpy(), y_pred.detach().numpy()
 
 ## DAGMM Model (ICLR 18)
 class DAGMM(nn.Module):
@@ -129,6 +188,35 @@ class DAGMM(nn.Module):
 		gamma = self.estimate(z)
 		return z_c, x_hat.view(-1), z, gamma.view(-1)
 
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		#compute = models.ComputeLoss(self, 0.1, 0.005, 'cpu', self.n_gmm)
+		#n = epoch + 1
+		l1s = []
+		l2s = []
+		if training:
+			for d in data:
+				_, x_hat, z, gamma = self(d)
+				l1, l2 = l(x_hat, d), l(gamma, d)
+				l1s.append(torch.mean(l1).item())
+				l2s.append(torch.mean(l2).item())
+				loss = torch.mean(l1) + torch.mean(l2)
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			scheduler.step()
+			tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)},\tL2 = {np.mean(l2s)}')
+			return np.mean(l1s)+np.mean(l2s), optimizer.param_groups[0]['lr']
+		else:
+			ae1s = []
+			for d in data:
+				_, x_hat, _, _ = self(d)
+				ae1s.append(x_hat)
+			ae1s = torch.stack(ae1s)
+			y_pred = ae1s[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = l(ae1s, data)[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
 ## OmniAnomaly Model (KDD 19)
 class OmniAnomaly(nn.Module):
 	def __init__(self, feats, n_hidden=32, n_latent=8, n_layers=2, beta=0.01, learning_rate=0.002):
@@ -169,6 +257,32 @@ class OmniAnomaly(nn.Module):
 		## Decoder
 		x = self.decoder(x)
 		return x.view(-1), mu.view(-1), logvar.view(-1), hidden
+
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		if training:
+			mses, klds = [], []
+			for i, d in enumerate(data):
+				y_pred, mu, logvar, hidden = self(d, hidden if i else None)
+				MSE = l(y_pred, d)
+				KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=0)
+				loss = torch.mean(MSE) + self.beta * torch.mean(KLD)
+				mses.append(torch.mean(MSE).item())
+				klds.append(self.beta * torch.mean(KLD).item())
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			tqdm.write(f'Epoch {epoch},\tMSE = {np.mean(mses)},\tKLD = {np.mean(klds)}')
+			scheduler.step()
+			return loss.item(), optimizer.param_groups[0]['lr']
+		else:
+			y_preds = []
+			for i, d in enumerate(data):
+				y_pred, _, _, hidden = self(d, hidden if i else None)
+				y_preds.append(y_pred)
+			y_pred = torch.stack(y_preds)
+			MSE = l(y_pred, data)
+			return MSE.detach().numpy(), y_pred.detach().numpy()
 
 ## USAD Model (KDD 20)
 class USAD(nn.Module):
@@ -211,6 +325,37 @@ class USAD(nn.Module):
 		ae2ae1 = self.decoder2(self.encoder(ae1))
 		return ae1.view(-1), ae2.view(-1), ae2ae1.view(-1)
 
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		n = epoch + 1
+		l1s, l2s = [], []
+		if training:
+			for d in data:
+				ae1s, ae2s, ae2ae1s = self(d)
+				l1 = (1 / n) * l(ae1s, d) + (1 - 1/n) * l(ae2ae1s, d)
+				l2 = (1 / n) * l(ae2s, d) - (1 - 1/n) * l(ae2ae1s, d)
+				l1s.append(torch.mean(l1).item())
+				l2s.append(torch.mean(l2).item())
+				loss = torch.mean(l1 + l2)
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			scheduler.step()
+			tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)},\tL2 = {np.mean(l2s)}')
+			return np.mean(l1s)+np.mean(l2s), optimizer.param_groups[0]['lr']
+		else:
+			ae1s, ae2s, ae2ae1s = [], [], []
+			for d in data:
+				ae1, ae2, ae2ae1 = self(d)
+				ae1s.append(ae1)
+				ae2s.append(ae2)
+				ae2ae1s.append(ae2ae1)
+			ae1s, ae2s, ae2ae1s = torch.stack(ae1s), torch.stack(ae2s), torch.stack(ae2ae1s)
+			y_pred = ae1s[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = 0.1 * l(ae1s, data) + 0.9 * l(ae2ae1s, data)
+			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
 ## MSCRED Model (AAAI 19)
 class MSCRED(nn.Module):
 	def __init__(self, feats, n_window=None, learning_rate=0.0001):
@@ -243,6 +388,31 @@ class MSCRED(nn.Module):
 		x = self.decoder(z)
 		return x.view(-1)
 
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		n = epoch + 1
+		l1s = []
+		if training:
+			for i, d in enumerate(data):
+				x = self(d)
+				loss = torch.mean(l(x, d))
+				l1s.append(torch.mean(loss).item())
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			tqdm.write(f'Epoch {epoch},\tMSE = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			xs = []
+			for d in data:
+				x = self(d)
+				xs.append(x)
+			xs = torch.stack(xs)
+			y_pred = xs[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = l(xs, data)
+			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
 ## CAE-M Model (TKDE 21)
 class CAE_M(nn.Module):
 	def __init__(self, feats, n_window=None, learning_rate=0.0001):
@@ -271,6 +441,31 @@ class CAE_M(nn.Module):
 		## Decode
 		x = self.decoder(z)
 		return x.view(-1)
+
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		n = epoch + 1
+		l1s = []
+		if training:
+			for i, d in enumerate(data):
+				x = self(d)
+				loss = torch.mean(l(x, d))
+				l1s.append(torch.mean(loss).item())
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			tqdm.write(f'Epoch {epoch},\tMSE = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			xs = []
+			for d in data:
+				x = self(d)
+				xs.append(x)
+			xs = torch.stack(xs)
+			y_pred = xs[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = l(xs, data)
+			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
 
 ## MTAD_GAT Model (ICDM 20)
 class MTAD_GAT(nn.Module):
@@ -305,6 +500,31 @@ class MTAD_GAT(nn.Module):
 		x = torch.cat((data, feat_r, time_r), dim=2).view(1, 1, -1)
 		x, h = self.gru(x, hidden)
 		return x.view(-1), h
+
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		n = epoch + 1
+		l1s = []
+		if training:
+			for i, d in enumerate(data):
+				x, h = self(d, h if i else None)
+				loss = torch.mean(l(x, d))
+				l1s.append(torch.mean(loss).item())
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			tqdm.write(f'Epoch {epoch},\tMSE = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			xs = []
+			for d in data:
+				x, h = self(d, None)
+				xs.append(x)
+			xs = torch.stack(xs)
+			y_pred = xs[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = l(xs, data)
+			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
 
 ## GDN Model (AAAI 21)
 class GDN(nn.Module):
@@ -347,6 +567,31 @@ class GDN(nn.Module):
 		x = self.fcn(feat_r)
 		return x.view(-1)
 
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		n = epoch + 1
+		l1s = []
+		if training:
+			for i, d in enumerate(data):
+				x = self(d)
+				loss = torch.mean(l(x, d))
+				l1s.append(torch.mean(loss).item())
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			tqdm.write(f'Epoch {epoch},\tMSE = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			xs = []
+			for d in data:
+				x = self(d)
+				xs.append(x)
+			xs = torch.stack(xs)
+			y_pred = xs[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = l(xs, data)
+			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
 # MAD_GAN (ICANN 19)
 class MAD_GAN(nn.Module):
 	def __init__(self, feats, n_window=5, n_hidden=16, learning_rate=0.0001):
@@ -380,8 +625,85 @@ class MAD_GAN(nn.Module):
 		fake_score = self.discriminator(z.view(1,-1))
 		return z.view(-1), real_score.view(-1), fake_score.view(-1)
 
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		bcel = nn.BCELoss(reduction='mean')
+		msel = nn.MSELoss(reduction='mean')
+		real_label, fake_label = torch.tensor([0.9]), torch.tensor([0.1])
+		real_label, fake_label = real_label.type(torch.DoubleTensor), fake_label.type(torch.DoubleTensor)
+		n = epoch + 1
+		mses, gls, dls = [], [], []
+		if training:
+			for d in data:
+				self.discriminator.zero_grad()
+				_, real, fake = self(d)
+				dl = bcel(real, real_label) + bcel(fake, fake_label)
+				dl.backward()
+				self.generator.zero_grad()
+				optimizer.step()
+				z, _, fake = self(d)
+				mse = msel(z, d)
+				gl = bcel(fake, real_label)
+				tl = gl + mse
+				tl.backward()
+				self.discriminator.zero_grad()
+				optimizer.step()
+				mses.append(mse.item())
+				gls.append(gl.item())
+				dls.append(dl.item())
+			tqdm.write(f'Epoch {epoch},\tMSE = {np.mean(mses)},\tG = {np.mean(gls)},\tD = {np.mean(dls)}')
+			return np.mean(gls)+np.mean(dls), optimizer.param_groups[0]['lr']
+		else:
+			outputs = []
+			for d in data:
+				z, _, _ = self(d)
+				outputs.append(z)
+			outputs = torch.stack(outputs)
+			y_pred = outputs[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			loss = l(outputs, data)
+			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
+			return loss.detach().numpy(), y_pred.detach().numpy()
+
+## Shared backprop logic for all TranAD variants
+class TranADBase:
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		data_x = torch.DoubleTensor(data)
+		dataset = TensorDataset(data_x, data_x)
+		bs = self.batch if training else len(data)
+		dataloader = DataLoader(dataset, batch_size=bs)
+		n = epoch + 1
+		l1s = []
+		if training:
+			for d, _ in dataloader:
+				local_bs = d.shape[0]
+				window = d.permute(1, 0, 2)
+				elem = window[-1, :, :].view(1, local_bs, feats)
+				z = self(window, elem)
+				l1 = l(z, elem) if not isinstance(z, tuple) else (1 / n) * l(z[0], elem) + (1 - 1/n) * l(z[1], elem)
+				if isinstance(z, tuple):
+					z = z[1]
+				l1s.append(torch.mean(l1).item())
+				loss = torch.mean(l1)
+				optimizer.zero_grad()
+				loss.backward(retain_graph=True)
+				optimizer.step()
+			scheduler.step()
+			tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			for d, _ in dataloader:
+				window = d.permute(1, 0, 2)
+				elem = window[-1, :, :].view(1, bs, feats)
+				z = self(window, elem)
+				if isinstance(z, tuple):
+					z = z[1]
+			loss = l(z, elem)[0]
+			return loss.detach().numpy(), z.detach().numpy()[0]
+
+
 # Proposed Model (VLDB 22)
-class TranAD_Basic(nn.Module):
+class TranAD_Basic(TranADBase, nn.Module):
 	def __init__(self, feats, n_window=10, batch_size=128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD_Basic, self).__init__()
 		self.name = 'TranAD_Basic'
@@ -410,7 +732,7 @@ class TranAD_Basic(nn.Module):
 		return x
 
 # Proposed Model (FCN) + Self Conditioning + Adversarial + MAML (VLDB 22)
-class TranAD_Transformer(nn.Module):
+class TranAD_Transformer(TranADBase, nn.Module):
 	def __init__(self, feats, n_window=10, batch_size = 128, n_hidden=8, learning_rate=None):
 		super(TranAD_Transformer, self).__init__()
 		self.name = 'TranAD_Transformer'
@@ -455,7 +777,7 @@ class TranAD_Transformer(nn.Module):
 		return x1, x2
 
 # Proposed Model + Self Conditioning + MAML (VLDB 22)
-class TranAD_Adversarial(nn.Module):
+class TranAD_Adversarial(TranADBase, nn.Module):
 	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD_Adversarial, self).__init__()
 		self.name = 'TranAD_Adversarial'
@@ -496,7 +818,7 @@ class TranAD_Adversarial(nn.Module):
 		return x
 
 # Proposed Model + Adversarial + MAML (VLDB 22)
-class TranAD_SelfConditioning(nn.Module):
+class TranAD_SelfConditioning(TranADBase, nn.Module):
 	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD_SelfConditioning, self).__init__()
 		self.name = 'TranAD_SelfConditioning'
@@ -537,7 +859,7 @@ class TranAD_SelfConditioning(nn.Module):
 		return x1, x2
 
 # Proposed Model + Self Conditioning + Adversarial + MAML (VLDB 22)
-class TranAD(nn.Module):
+class TranAD(TranADBase, nn.Module):
 	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
 		super(TranAD, self).__init__()
 		self.name = 'TranAD'

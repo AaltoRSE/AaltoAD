@@ -256,8 +256,6 @@ def test_backprop_omni_scalar_loss():
     to a scalar first, causing 'grad can be implicitly created only for scalar
     outputs' when calling loss.backward().
     """
-    from TranAD.run_experiment import _backprop_omni
-
     feats = 5
     n_window = 5
     model = OmniAnomaly(feats, n_hidden=32, n_latent=16, beta=0.01)
@@ -266,9 +264,8 @@ def test_backprop_omni_scalar_loss():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
 
     # This should not raise "grad can be implicitly created only for scalar outputs"
-    result = _backprop_omni(epoch=0, model=model, data=data,
-                            optimizer=optimizer, scheduler=scheduler,
-                            training=True, feats=feats)
+    result = model._backprop(epoch=0, data=data, optimizer=optimizer,
+                             scheduler=scheduler, training=True, feats=feats)
     loss_val, lr = result
     assert isinstance(loss_val, float), f"Loss should be a float scalar, got {type(loss_val)}"
     assert isinstance(lr, float)
@@ -468,3 +465,12 @@ def test_model_fixed_input_outputs(ModelClass, input_shape):
         assert_structure_close(output, expected_py)
 
 
+@pytest.mark.parametrize("ModelClass", [
+    LSTM_Univariate, Attention, LSTM_AD, DAGMM, OmniAnomaly, USAD, MSCRED,
+    CAE_M, MTAD_GAT, GDN, MAD_GAN, TranAD_Basic, TranAD_Transformer,
+    TranAD_Adversarial, TranAD_SelfConditioning, TranAD,
+])
+def test_all_models_have_backprop(ModelClass):
+    """Every model class must have a _backprop method."""
+    assert hasattr(ModelClass, '_backprop'), f"{ModelClass.__name__} is missing _backprop method"
+    assert callable(getattr(ModelClass, '_backprop')), f"{ModelClass.__name__}._backprop is not callable"
