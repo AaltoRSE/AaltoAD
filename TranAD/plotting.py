@@ -6,6 +6,7 @@ import scienceplots # must be imported for the plt style 'science'
 
 plt.style.use(['science', 'ieee'])
 plt.rcParams["text.usetex"] = False
+plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams.get('font.serif', [])
 plt.rcParams['figure.figsize'] = 6, 2
 
 os.makedirs('plots', exist_ok=True)

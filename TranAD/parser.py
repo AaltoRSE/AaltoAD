@@ -81,6 +81,13 @@ parser.add_argument('--worker',
 					action='store_true',
 					help="Run as a worker that loops claiming and running tasks until none remain")
 
+parser.add_argument('--plot',
+                    action="store_true",
+                    help="Generate plots after training")
+parser.add_argument('--report',
+                    action="store_true",
+                    help="Generate tables of top results for each model and dataset")
+
 def parse_arguments():
 	"""Parse command-line arguments and return the args object."""
 	global args

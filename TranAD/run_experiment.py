@@ -163,7 +163,8 @@ def append_benchmark_row(model_name, dataset_name, result_dict, bench_path=os.pa
 
 def run_experiment(model_name: str, dataset_name: str, model_name_full: str = None,
                    hyperparams_str: str = None, experiment_id: str = None,
-                   less: bool = False, test: bool = False, retrain: bool = False) -> Dict:
+                   less: bool = False, test: bool = False, retrain: bool = False,
+                   plot: bool = False) -> Dict:
 	"""Run a single experiment with specified parameters.
 
 	Args:
@@ -222,14 +223,14 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
 
 	### Testing phase
-	torch.zero_grad = True
 	model.eval()
 	print(f'{utils.color.HEADER}Testing {model_name} on {utils.color.ENDC}')
 	feats = testO.shape[1]
-	loss, y_pred = model._backprop(0, testD, optimizer, scheduler, False, feats)
+	with torch.no_grad():
+		loss, y_pred = model._backprop(0, testD, optimizer, scheduler, False, feats)
 
 	### Plot curves
-	if not test:
+	if plot:
 		if 'TranAD' in model.name:
 			testO = torch.roll(testO, 1, 0)
 		plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)
@@ -237,7 +238,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	### Scores
 	df = pd.DataFrame()
 	feats = trainO.shape[1]
-	lossT, _ = model._backprop(0, trainD, optimizer, scheduler, False, feats)
+	with torch.no_grad():
+		lossT, _ = model._backprop(0, trainD, optimizer, scheduler, False, feats)
 	for i in range(loss.shape[1]):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
 		result, pred = pot.pot_eval(lt, l, ls)
