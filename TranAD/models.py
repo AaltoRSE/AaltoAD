@@ -899,3 +899,4 @@ class TranAD(TranADBase, nn.Module):
 		c = (x1 - src) ** 2
 		x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
 		return x1, x2
+
