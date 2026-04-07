@@ -226,8 +226,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	model.eval()
 	print(f'{utils.color.HEADER}Testing {model_name} on {utils.color.ENDC}')
 	feats = testO.shape[1]
+	start = time()
 	with torch.no_grad():
 		loss, y_pred = model._backprop(0, testD, optimizer, scheduler, False, feats)
+		lossT, _ = model._backprop(0, trainD, optimizer, scheduler, False, feats)
+	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 
 	### Plot curves
 	if plot:
@@ -238,8 +241,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	### Scores
 	df = pd.DataFrame()
 	feats = trainO.shape[1]
-	with torch.no_grad():
-		lossT, _ = model._backprop(0, trainD, optimizer, scheduler, False, feats)
 	for i in range(loss.shape[1]):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
 		result, pred = pot.pot_eval(lt, l, ls)

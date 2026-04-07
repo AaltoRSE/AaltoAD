@@ -401,7 +401,8 @@ def handle_single_run(args):
 			experiment_id=None,
 			less=args.less,
 			test=args.test,
-			retrain=args.retrain
+			retrain=args.retrain,
+			plot=args.plot
 		)
 
 
@@ -558,6 +559,10 @@ def handle_experiment_file(args):
 def main():
 	"""Main entry point."""
 	args = parser.parse_args()
+
+	if args.report:
+		print("Report generation not implemented yet.")
+		return 0
 	
 	# Determine which mode to run
 	# Use experiment file mode if:
