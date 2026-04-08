@@ -242,7 +242,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	### Scores
 	df = pd.DataFrame()
 	feats = trainO.shape[1]
-	for i in range(loss.shape[1]):
+	for i in tqdm(range(loss.shape[1]), desc='Evaluating features'):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
 		result, pred = pot.pot_eval(lt, l, ls)
 		preds.append(pred)
