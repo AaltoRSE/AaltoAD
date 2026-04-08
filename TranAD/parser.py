@@ -87,6 +87,10 @@ parser.add_argument('--plot',
 parser.add_argument('--report',
                     action="store_true",
                     help="Generate tables of top results for each model and dataset")
+parser.add_argument('--metric',
+                    type=str,
+                    default='f1',
+                    help="Metric to optimize for in report (default: f1)")
 
 def parse_arguments():
 	"""Parse command-line arguments and return the args object."""

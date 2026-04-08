@@ -12,6 +12,7 @@ import TranAD
 from TranAD.parser import parser
 from TranAD import constants
 from TranAD.run_experiment import run_experiment, run_all
+from TranAD.report import generate_report
 
 # Suppress matplotlib font warnings
 import warnings
@@ -561,7 +562,7 @@ def main():
 	args = parser.parse_args()
 
 	if args.report:
-		print("Report generation not implemented yet.")
+		generate_report(args.dataset, metric=args.metric)
 		return 0
 	
 	# Determine which mode to run
