@@ -131,6 +131,14 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
     Returns:
         dict: pot result dict
     """
+    if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
+        pred = np.zeros_like(label)
+        return {
+            'f1': np.nan, 'precision': np.nan, 'recall': np.nan,
+            'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
+            'ROC/AUC': np.nan, 'threshold': np.nan,
+        }, pred
+
     lms = constants.lm[0]
     retries = 0
     while True:
@@ -140,23 +148,22 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
             s.initialize(level=lms, min_extrema=False, verbose=False)  # initialization step
         except:
             retries += 1
+            if retries > 100:
+                print(f'SPOT: giving up after {retries} retries')
+                pred = np.zeros_like(label)
+                return {
+                    'f1': np.nan, 'precision': np.nan, 'recall': np.nan,
+                    'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
+                    'ROC/AUC': np.nan, 'threshold': np.nan,
+                }, pred
             lms = lms * 0.95
         else: break
     if retries > 0:
         print(f'SPOT threshold: {retries} retries, lms decayed from {constants.lm[0]} to {lms}')
-    print(f'SPOT: starting run(dynamic=False), init_score len={len(init_score)}, score len={len(score)}', flush=True)
     ret = s.run(dynamic=False)  # run
-    print(f'SPOT: run complete, {len(ret["thresholds"])} thresholds, {len(ret["alarms"])} alarms', flush=True)
-    # print(len(ret['alarms']))
-    # print(len(ret['thresholds']))
     pot_th = np.mean(ret['thresholds']) * constants.lm[1]
-    # pot_th = np.percentile(score, 100 * constants.lm[0])
-    # np.percentile(score, 100 * constants.lm[0])
     pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)
-    # DEBUG - np.save(f'{debug}.npy', np.array(pred))
-    # DEBUG - print(np.argwhere(np.array(pred)))
     p_t = calc_point2point(pred, label)
-    # print('POT result: ', p_t, pot_th, p_latency)
     return {
         'f1': p_t[0],
         'precision': p_t[1],
@@ -167,5 +174,4 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
         'FN': p_t[6],
         'ROC/AUC': p_t[7],
         'threshold': pot_th,
-        # 'pot-latency': p_latency
     }, np.array(pred)

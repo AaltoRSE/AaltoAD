@@ -243,7 +243,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	df = pd.DataFrame()
 	feats = trainO.shape[1]
 	for i in range(loss.shape[1]):
-		print(f'pot_eval feature {i}/{loss.shape[1]}', flush=True)
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
 		result, pred = pot.pot_eval(lt, l, ls)
 		preds.append(pred)
