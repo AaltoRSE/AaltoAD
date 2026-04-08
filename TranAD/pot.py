@@ -144,7 +144,9 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
         else: break
     if retries > 0:
         print(f'SPOT threshold: {retries} retries, lms decayed from {constants.lm[0]} to {lms}')
+    print(f'SPOT: starting run(dynamic=False), init_score len={len(init_score)}, score len={len(score)}', flush=True)
     ret = s.run(dynamic=False)  # run
+    print(f'SPOT: run complete, {len(ret["thresholds"])} thresholds, {len(ret["alarms"])} alarms', flush=True)
     # print(len(ret['alarms']))
     # print(len(ret['thresholds']))
     pot_th = np.mean(ret['thresholds']) * constants.lm[1]
