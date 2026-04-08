@@ -220,7 +220,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			'num_features': int(trainO.shape[1]),
 		}
 		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name, hyperparams=applied_hyperparams, metadata=data_metadata)
-		utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
+		if plot:
+			utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
 
 	### Testing phase
 	model.eval()
