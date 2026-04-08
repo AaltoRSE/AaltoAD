@@ -172,7 +172,7 @@ class DAGMM(nn.Module):
 		self.estimate = self.estimate.double()
 
 	def compute_reconstruction(self, x, x_hat):
-		relative_euclidean_distance = (x-x_hat).norm(2, dim=1) / x.norm(2, dim=1)
+		relative_euclidean_distance = (x-x_hat).norm(2, dim=1) / (x.norm(2, dim=1) + 1e-10)
 		cosine_similarity = F.cosine_similarity(x, x_hat, dim=1)
 		return relative_euclidean_distance, cosine_similarity
 
