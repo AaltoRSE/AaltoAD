@@ -13,6 +13,7 @@ import math
 from tqdm import tqdm
 from TranAD import dlutils
 from TranAD import constants
+from TranAD.stagnn_core import STAGNN_Core
 torch.manual_seed(1)
 
 ## Separate LSTM for each variable
@@ -899,4 +900,57 @@ class TranAD(TranADBase, nn.Module):
 		c = (x1 - src) ** 2
 		x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
 		return x1, x2
+
+
+
+class STAGNN(nn.Module):
+	def __init__(self, feats, n_window=10, batch_size=128, embed_dim=64, topk=5, dropout=0.1, graph_num_heads=4, learning_rate=0.001):
+		super(STAGNN, self).__init__()
+		self.name = 'STAGNN'
+		self.lr = learning_rate
+		self.n_feats = feats
+		self.n_window = n_window
+		self.batch = batch_size
+		self.model = STAGNN_Core(
+			num_sensors=feats,
+			embed_dim=embed_dim,
+			window_size=n_window,
+			topk=topk,
+			dropout=dropout,
+			feature_dim=1,
+			graph_num_heads=graph_num_heads,
+		)
+		self.model = self.model.double()
+
+	def forward(self, x):
+		out, alpha = self.model(x)
+		out = out.squeeze(-1)
+		return out, alpha
+
+	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
+		l = nn.MSELoss(reduction='none')
+		data_x = torch.DoubleTensor(data)
+		dataset = TensorDataset(data_x, data_x)
+		bs = self.batch if training else len(data)
+		dataloader = DataLoader(dataset, batch_size=bs)
+		l1s = []
+		if training:
+			for d, _ in dataloader:
+				target = d[:, -1, :]
+				out, alpha = self(d)
+				loss = torch.mean(l(out, target))
+				l1s.append(loss.item())
+				optimizer.zero_grad()
+				loss.backward()
+				torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+				optimizer.step()
+			scheduler.step()
+			tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)}')
+			return np.mean(l1s), optimizer.param_groups[0]['lr']
+		else:
+			for d, _ in dataloader:
+				target = d[:, -1, :]
+				out, alpha = self(d)
+			loss = l(out, target)
+			return loss.detach().numpy(), out.detach().numpy()
 

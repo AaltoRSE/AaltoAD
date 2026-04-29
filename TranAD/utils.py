@@ -106,7 +106,7 @@ def convert_to_windows(data: torch.Tensor, model_obj, model_name: str) -> torch.
 		else:
 			w = torch.cat([data[0].repeat(w_size - i, 1), data[0:i]])
 		# TranAD and Attention models use 3D windows, others use flattened
-		windows.append(w if 'TranAD' in model_name or 'Attention' in model_name else w.view(-1))
+		windows.append(w if 'TranAD' in model_name or 'Attention' in model_name or 'STAGNN' in model_name else w.view(-1))
 	return torch.stack(windows)
 
 
