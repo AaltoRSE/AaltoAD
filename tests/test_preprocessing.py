@@ -72,10 +72,22 @@ def test_normalize_constant_train_with_varying_test():
     assert out_test[1] > 1000  # ~1/eps
 
 
-def test_normalize_2d_array():
+def test_normalize_2d_per_column_default():
+    """2D input is normalized per-column by default: min/max are arrays of shape (n_features,)."""
     a = np.array([[0.0, 10.0], [5.0, 20.0]])
     out, min_a, max_a = normalize(a)
-    # min/max are scalar over the whole array.
+    assert np.array_equal(min_a, np.array([0.0, 10.0]))
+    assert np.array_equal(max_a, np.array([5.0, 20.0]))
+    assert out.shape == a.shape
+    # Each column independently in [0, 1).
+    assert np.all(out.min(axis=0) == 0.0)
+    assert np.all(out.max(axis=0) < 1.0)
+
+
+def test_normalize_2d_shared_flag():
+    """shared=True falls back to whole-array min/max (scalar)."""
+    a = np.array([[0.0, 10.0], [5.0, 20.0]])
+    out, min_a, max_a = normalize(a, shared=True)
     assert min_a == 0.0
     assert max_a == 20.0
     assert out.shape == a.shape

@@ -11,8 +11,8 @@ def load_MBA(folder, data_folder=DEFAULT_DATA_FOLDER):
 	train = pd.read_excel(os.path.join(dataset_folder, 'train.xlsx'))
 	test = pd.read_excel(os.path.join(dataset_folder, 'test.xlsx'))
 	train, test = train.values[1:,1:].astype(float), test.values[1:,1:].astype(float)
-	train, min_a, max_a = normalize(train)
-	test, _, _ = normalize(test, min_a, max_a)
+	train, min_a, max_a = normalize(train, shared=True)
+	test, _, _ = normalize(test, min_a, max_a, shared=True)
 	ls = ls.values[:,1].astype(int)
 	labels = np.zeros_like(test)
 	for i in range(-20, 20):

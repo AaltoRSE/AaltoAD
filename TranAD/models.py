@@ -46,21 +46,24 @@ class LSTM_Univariate(nn.Module):
 
 	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
 		l = nn.MSELoss(reduction='mean' if training else 'none')
-		y_pred = self(data)
 		if training:
-			loss_sum = 0
+			total = 0.0
+			n_samples = 0
 			for b in range(0, data.shape[0], self.batch_size):
 				batch_data = data[b:b+self.batch_size]
-				batch_pred = y_pred[b:b+self.batch_size]
+				batch_pred = self(batch_data)
 				loss = l(batch_pred, batch_data)
-				loss_sum += loss.item()
-				tqdm.write(f'Epoch {epoch},\tMSE = {loss_sum / (data.shape[0] // self.batch_size)}')
 				optimizer.zero_grad()
 				loss.backward()
 				optimizer.step()
-				scheduler.step()
-			return loss.item(), optimizer.param_groups[0]['lr']
+				total += loss.item() * batch_data.shape[0]
+				n_samples += batch_data.shape[0]
+			scheduler.step()
+			mean_loss = total / max(n_samples, 1)
+			tqdm.write(f'Epoch {epoch},\tMSE = {mean_loss}')
+			return mean_loss, optimizer.param_groups[0]['lr']
 		else:
+			y_pred = self(data)
 			loss = l(y_pred, data)
 			return loss.detach().numpy(), y_pred.detach().numpy()
 
@@ -139,20 +142,24 @@ class LSTM_AD(nn.Module):
 
 	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
 		l = nn.MSELoss(reduction='mean' if training else 'none')
-		y_pred = self(data)
 		if training:
-			loss_sum = 0
+			total = 0.0
+			n_samples = 0
 			for b in range(0, data.shape[0], self.batch_size):
 				batch_data = data[b:b+self.batch_size]
-				batch_pred = y_pred[b:b+self.batch_size]
+				batch_pred = self(batch_data)
 				loss = l(batch_pred, batch_data)
-				loss_sum += loss.item()
-				tqdm.write(f'Epoch {epoch},\tMSE = {loss_sum / (data.shape[0] // self.batch_size)}')
 				optimizer.zero_grad()
 				loss.backward()
 				optimizer.step()
-			return loss_sum, optimizer.param_groups[0]['lr']
+				total += loss.item() * batch_data.shape[0]
+				n_samples += batch_data.shape[0]
+			scheduler.step()
+			mean_loss = total / max(n_samples, 1)
+			tqdm.write(f'Epoch {epoch},\tMSE = {mean_loss}')
+			return mean_loss, optimizer.param_groups[0]['lr']
 		else:
+			y_pred = self(data)
 			loss = l(y_pred, data)
 			return loss.detach().numpy(), y_pred.detach().numpy()
 
