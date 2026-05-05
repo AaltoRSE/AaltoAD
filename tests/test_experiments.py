@@ -273,7 +273,7 @@ def test_run_experiment_with_training(mock_git_hash, mock_ndcg, mock_hit_att, mo
     mock_ndcg.return_value = {'ndcg': 0.78}
 
     # Run experiment with training
-    result = run_experiment.run_experiment('USAD', 'MSL', test=False)
+    result = run_experiment.run_experiment('USAD', 'MSL', test=False, plot=True)
 
     # Verify training was performed
     assert mock_model._backprop.call_count >= 5  # at least 5 training epochs

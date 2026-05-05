@@ -19,13 +19,14 @@ torch.manual_seed(1)
 
 ## Separate LSTM for each variable
 class LSTM_Univariate(nn.Module):
-	def __init__(self, feats, n_hidden=1, n_layers=1, learning_rate=0.002):
+	def __init__(self, feats, n_hidden=1, n_layers=1, learning_rate=0.002, batch_size = 512):
 		super(LSTM_Univariate, self).__init__()
 		self.name = 'LSTM_Univariate'
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
+		self.batch_size = batch_size
 		self.lstm = nn.ModuleList([nn.LSTM(1, self.n_hidden, self.n_layers) for i in range(feats)])
 		self.lstm = self.lstm.double()
 
@@ -46,15 +47,21 @@ class LSTM_Univariate(nn.Module):
 	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
 		l = nn.MSELoss(reduction='mean' if training else 'none')
 		y_pred = self(data)
-		loss = l(y_pred, data)
 		if training:
-			tqdm.write(f'Epoch {epoch},\tMSE = {loss}')
-			optimizer.zero_grad()
-			loss.backward()
-			optimizer.step()
-			scheduler.step()
+			loss_sum = 0
+			for b in range(0, data.shape[0], self.batch_size):
+				batch_data = data[b:b+self.batch_size]
+				batch_pred = y_pred[b:b+self.batch_size]
+				loss = l(batch_pred, batch_data)
+				loss_sum += loss.item()
+				tqdm.write(f'Epoch {epoch},\tMSE = {loss_sum / (data.shape[0] // self.batch_size)}')
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+				scheduler.step()
 			return loss.item(), optimizer.param_groups[0]['lr']
 		else:
+			loss = l(y_pred, data)
 			return loss.detach().numpy(), y_pred.detach().numpy()
 
 
@@ -108,13 +115,14 @@ class Attention(nn.Module):
 
 ## LSTM_AD Model
 class LSTM_AD(nn.Module):
-	def __init__(self, feats, n_hidden=64, n_layers=1, learning_rate=0.002):
+	def __init__(self, feats, n_hidden=64, n_layers=1, learning_rate=0.002, batch_size = 512):
 		super(LSTM_AD, self).__init__()
 		self.name = 'LSTM_AD'
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
+		self.batch_size = batch_size
 		self.lstm = nn.LSTM(feats, self.n_hidden, n_layers)
 		self.fcn = nn.Sequential(nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid())
 		self.lstm = self.lstm.double()
@@ -132,15 +140,20 @@ class LSTM_AD(nn.Module):
 	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
 		l = nn.MSELoss(reduction='mean' if training else 'none')
 		y_pred = self(data)
-		loss = l(y_pred, data)
 		if training:
-			tqdm.write(f'Epoch {epoch},\tMSE = {loss}')
-			optimizer.zero_grad()
-			loss.backward()
-			optimizer.step()
-			scheduler.step()
-			return loss.item(), optimizer.param_groups[0]['lr']
+			loss_sum = 0
+			for b in range(0, data.shape[0], self.batch_size):
+				batch_data = data[b:b+self.batch_size]
+				batch_pred = y_pred[b:b+self.batch_size]
+				loss = l(batch_pred, batch_data)
+				loss_sum += loss.item()
+				tqdm.write(f'Epoch {epoch},\tMSE = {loss_sum / (data.shape[0] // self.batch_size)}')
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			return loss_sum, optimizer.param_groups[0]['lr']
 		else:
+			loss = l(y_pred, data)
 			return loss.detach().numpy(), y_pred.detach().numpy()
 
 ## DAGMM Model (ICLR 18)
