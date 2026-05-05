@@ -253,6 +253,15 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	result, _ = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
+
+	# Write labels with timestamps to a csv
+	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
+	labels_df = pd.DataFrame({
+		'timestamp': timestamps,
+		'label': labelsFinal
+	})
+	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_labels.csv')
+	labels_df.to_csv(labels_csv_path, index=False)
 	
 	# Add metadata to results
 	result['git_hash'] = utils.get_git_hash()

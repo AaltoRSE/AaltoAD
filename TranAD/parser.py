@@ -38,7 +38,7 @@ parser.add_argument('--model',
 					metavar='-m', 
 					type=str, 
 					required=False,
-					default='LSTM_Multivariate',
+					default='LSTM_Univariate',
                     help="Model name (or 'ALL' for all models)")
 parser.add_argument('--test', 
 					action='store_true', 

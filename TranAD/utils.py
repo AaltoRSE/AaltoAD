@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from typing import Dict, Tuple
 import matplotlib.pyplot as plt
 import os
+import pandas as pd
 
 
 class color:
@@ -156,3 +157,27 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 	labels = loader[2]
 	
 	return train_loader, test_loader, labels
+
+def load_timestamps(dataset: str, output_folder: str = 'processed') -> np.ndarray:
+	"""Load timestamps for a given dataset.
+	
+
+		Args:
+			dataset (str): Name of the dataset (e.g., 'SMD', 'SMAP', 'MSL', 'UCR', 'NAB').
+				Must have corresponding processed .npy files in the output folder.
+			output_folder (str): Path to the processed data folder (default: 'processed').
+		Returns:
+			pd.Series: Timestamps corresponding to the test data samples.
+	"""
+
+	folder = os.path.join(output_folder, dataset)
+	if not os.path.exists(folder):
+		raise Exception('Processed Data not found.')
+	
+	timestamps_file = os.path.join(folder, 'timestamps.csv')
+	if not os.path.exists(timestamps_file):
+		raise Exception('Timestamps file not found.')
+	timestamps_df = pd.read_csv(timestamps_file, header=None).iloc[:, 0]
+	return timestamps_df
+
+	

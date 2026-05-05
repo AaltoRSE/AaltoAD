@@ -18,6 +18,7 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
+    test_timestamps = df_test['Timestamp']
 
     df_train = df_train.drop(columns=['Timestamp'])
     df_test = df_test.drop(columns=['Timestamp'])
@@ -27,6 +28,8 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     test = df_test.values
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+
+    pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
 
 
 def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
@@ -41,6 +44,7 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
+    test_timestamps = df_test['Timestamp']
 
     df_train = df_train.drop(columns=['Timestamp'])
     df_test = df_test.drop(columns=['Timestamp'])
@@ -56,6 +60,8 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     test = df_test.values
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+
+    pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
 
 
 def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
@@ -72,6 +78,7 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
 
     labels = df_test['Normal/Attack'].apply(lambda x: 0 if x == 'Normal' else 1).values
+    test_timestamps = df_test['Timestamp']
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp'])
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp'])
 
@@ -85,4 +92,6 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
     test = df_test.values
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+    
+    pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
 
