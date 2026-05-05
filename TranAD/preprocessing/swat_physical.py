@@ -24,9 +24,9 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = df_test.drop(columns=['Timestamp'])
 
     labels = np.concatenate([np.zeros(len(df_baseline) - df_train_len), np.ones(len(df_attack))])
-    labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     train = df_train.values
     test = df_test.values
+    labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
 
@@ -57,9 +57,9 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
         df_test[col] = test_col
 
     labels = np.concatenate([np.zeros(len(df_baseline) - df_train_len), np.ones(len(df_attack))])
-    labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     train = df_train.values
     test = df_test.values
+    labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
 
@@ -80,7 +80,6 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
 
     labels = df_test['Normal/Attack'].apply(lambda x: 0 if x == 'Normal' else 1).values
-    labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     test_timestamps = df_test['Timestamp']
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp'])
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp'])
@@ -93,6 +92,7 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
 
     train = df_train.values
     test = df_test.values
+    labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
     
