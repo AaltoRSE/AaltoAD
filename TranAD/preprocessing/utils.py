@@ -49,7 +49,7 @@ def load_and_save2(category, filename, dataset, dataset_folder, shape, output_fo
 	print(dataset, category, filename, temp.shape)
 	np.save(os.path.join(output_folder, f"SMD/{dataset}_{category}.npy"), temp)
 
-def normalize(a, min_a = None, max_a = None, eps = 1e-4):
+def normalize(a, min_a = None, max_a = None, eps = 1e-4, shared = False):
 	"""Normalize array to range [min_range, max_range] using symmetric scaling.
 	
 	Args:
@@ -63,8 +63,9 @@ def normalize(a, min_a = None, max_a = None, eps = 1e-4):
 	Returns:
 		np.ndarray: Normalized array with same shape, values in approximately [min_range, max_range].
 	"""
-	if min_a is None: min_a = a.min()
-	if max_a is None: max_a = a.max()
+	axis = None if shared or np.ndim(a) < 2 else 0
+	if min_a is None: min_a = np.nanmin(a, axis=axis)
+	if max_a is None: max_a = np.nanmax(a, axis=axis)
 	a = (a - min_a) / (max_a - min_a + eps)
 	return a, min_a, max_a
 
