@@ -16,6 +16,7 @@ from TranAD import constants
 from TranAD.stagnn_core import STAGNN_Core
 torch.manual_seed(1)
 
+
 ## Separate LSTM for each variable
 class LSTM_Univariate(nn.Module):
 	def __init__(self, feats, n_hidden=1, n_layers=1, learning_rate=0.002):
