@@ -92,7 +92,7 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
 
     for col in df_train.columns:
         train_col, min_a, max_a = normalize(df_train[col])
-        test_col = normalize(df_test[col], min_a, max_a)[0]
+        test_col, _, _ = normalize(df_test[col], min_a, max_a)[0]
         df_train[col] = train_col
         df_test[col] = test_col
 
