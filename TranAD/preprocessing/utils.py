@@ -63,8 +63,8 @@ def normalize(a, min_a = None, max_a = None, eps = 1e-4):
 	Returns:
 		np.ndarray: Normalized array with same shape, values in approximately [min_range, max_range].
 	"""
-	if min_a is None: min_a = a.min()
-	if max_a is None: max_a = a.max()
+	if min_a is None: min_a = np.nanmin(a)
+	if max_a is None: max_a = np.nanmax(a)
 	a = (a - min_a) / (max_a - min_a + eps)
 	return a, min_a, max_a
 
