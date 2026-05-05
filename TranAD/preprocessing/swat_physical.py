@@ -90,11 +90,20 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp'])
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp'])
 
+    # The physical dataset has NaN rows. These are anomalous, of course. Replace with a placeholder after normalization
+    df_train_nans = df_train.isna().any(axis=1)
+    df_test_nans = df_test.isna().any(axis=1)
+    df_train = df_train.fillna(0)
+    df_test = df_test.fillna(0)
+
     for col in df_train.columns:
         train_col, min_a, max_a = normalize(df_train[col])
         test_col = normalize(df_test[col], min_a, max_a)[0]
         df_train[col] = train_col
         df_test[col] = test_col
+
+    df_train[df_train_nans] = -1
+    df_test[df_test_nans] = -1
 
     train = df_train.values
     test = df_test.values
