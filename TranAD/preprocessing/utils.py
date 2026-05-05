@@ -49,51 +49,26 @@ def load_and_save2(category, filename, dataset, dataset_folder, shape, output_fo
 	print(dataset, category, filename, temp.shape)
 	np.save(os.path.join(output_folder, f"SMD/{dataset}_{category}.npy"), temp)
 
-def normalize(a):
-	"""Normalize array to range [0.25, 0.75] using symmetric scaling.
+def normalize(a, min_a = None, max_a = None, eps = 1e-4):
+	"""Normalize array to range [min_range, max_range] using symmetric scaling.
 	
 	Args:
 		a (np.ndarray): Input array of any shape.
+		min_a (float): Minimum value of input array for scaling. If None, uses a.min().
+		max_a (float): Maximum value of input array for scaling. If None, uses a
+		min_range (float): Minimum value of the target range.
+		max_range (float): Maximum value of the target range.
+		eps (float): Small value to avoid division by zero.
 	
 	Returns:
-		np.ndarray: Normalized array with same shape, values in approximately [0.25, 0.75].
+		np.ndarray: Normalized array with same shape, values in approximately [min_range, max_range].
 	"""
-	a = a / np.maximum(np.absolute(a.max(axis=0)), np.absolute(a.min(axis=0)))
-	return (a / 2 + 0.5)
+	if min_a is None: min_a = a.min()
+	if max_a is None: max_a = a.max()
+	a = (a - min_a) / (max_a - min_a + eps)
+	return a, min_a, max_a
 
-def normalize2(a, min_a = None, max_a = None):
-	"""Normalize array to range [0, 1] using min-max scaling.
-	
-	Args:
-		a (np.ndarray): Input array to normalize.
-		min_a (float, optional): Minimum value for scaling. If None, computed from data.
-		max_a (float, optional): Maximum value for scaling. If None, computed from data.
-	
-	Returns:
-		tuple: A tuple containing:
-			- normalized_array (np.ndarray): Normalized values in range [0, 1].
-			- min_a (float): Minimum value used for normalization.
-			- max_a (float): Maximum value used for normalization.
-	"""
-	if min_a is None: min_a, max_a = min(a), max(a)
-	return (a - min_a) / (max_a - min_a), min_a, max_a
 
-def normalize3(a, min_a = None, max_a = None):
-	"""Normalize array to range [0, 1] using per-feature min-max scaling.
-	
-	Args:
-		a (np.ndarray): Input array of shape (num_samples, num_features).
-		min_a (np.ndarray, optional): Per-feature minimum values. If None, computed from data.
-		max_a (np.ndarray, optional): Per-feature maximum values. If None, computed from data.
-	
-	Returns:
-		tuple: A tuple containing:
-			- normalized_array (np.ndarray): Normalized values in range [0, 1].
-			- min_a (np.ndarray): Per-feature minimum values used for normalization.
-			- max_a (np.ndarray): Per-feature maximum values used for normalization.
-	"""
-	if min_a is None: min_a, max_a = np.min(a, axis = 0), np.max(a, axis = 0)
-	return (a - min_a) / (max_a - min_a + 0.0001), min_a, max_a
 
 def convertNumpy(df):
 	"""Convert pandas DataFrame to normalized numpy array, skipping first 3 columns and downsampling.

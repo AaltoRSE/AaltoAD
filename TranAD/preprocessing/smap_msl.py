@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from TranAD.constants import DEFAULT_DATA_FOLDER
-from TranAD.preprocessing.utils import normalize3
+from TranAD.preprocessing.utils import normalize
 
 
 def load_SMAP_MSL(folder, dataset, data_folder=DEFAULT_DATA_FOLDER):
@@ -14,8 +14,8 @@ def load_SMAP_MSL(folder, dataset, data_folder=DEFAULT_DATA_FOLDER):
 	for fn in filenames:
 		train = np.load(f'{dataset_folder}/train/{fn}.npy')
 		test = np.load(f'{dataset_folder}/test/{fn}.npy')
-		train, min_a, max_a = normalize3(train)
-		test, _, _ = normalize3(test, min_a, max_a)
+		train, min_a, max_a = normalize(train)
+		test, _, _ = normalize(test, min_a, max_a)
 		np.save(f'{folder}/{fn}_train.npy', train)
 		np.save(f'{folder}/{fn}_test.npy', test)
 		labels = np.zeros(test.shape)
