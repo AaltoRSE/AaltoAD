@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-from TranAD.preprocessing.utils import normalize2
+from TranAD.preprocessing.utils import normalize
 from TranAD.constants import DEFAULT_DATA_FOLDER
 
 
@@ -22,6 +22,12 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
 
     df_train = df_train.drop(columns=['Timestamp'])
     df_test = df_test.drop(columns=['Timestamp'])
+
+    for col in df_train.columns:
+        train_col, min_a, max_a = normalize(df_train[col])
+        test_col = normalize(df_test[col], min_a, max_a)[0]
+        df_train[col] = train_col
+        df_test[col] = test_col
 
     labels = np.concatenate([np.zeros(len(df_baseline) - df_train_len), np.ones(len(df_attack))])
     train = df_train.values
@@ -51,8 +57,8 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = df_test.drop(columns=['Timestamp'])
 
     for col in df_train.columns:
-        train_col, min_a, max_a = normalize2(df_train[col])
-        test_col = normalize2(df_test[col], min_a, max_a)[0]
+        train_col, min_a, max_a = normalize(df_train[col])
+        test_col = normalize(df_test[col], min_a, max_a)[0]
         df_train[col] = train_col
         df_test[col] = test_col
 
@@ -85,8 +91,8 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp'])
 
     for col in df_train.columns:
-        train_col, min_a, max_a = normalize2(df_train[col])
-        test_col = normalize2(df_test[col], min_a, max_a)[0]
+        train_col, min_a, max_a = normalize(df_train[col])
+        test_col = normalize(df_test[col], min_a, max_a)[0]
         df_train[col] = train_col
         df_test[col] = test_col
 
