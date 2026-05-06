@@ -314,6 +314,41 @@ def test_mtad_gat_feature_variations(feats):
     assert any((g.abs().sum() > 0) for g in grads)
 
 
+@pytest.mark.parametrize("feats", [3, 5, 8])
+def test_mtad_gat_hidden_threading(feats):
+    """MTAD_GAT must thread the GRU hidden state across timesteps without crashing.
+
+    Regression test: forward() previously had an inverted None check that
+    overwrote a passed-in hidden with a fresh random tensor, masking both a
+    GRU-size mismatch and a missing detach() in _backprop's BPTT loop.
+    """
+    model = MTAD_GAT(feats)
+    expected_hidden = feats * feats
+
+    # Forward pass with hidden=None (initial step).
+    model.eval()
+    x = torch.randn(1, feats * feats, dtype=torch.float64)
+    with torch.no_grad():
+        out, h = model(x)
+    assert h.shape == (1, 1, expected_hidden)
+
+    # Forward pass that reuses the returned hidden.
+    with torch.no_grad():
+        out2, h2 = model(x, h)
+    assert h2.shape == (1, 1, expected_hidden)
+
+    # Training step: _backprop threads hidden across iterations under autograd;
+    # without detach() this raises 'backward through the graph a second time'.
+    model.train()
+    data = torch.randn(3, feats * feats, dtype=torch.float64)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
+    loss, lr = model._backprop(epoch=0, data=data, optimizer=optimizer,
+                               scheduler=scheduler, training=True, feats=feats)
+    assert isinstance(loss, float)
+    assert isinstance(lr, float)
+
+
 @pytest.mark.parametrize("ModelClass, input_shape", [
     (LSTM_Univariate, (5, 5, 1)),      # feats=1, batch=5, seq_len=5
     (Attention, (5, 5)),               # seq_len=5, feats=5
