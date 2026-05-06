@@ -491,13 +491,12 @@ class CAE_M(nn.Module):
 
 ## MTAD_GAT Model (ICDM 20)
 class MTAD_GAT(nn.Module):
-	def __init__(self, feats, n_window=None, n_hidden=None, learning_rate=0.0001):
+	def __init__(self, feats, n_window=None, learning_rate=0.0001):
 		super(MTAD_GAT, self).__init__()
 		self.name = 'MTAD_GAT'
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window or feats
-		self.n_hidden = feats * feats if n_hidden is None else n_hidden
 		edge_index = torch.tensor([list(range(1, feats+1)), [0]*feats], dtype=torch.long)
 		edge_index, _ = add_self_loops(edge_index)
 		self.g = Data(edge_index=edge_index)
@@ -509,7 +508,8 @@ class MTAD_GAT(nn.Module):
 		self.gru = self.gru.double()
 
 	def forward(self, data, hidden=None):
-		hidden = torch.rand(1, 1, self.n_hidden, dtype=torch.float64) if hidden is not None else hidden
+		if hidden is None:
+			hidden = torch.rand(1, 1, self.n_feats * self.n_feats, dtype=torch.float64)
 		data = data.view(self.n_window, self.n_feats)
 		data_r = torch.cat((torch.zeros(1, self.n_feats), data))
 		feat_r = self.feature_gat(data_r, self.g.edge_index)
@@ -529,7 +529,7 @@ class MTAD_GAT(nn.Module):
 		l1s = []
 		if training:
 			for i, d in enumerate(data):
-				x, h = self(d, h if i else None)
+				x, h = self(d, h.detach() if i else None)
 				loss = torch.mean(l(x, d))
 				l1s.append(torch.mean(loss).item())
 				optimizer.zero_grad()
