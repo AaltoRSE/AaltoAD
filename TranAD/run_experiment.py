@@ -250,7 +250,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
-	result, _ = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
+	result, pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
 
@@ -258,7 +258,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
 	labels_df = pd.DataFrame({
 		'timestamp': timestamps,
-		'label': labelsFinal
+		'label': pred
 	})
 	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_labels.csv')
 	labels_df.to_csv(labels_csv_path, index=False)
