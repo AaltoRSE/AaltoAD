@@ -6,7 +6,7 @@ from TranAD.constants import DEFAULT_DATA_FOLDER
 
 
 
-def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
+def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     dataset_folder = os.path.join(data_folder, 'SWaT_payload_netflow')
     baseline_file = os.path.join(dataset_folder, 'NetflowPayload-Baseline-10s.csv')
     attack_file = os.path.join(dataset_folder, 'NetflowPayload-Attack-10s.csv')
@@ -14,7 +14,7 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_baseline = pd.read_csv(baseline_file)
     df_attack = pd.read_csv(attack_file)
 
-    n_test_baseline = min(60, int(0.2*len(df_baseline)))
+    n_test_baseline = int(test_size*len(df_baseline))
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
@@ -39,7 +39,7 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
 
 
-def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
+def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     dataset_folder = os.path.join(data_folder, 'SWaT_netflow')
     baseline_file = os.path.join(dataset_folder, 'SWat2015-JUST-NETFLOW-Baseline-10s.csv')
     attack_file = os.path.join(dataset_folder, 'SWat2015-JUST-NETFLOW-Attack-10s.csv')
@@ -47,7 +47,7 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_baseline = pd.read_csv(baseline_file)
     df_attack = pd.read_csv(attack_file)
 
-    n_test_baseline = min(60, int(0.2*len(df_baseline)))
+    n_test_baseline = int(test_size*len(df_baseline))
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
@@ -72,7 +72,7 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
 
 
-def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
+def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     dataset_folder = os.path.join(data_folder, 'SWaT_physical')
     baseline_file = os.path.join(dataset_folder, 'SWaT-PHYSICAL-BASELINE2015.csv')
     attack_file = os.path.join(dataset_folder, 'SWaT-PHYSICAL-ATTACK2015.csv')
@@ -80,7 +80,7 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_baseline = pd.read_csv(baseline_file)
     df_attack = pd.read_csv(attack_file)
 
-    n_test_baseline = min(60, int(0.2*len(df_baseline)))
+    n_test_baseline = int(test_size*len(df_baseline))
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
