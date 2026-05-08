@@ -258,7 +258,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
 	labels_df = pd.DataFrame({
 		'timestamp': timestamps,
-		'label': pred
+		'label': pred,
+		'ground_truth': labelsFinal
 	})
 	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_labels.csv')
 	labels_df.to_csv(labels_csv_path, index=False)
