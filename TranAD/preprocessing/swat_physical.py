@@ -20,6 +20,7 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
     test_timestamps = df_test['Timestamp']
 
+    labels = df_test['Tag'].values
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
@@ -29,7 +30,6 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
         df_train[col] = train_col
         df_test[col] = test_col
 
-    labels = np.concatenate([np.zeros(len(df_baseline) - df_train_len), np.ones(len(df_attack))])
     train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
@@ -53,6 +53,7 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
     test_timestamps = df_test['Timestamp']
 
+    labels = df_test['Tag'].values
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
@@ -62,7 +63,6 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER):
         df_train[col] = train_col
         df_test[col] = test_col
 
-    labels = np.concatenate([np.zeros(len(df_baseline) - df_train_len), np.ones(len(df_attack))])
     train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
