@@ -119,7 +119,7 @@ class Attention(nn.Module):
 
 ## LSTM_AD Model
 class LSTM_AD(nn.Module):
-	def __init__(self, feats, n_hidden=64, n_layers=1, sequence_length = 30, learning_rate=0.002, epochs=10, batch_size = 512):
+	def __init__(self, feats, n_hidden=64, n_layers=1, sequence_length = 30, learning_rate=0.002, epochs=10, batch_size = 256):
 		super(LSTM_AD, self).__init__()
 		self.name = 'LSTM_AD'
 		self.lr = learning_rate
@@ -141,7 +141,7 @@ class LSTM_AD(nn.Module):
 		c0 = torch.zeros(self.n_layers, B, self.n_hidden, dtype=x.dtype, device=x.device)
 		out, _ = self.lstm(x, (h0, c0))
 		out = self.fcn(out)
-		return 2 * out
+		return out
 
 	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
 		data_x = torch.as_tensor(data, dtype=torch.float64)
@@ -194,10 +194,10 @@ class LSTM_AD(nn.Module):
 					all_loss.append(loss.cpu())
 					all_pred.append(pred.cpu())
 
-			pred = torch.stack(all_pred)
-			losses = torch.stack(all_loss)
-			pred = pred.view(-1, feats)
-			losses = losses.view(-1, feats)
+			pred = torch.cat(all_pred, dim=0)    # [N, W, F]
+			losses = torch.cat(all_loss, dim=0)  # [N, W, F]
+			pred = pred[:, -1, :]                 # [N, F]
+			losses = losses.mean(dim=1)           # [N, F]
 			
 			return losses.detach().numpy(), pred.detach().numpy()
 
