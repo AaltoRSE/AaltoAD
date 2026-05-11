@@ -102,12 +102,23 @@ def convert_to_windows(data: torch.Tensor, model_obj, model_name: str) -> torch.
 	windows = []
 	w_size = model_obj.n_window
 	for i, g in enumerate(data):
-		if i >= w_size:
+		if model_name == 'LSTM_AD':
+			if i >= w_size - 1:
+				w = data[i - w_size + 1:i + 1]
+			else:
+				w = torch.cat([data[0].repeat(w_size - (i + 1), 1), data[0:i + 1]])
+		elif i >= w_size:
 			w = data[i - w_size:i]
 		else:
 			w = torch.cat([data[0].repeat(w_size - i, 1), data[0:i]])
 		# TranAD and Attention models use 3D windows, others use flattened
-		windows.append(w if 'TranAD' in model_name or 'Attention' in model_name or 'STAGNN' in model_name else w.view(-1))
+		if hasattr(model_obj, 'flat_window'):
+			if model_obj.flat_window:
+				windows.append(w.view(-1))
+			else:
+				windows.append(w)
+		else:
+			windows.append(w if 'TranAD' in model_name or 'Attention' in model_name or 'STAGNN' in model_name else w.view(-1))
 	return torch.stack(windows)
 
 

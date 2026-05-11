@@ -118,50 +118,87 @@ class Attention(nn.Module):
 
 ## LSTM_AD Model
 class LSTM_AD(nn.Module):
-	def __init__(self, feats, n_hidden=64, n_layers=1, learning_rate=0.002, batch_size = 512):
+	def __init__(self, feats, n_hidden=64, n_layers=1, sequence_length = 30, learning_rate=0.002, epochs=10, batch_size = 512):
 		super(LSTM_AD, self).__init__()
 		self.name = 'LSTM_AD'
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
+		self.n_window = sequence_length
+		self.flat_window = False
+		self.epochs = epochs
 		self.batch_size = batch_size
-		self.lstm = nn.LSTM(feats, self.n_hidden, n_layers)
+		self.lstm = nn.LSTM(feats, self.n_hidden, n_layers, batch_first=True)
 		self.fcn = nn.Sequential(nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid())
 		self.lstm = self.lstm.double()
 		self.fcn = self.fcn.double()
 
 	def forward(self, x):
-		hidden = (torch.rand(self.n_layers, 1, self.n_hidden, dtype=torch.float64), torch.randn(self.n_layers, 1, self.n_hidden, dtype=torch.float64))
-		outputs = []
-		for i, g in enumerate(x):
-			out, hidden = self.lstm(g.view(1, 1, -1), hidden)
-			out = self.fcn(out.view(-1))
-			outputs.append(2 * out.view(-1))
-		return torch.stack(outputs)
+		B = x.size(0)
+		h0 = torch.zeros(self.n_layers, B, self.n_hidden, dtype=x.dtype, device=x.device)
+		c0 = torch.zeros(self.n_layers, B, self.n_hidden, dtype=x.dtype, device=x.device)
+		out, _ = self.lstm(x, (h0, c0))
+		out = self.fcn(out)
+		return 2 * out
 
 	def _backprop(self, epoch, data, optimizer, scheduler, training, feats):
-		l = nn.MSELoss(reduction='mean' if training else 'none')
+		data_x = torch.as_tensor(data, dtype=torch.float64)
+		if data_x.ndim != 3:
+			print(data_x.shape)
+			raise ValueError("LSTM_AD expects windowed input [N, W, F]")
+		
+		dataset = TensorDataset(data_x, data_x)
+		bs = self.batch_size if training else len(dataset)
+		dataloader = DataLoader(dataset, batch_size=bs, shuffle=training, drop_last=False)
+
+		device = next(self.parameters()).device
+
 		if training:
-			total = 0.0
+			self.train()
+			criterion = nn.MSELoss(reduction='mean')
+			total_loss = 0.0
 			n_samples = 0
-			for b in range(0, data.shape[0], self.batch_size):
-				batch_data = data[b:b+self.batch_size]
-				batch_pred = self(batch_data)
-				loss = l(batch_pred, batch_data)
+			for xb, yb in dataloader:
+				xb = xb.to(device)
+				yb = yb.to(device)
+
+				pred = self(xb)
+				loss = criterion(pred, yb)
 				optimizer.zero_grad()
 				loss.backward()
 				optimizer.step()
-				total += loss.item() * batch_data.shape[0]
-				n_samples += batch_data.shape[0]
+
+				total_loss += loss.item() * xb.size(0)
+				n_samples += xb.size(0)
+
 			scheduler.step()
-			mean_loss = total / max(n_samples, 1)
+			mean_loss = total_loss / max(n_samples, 1)
 			tqdm.write(f'Epoch {epoch},\tMSE = {mean_loss}')
+			
 			return mean_loss, optimizer.param_groups[0]['lr']
 		else:
-			y_pred = self(data)
-			loss = l(y_pred, data)
-			return loss.detach().numpy(), y_pred.detach().numpy()
+			self.eval()
+			criterion = nn.MSELoss(reduction='none')
+			all_loss = []
+			all_pred = []
+			with torch.no_grad():
+				for xb, yb in dataloader:
+					xb = xb.to(device)
+					yb = yb.to(device)
+
+					pred = self(xb)
+					loss = criterion(pred, yb)
+
+					all_loss.append(loss.cpu())
+					all_pred.append(pred.cpu())
+
+			pred = torch.stack(all_pred)
+			losses = torch.stack(all_loss)
+			pred = pred.view(-1, feats)
+			losses = losses.view(-1, feats)
+			
+			return losses.detach().numpy(), pred.detach().numpy()
 
 ## DAGMM Model (ICLR 18)
 class DAGMM(nn.Module):

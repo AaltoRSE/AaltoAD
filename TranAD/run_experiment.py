@@ -15,8 +15,6 @@ from time import time
 from pprint import pprint
 
 import torch
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import numpy as np
 
@@ -198,13 +196,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	## Prepare data
 	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
 	trainO, testO = trainD, testD
-	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'MERLIN', 'STAGNN'] or 'TranAD' in model.name:
+	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'MERLIN', 'STAGNN', 'LSTM_AD'] or 'TranAD' in model.name:
 		trainD, testD = utils.convert_to_windows(trainD, model, model_name), utils.convert_to_windows(testD, model, model_name)
 
 	### Training phase
 	if not test:
 		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
-		num_epochs = 5
+		if hasattr(model, 'epochs'):
+			num_epochs = model.epochs
+		else:
+			num_epochs = 5
 		e = epoch + 1
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):

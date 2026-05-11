@@ -20,7 +20,8 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
     test_timestamps = df_test['Timestamp']
 
-    labels = df_test['Tag'].values
+    labels = df_test['Tag']
+    labels = pd.to_numeric(labels, errors="coerce").ne(0).astype(int).to_numpy()
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
@@ -53,7 +54,8 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
     test_timestamps = df_test['Timestamp']
 
-    labels = df_test['Tag'].values
+    labels = df_test['Tag']
+    labels = pd.to_numeric(labels, errors="coerce").ne(0).astype(int).to_numpy()
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
@@ -85,7 +87,8 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
 
-    labels = df_test['Normal/Attack'].apply(lambda x: 0 if x == 'Normal' else 1).values
+    labels = df_test['Normal/Attack']
+    labels = labels.astype(str).str.strip().str.lower().ne("normal").astype(int).to_numpy()
     test_timestamps = df_test['Timestamp']
     df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
