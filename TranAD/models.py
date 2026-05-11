@@ -77,6 +77,7 @@ class Attention(nn.Module):
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = False
 		self.n = self.n_feats * self.n_window
 		self.atts = [ nn.Sequential( nn.Linear(self.n, feats * feats), 
 				nn.ReLU(True))	for i in range(1)]
@@ -210,6 +211,7 @@ class DAGMM(nn.Module):
 		self.n_hidden = n_hidden
 		self.n_latent = n_latent
 		self.n_window = n_window
+		self.flat_window = True
 		self.n = self.n_feats * self.n_window
 		self.n_gmm = self.n_feats * self.n_window
 		self.encoder = nn.Sequential(
@@ -353,6 +355,7 @@ class USAD(nn.Module):
 		self.n_hidden = n_hidden
 		self.n_latent = n_latent
 		self.n_window = n_window
+		self.flat_window = True
 		self.n = self.n_feats * self.n_window
 		self.encoder = nn.Sequential(
 			nn.Flatten(),
@@ -423,6 +426,7 @@ class MSCRED(nn.Module):
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window or feats
+		self.flat_window = True
 		self.encoder = nn.ModuleList([
 			dlutils.ConvLSTM(1, 32, (3, 3), 1, True, True, False),
 			dlutils.ConvLSTM(32, 64, (3, 3), 1, True, True, False),
@@ -480,6 +484,7 @@ class CAE_M(nn.Module):
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window or feats
+		self.flat_window = True
 		self.encoder = nn.Sequential(
 			nn.Conv2d(1, 8, (3, 3), 1, 1), nn.Sigmoid(),
 			nn.Conv2d(8, 16, (3, 3), 1, 1), nn.Sigmoid(),
@@ -534,6 +539,7 @@ class MTAD_GAT(nn.Module):
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window or feats
+		self.flat_window = True
 		edge_index = torch.tensor([list(range(1, feats+1)), [0]*feats], dtype=torch.long)
 		edge_index, _ = add_self_loops(edge_index)
 		self.g = Data(edge_index=edge_index)
@@ -593,6 +599,7 @@ class GDN(nn.Module):
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = True
 		self.n_hidden = n_hidden
 		self.n = self.n_window * self.n_feats
 		src_ids = np.repeat(np.array(list(range(feats))), feats)
@@ -660,6 +667,7 @@ class MAD_GAN(nn.Module):
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_window = n_window
+		self.flat_window = True
 		self.n = self.n_feats * self.n_window
 		self.generator = nn.Sequential(
 			nn.Flatten(),
@@ -770,6 +778,7 @@ class TranAD_Basic(TranADBase, nn.Module):
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = False
 		self.nheads = nheads if nheads is not None else feats
 		self.n = self.n_feats * self.n_window
 		self.pos_encoder = dlutils.PositionalEncoding(feats, 0.1, self.n_window)
@@ -800,6 +809,7 @@ class TranAD_Transformer(TranADBase, nn.Module):
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_window = n_window
+		self.flat_window = False
 		self.n = 2 * self.n_feats * self.n_window
 		self.transformer_encoder = nn.Sequential(
 			nn.Linear(self.n, self.n_hidden), nn.ReLU(True),
@@ -844,6 +854,7 @@ class TranAD_Adversarial(TranADBase, nn.Module):
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = False
 		self.n = self.n_feats * self.n_window
 		self.nheads = nheads if nheads is not None else feats
 		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
@@ -885,6 +896,7 @@ class TranAD_SelfConditioning(TranADBase, nn.Module):
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = False
 		self.n = self.n_feats * self.n_window
 		self.nheads = nheads if nheads is not None else feats
 		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
@@ -926,6 +938,7 @@ class TranAD(TranADBase, nn.Module):
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = False
 		self.n = self.n_feats * self.n_window
 		self.nheads = nheads if nheads is not None else feats
 		self.pos_encoder = dlutils.PositionalEncoding(2 * feats, 0.1, self.n_window)
@@ -968,6 +981,7 @@ class STAGNN(nn.Module):
 		self.lr = learning_rate
 		self.n_feats = feats
 		self.n_window = n_window
+		self.flat_window = False
 		self.batch = batch_size
 		self.model = STAGNN_Core(
 			num_sensors=feats,

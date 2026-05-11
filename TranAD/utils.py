@@ -87,38 +87,27 @@ def load_hyperparams_from_string(hyperparams_str: str) -> Dict:
 	raise ValueError(f"Could not parse hyperparameters: not valid JSON and not an existing file path: {hyperparams_str!r}")
 
 
-def convert_to_windows(data: torch.Tensor, model_obj, model_name: str) -> torch.Tensor:
+def convert_to_windows(data: torch.Tensor, model_obj) -> torch.Tensor:
 	"""Convert time series data into sliding windows for model input.
 	
 	Args:
 		data (torch.Tensor): Input time series data with shape (num_samples, num_features).
-		model_obj: Model object that contains the n_window attribute specifying window size.
-		model_name (str): Name of the model (to determine window format).
+		model_obj: Model object that contains the n_window and flat_window attributes.
 	
 	Returns:
-		torch.Tensor: Stacked windows with shape (num_samples, window_size, num_features) for TranAD/Attention
-			models or (num_samples, window_size * num_features) for other models.
+		torch.Tensor: Stacked windows with shape (num_samples, window_size, num_features)
+			when flat_window is False, or (num_samples, window_size * num_features)
+			when flat_window is True.
 	"""
 	windows = []
 	w_size = model_obj.n_window
+	flatten = getattr(model_obj, 'flat_window', False)
 	for i, g in enumerate(data):
-		if model_name == 'LSTM_AD':
-			if i >= w_size - 1:
-				w = data[i - w_size + 1:i + 1]
-			else:
-				w = torch.cat([data[0].repeat(w_size - (i + 1), 1), data[0:i + 1]])
-		elif i >= w_size:
+		if i >= w_size:
 			w = data[i - w_size:i]
 		else:
 			w = torch.cat([data[0].repeat(w_size - i, 1), data[0:i]])
-		# TranAD and Attention models use 3D windows, others use flattened
-		if hasattr(model_obj, 'flat_window'):
-			if model_obj.flat_window:
-				windows.append(w.view(-1))
-			else:
-				windows.append(w)
-		else:
-			windows.append(w if 'TranAD' in model_name or 'Attention' in model_name or 'STAGNN' in model_name else w.view(-1))
+		windows.append(w.view(-1) if flatten else w)
 	return torch.stack(windows)
 
 
