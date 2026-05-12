@@ -209,10 +209,25 @@ class LSTM_AD(nn.Module):
 
 		pred = torch.cat(all_pred, dim=0)    # [N, W, F]
 		losses = torch.cat(all_loss, dim=0)  # [N, W, F]
-		pred = pred[:, -1, :]                 # [N, F]
-		losses = losses.mean(dim=1)           # [N, F]
-		
-		return losses.detach().numpy(), pred.detach().numpy()
+
+		losses_np = losses.numpy()                       # [N, W, F]
+		N, W, F = losses_np.shape
+		# Window i (right-aligned by convert_to_windows) covers original times [i-W+1, i].
+		starts = np.arange(N) - W + 1
+		positions = starts[:, None] + np.arange(W)[None, :]   # [N, W], original-time index
+		mask = (positions >= 0) & (positions < N)             # padded prefix is masked out
+
+		valid_positions = positions[mask]                     # [count]
+		valid_losses    = losses_np[mask]                     # [count, F]
+
+		score_sum   = np.zeros((N, F), dtype=np.float64)
+		score_count = np.zeros(N,       dtype=np.float64)
+		np.add.at(score_sum,   valid_positions, valid_losses)
+		np.add.at(score_count, valid_positions, 1)
+		losses_per_t = score_sum / np.maximum(score_count, 1)[:, None]   # [N, F]
+
+		pred = pred[:, -1, :]                                 # [N, F] - kept for plotting only
+		return losses_per_t, pred.detach().numpy()
 
 ## DAGMM Model (ICLR 18)
 class DAGMM(nn.Module):
