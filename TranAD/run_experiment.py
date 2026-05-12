@@ -297,8 +297,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	print(f'raw loss [N, F] shape={loss.shape} min={float(loss.min()):.4g} max={float(loss.max()):.4g}')
 	print(f'NaN/Inf in loss? nan={int(np.isnan(loss).sum())} inf={int(np.isinf(loss).sum())}')
 
+	loss_test_normal = lossFinal[labelsFinal == 0]
+
 	_loss_stats('train loss (mean over feats)', lossTfinal)
 	_loss_stats('calib  loss (mean over feats)', lossCfinal)
+	_loss_stats('test  loss | label=0 (normal)', loss_test_normal)
 	_loss_stats('test  loss (mean over feats)', lossFinal)
 
 	# Oracle: F1-maximising threshold on the test labels.
