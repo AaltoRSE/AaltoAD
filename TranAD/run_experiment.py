@@ -51,32 +51,49 @@ def loss_stats(name, x):
 	)
 
 
-def oracle_f1(scores, labels):
-	"""Find the F1-maximising threshold on `scores` against `labels`.
+def oracle_f1(scores, labels, calib_fraction=0.5):
+	"""Pick the F1-optimal threshold on a calibration split, score the held-out split.
 
-	This is a label leak (uses test labels) and is for diagnostic comparison only —
-	it tells you the upper bound on F1 achievable from the score series, regardless
-	of how the threshold is chosen at deployment.
+	Splits `(scores, labels)` sequentially into a calibration half (first `calib_fraction`)
+	and an evaluation half (remainder). The threshold is chosen to maximise F1 on the
+	calibration half; the returned metrics are computed on the evaluation half. This makes
+	the oracle an honest upper bound (uses labels, but not the labels it's evaluated on).
 
-	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix counts.
-	Returns None if precision_recall_curve produced no thresholds.
+	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix counts
+	on the evaluation half. Returns None if calibration has no usable thresholds.
 	"""
-	precision, recall, thresholds = precision_recall_curve(labels, scores)
+	scores = np.asarray(scores)
+	labels = np.asarray(labels)
+	n = len(scores)
+	n_calib = int(n * calib_fraction)
+	calib_scores, calib_labels = scores[:n_calib], labels[:n_calib]
+	eval_scores,  eval_labels  = scores[n_calib:], labels[n_calib:]
+
+	precision, recall, thresholds = precision_recall_curve(calib_labels, calib_scores)
 	if len(thresholds) == 0:
 		return None
 	f1 = 2 * precision[:-1] * recall[:-1] / (precision[:-1] + recall[:-1] + 1e-12)
 	best = int(np.nanargmax(f1))
 	thr = float(thresholds[best])
-	pred = (scores >= thr).astype(int)
-	tn, fp, fn, tp = confusion_matrix(labels, pred, labels=[0, 1]).ravel()
+
+	pred = (eval_scores >= thr).astype(int)
+	tn, fp, fn, tp = confusion_matrix(eval_labels, pred, labels=[0, 1]).ravel()
+	denom_p = tp + fp
+	denom_r = tp + fn
+	prec = tp / denom_p if denom_p else 0.0
+	rec  = tp / denom_r if denom_r else 0.0
+	f1_eval = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
 	fpr = fp / (fp + tn) if (fp + tn) else 0.0
 	return {
 		'threshold': thr,
-		'f1': float(f1[best]),
-		'precision': float(precision[best]),
-		'recall': float(recall[best]),
-		'fpr': fpr,
+		'f1': float(f1_eval),
+		'precision': float(prec),
+		'recall': float(rec),
+		'fpr': float(fpr),
 		'tp': int(tp), 'fp': int(fp), 'fn': int(fn), 'tn': int(tn),
+		'calib_fraction': calib_fraction,
+		'n_calib': int(n_calib),
+		'n_eval': int(n - n_calib),
 	}
 
 
