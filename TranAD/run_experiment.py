@@ -51,23 +51,37 @@ def loss_stats(name, x):
 	)
 
 
-def oracle_f1(scores, labels, calib_fraction=0.5):
+def oracle_f1(scores, labels, calib_fraction=0.5, seed=0):
 	"""Pick the F1-optimal threshold on a calibration split, score the held-out split.
 
-	Splits `(scores, labels)` sequentially into a calibration half (first `calib_fraction`)
-	and an evaluation half (remainder). The threshold is chosen to maximise F1 on the
-	calibration half; the returned metrics are computed on the evaluation half. This makes
-	the oracle an honest upper bound (uses labels, but not the labels it's evaluated on).
+	Splits `(scores, labels)` into a stratified-random calibration set (size `calib_fraction`)
+	and a held-out evaluation set (remainder). The threshold is chosen to maximise F1 on the
+	calibration set; the returned metrics are computed on the evaluation set. This makes the
+	oracle an honest upper bound (uses labels, but not the labels it's evaluated on).
+
+	Stratified rather than sequential because attack timestamps in real datasets are clustered
+	in time — a sequential split can leave one half with a wildly different attack base rate
+	than the other, producing thresholds calibrated to the wrong distribution.
 
 	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix counts
-	on the evaluation half. Returns None if calibration has no usable thresholds.
+	on the evaluation set. Returns None if calibration has no usable thresholds.
 	"""
 	scores = np.asarray(scores)
 	labels = np.asarray(labels)
 	n = len(scores)
-	n_calib = int(n * calib_fraction)
-	calib_scores, calib_labels = scores[:n_calib], labels[:n_calib]
-	eval_scores,  eval_labels  = scores[n_calib:], labels[n_calib:]
+
+	rng = np.random.default_rng(seed)
+	pos_idx = np.where(labels == 1)[0]
+	neg_idx = np.where(labels == 0)[0]
+	rng.shuffle(pos_idx)
+	rng.shuffle(neg_idx)
+	n_calib_pos = int(len(pos_idx) * calib_fraction)
+	n_calib_neg = int(len(neg_idx) * calib_fraction)
+	calib_idx = np.concatenate([pos_idx[:n_calib_pos], neg_idx[:n_calib_neg]])
+	eval_idx  = np.concatenate([pos_idx[n_calib_pos:], neg_idx[n_calib_neg:]])
+	calib_scores, calib_labels = scores[calib_idx], labels[calib_idx]
+	eval_scores,  eval_labels  = scores[eval_idx],  labels[eval_idx]
+	n_calib = len(calib_idx)
 
 	precision, recall, thresholds = precision_recall_curve(calib_labels, calib_scores)
 	if len(thresholds) == 0:
