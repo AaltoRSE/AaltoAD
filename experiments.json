@@ -38,6 +38,42 @@
       "notes": "LSTM_AD"
     },
     {
+      "index": 1,
+      "dataset": "SWaT_physical",
+      "model": "LSTM_AE",
+      "learning_rate": [0.001],
+      "n_layers": [1],
+      "n_hidden": [64],
+      "batch_size": [256],
+      "sequence_length": [30],
+      "epochs": [10],
+      "notes": "LSTM_AE"
+    },
+    {
+      "index": 2,
+      "dataset": "SWaT_netflow",
+      "model": "LSTM_AE",
+      "learning_rate": [0.001],
+      "n_layers": [1],
+      "n_hidden": [64],
+      "batch_size": [256],
+      "sequence_length": [30],
+      "epochs": [10],
+      "notes": "LSTM_AE"
+    },
+    {
+      "index": 3,
+      "dataset": "SWaT_payload_netflow",
+      "model": "LSTM_AE",
+      "learning_rate": [0.001],
+      "n_layers": [1],
+      "n_hidden": [64],
+      "batch_size": [256],
+      "sequence_length": [30],
+      "epochs": [10],
+      "notes": "LSTM_AE"
+    },
+    {
       "index": 4,
       "dataset": "SWaT_physical",
       "model": "LSTM_Univariate",
