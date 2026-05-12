@@ -298,10 +298,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	print(f'NaN/Inf in loss? nan={int(np.isnan(loss).sum())} inf={int(np.isinf(loss).sum())}')
 
 	loss_test_normal = lossFinal[labelsFinal == 0]
+	loss_test_attack = lossFinal[labelsFinal == 1]
 
 	_loss_stats('train loss (mean over feats)', lossTfinal)
 	_loss_stats('calib  loss (mean over feats)', lossCfinal)
 	_loss_stats('test  loss | label=0 (normal)', loss_test_normal)
+	if loss_test_attack.size:
+		_loss_stats('test  loss | label=1 (attack)', loss_test_attack)
 	_loss_stats('test  loss (mean over feats)', lossFinal)
 
 	# Oracle: F1-maximising threshold on the test labels.
