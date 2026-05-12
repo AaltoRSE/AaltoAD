@@ -251,6 +251,27 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
+
+	def _loss_stats(name, x):
+		x = np.asarray(x)
+		mean = float(x.mean())
+		above = x[x > mean]
+		below = x[x < mean]
+		std_pos = float(above.std()) if above.size else 0.0
+		std_neg = float(below.std()) if below.size else 0.0
+		pcts = np.percentile(x, [1, 50, 90, 99, 99.9])
+		print(
+			f'{name}: n={x.size} mean={mean:.6g} '
+			f'std+={std_pos:.6g} std-={std_neg:.6g} '
+			f'p1={pcts[0]:.6g} p50={pcts[1]:.6g} '
+			f'p90={pcts[2]:.6g} p99={pcts[3]:.6g} p99.9={pcts[4]:.6g} '
+			f'min={float(x.min()):.6g} max={float(x.max()):.6g}'
+		)
+
+	_loss_stats('train loss (mean over feats)', lossTfinal)
+	_loss_stats('test  loss (mean over feats)', lossFinal)
+	print(f'attack base rate: {labelsFinal.mean():.4f} ({int(labelsFinal.sum())}/{len(labelsFinal)})')
+
 	result, pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
