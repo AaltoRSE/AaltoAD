@@ -8,9 +8,9 @@ from TranAD.constants import DEFAULT_DATA_FOLDER
 def load_SWaT(folder, data_folder=DEFAULT_DATA_FOLDER):
 	dataset_folder = os.path.join(data_folder, 'SWaT')
 	file = os.path.join(dataset_folder, 'series.json')
-	dftrain_step = pd.read_json(file, lines=True)[['val']][3000:6000]
+	df_train = pd.read_json(file, lines=True)[['val']][3000:6000]
 	df_test  = pd.read_json(file, lines=True)[['val']][7000:12000]
-	train, min_a, max_a = normalize(dftrain_step.values)
+	train, min_a, max_a = normalize(df_train.values)
 	test, _, _ = normalize(df_test.values, min_a, max_a)
 	labels = pd.read_json(file, lines=True)[['noti']][7000:12000] + 0
 	for file in ['train', 'test', 'labels']:

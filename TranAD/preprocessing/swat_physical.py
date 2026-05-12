@@ -5,6 +5,21 @@ from TranAD.preprocessing.utils import normalize
 from TranAD.constants import DEFAULT_DATA_FOLDER
 
 
+def _zero_baseline_constant_cols(df_train, dftest):
+    """Zero out columns that are constant in the training (baseline) data.
+
+    Without this, the eps-regularised divisor in normalize() would amplify any
+    test-time variation in such columns by 1/eps (~10000x), drowning out signal
+    from the well-behaved features.
+    """
+    constant_cols = [c for c in df_train.columns if df_train[c].nunique(dropna=True) <= 1]
+    if constant_cols:
+        print(f'zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}')
+    for c in constant_cols:
+        df_train[c] = 0.0
+        dftest[c] = 0.0
+    return constant_cols
+
 
 def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     dataset_folder = os.path.join(data_folder, 'SWaT_payload_netflow')
@@ -15,23 +30,27 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size
     df_attack = pd.read_csv(attack_file)
 
     n_test_baseline = int(test_size*len(df_baseline))
-    dftrain_step_len = int(len(df_baseline)) - n_test_baseline
-    dftrain_step = df_baseline[:dftrain_step_len]
-    df_test = pd.concat([df_baseline[dftrain_step_len:], df_attack], ignore_index=True)
+    df_train_len = int(len(df_baseline)) - n_test_baseline
+    df_train = df_baseline[:df_train_len]
+    df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
     test_timestamps = df_test['Timestamp']
 
     labels = df_test['Tag']
     labels = pd.to_numeric(labels, errors="coerce").ne(0).astype(int).to_numpy()
-    dftrain_step = dftrain_step.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
+    df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
-    for col in dftrain_step.columns:
-        train_col, min_a, max_a = normalize(dftrain_step[col])
+    constant_cols = _zero_baseline_constant_cols(df_train, df_test)
+
+    for col in df_train.columns:
+        if col in constant_cols:
+            continue
+        train_col, min_a, max_a = normalize(df_train[col])
         test_col = normalize(df_test[col], min_a, max_a)[0]
-        dftrain_step[col] = train_col
+        df_train[col] = train_col
         df_test[col] = test_col
 
-    train = dftrain_step.values
+    train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     for file in ['train', 'test', 'labels']:
@@ -49,23 +68,27 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     df_attack = pd.read_csv(attack_file)
 
     n_test_baseline = int(test_size*len(df_baseline))
-    dftrain_step_len = int(len(df_baseline)) - n_test_baseline
-    dftrain_step = df_baseline[:dftrain_step_len]
-    df_test = pd.concat([df_baseline[dftrain_step_len:], df_attack], ignore_index=True)
+    df_train_len = int(len(df_baseline)) - n_test_baseline
+    df_train = df_baseline[:df_train_len]
+    df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
     test_timestamps = df_test['Timestamp']
 
     labels = df_test['Tag']
     labels = pd.to_numeric(labels, errors="coerce").ne(0).astype(int).to_numpy()
-    dftrain_step = dftrain_step.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
+    df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
-    for col in dftrain_step.columns:
-        train_col, min_a, max_a = normalize(dftrain_step[col])
+    constant_cols = _zero_baseline_constant_cols(df_train, df_test)
+
+    for col in df_train.columns:
+        if col in constant_cols:
+            continue
+        train_col, min_a, max_a = normalize(df_train[col])
         test_col = normalize(df_test[col], min_a, max_a)[0]
-        dftrain_step[col] = train_col
+        df_train[col] = train_col
         df_test[col] = test_col
 
-    train = dftrain_step.values
+    train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     for file in ['train', 'test', 'labels']:
@@ -83,31 +106,35 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     df_attack = pd.read_csv(attack_file)
 
     n_test_baseline = int(test_size*len(df_baseline))
-    dftrain_step_len = int(len(df_baseline)) - n_test_baseline
-    dftrain_step = df_baseline[:dftrain_step_len]
-    df_test = pd.concat([df_baseline[dftrain_step_len:], df_attack], ignore_index=True)
+    df_train_len = int(len(df_baseline)) - n_test_baseline
+    df_train = df_baseline[:df_train_len]
+    df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
 
     labels = df_test['Normal/Attack']
     labels = labels.astype(str).str.strip().str.lower().ne("normal").astype(int).to_numpy()
     test_timestamps = df_test['Timestamp']
-    dftrain_step = dftrain_step.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
+    df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
     df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
 
-    for col in dftrain_step.columns:
-        train_col, min_a, max_a = normalize(dftrain_step[col])
+    constant_cols = _zero_baseline_constant_cols(df_train, df_test)
+
+    for col in df_train.columns:
+        if col in constant_cols:
+            continue
+        train_col, min_a, max_a = normalize(df_train[col])
         test_col = normalize(df_test[col], min_a, max_a)[0]
-        dftrain_step[col] = train_col
+        df_train[col] = train_col
         df_test[col] = test_col
 
     # The physical datasethas NaN rows. These are anomalous, of course. Replace with a placeholder after normalization
-    dftrain_step = dftrain_step.fillna(0)
+    df_train = df_train.fillna(0)
     df_test = df_test.fillna(0)
 
-    train = dftrain_step.values
+    train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
     for file in ['train', 'test', 'labels']:
         np.save(os.path.join(folder, f'{file}.npy'), eval(file))
-    
+
     pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
 

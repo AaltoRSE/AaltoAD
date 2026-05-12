@@ -7,11 +7,11 @@ from TranAD.preprocessing.utils import normalize
 
 def load_MSDS(folder, data_folder=DEFAULT_DATA_FOLDER):
 	dataset_folder = os.path.join(data_folder, 'MSDS')
-	dftrain_step = pd.read_csv(os.path.join(dataset_folder, 'train.csv'))
+	df_train = pd.read_csv(os.path.join(dataset_folder, 'train.csv'))
 	df_test  = pd.read_csv(os.path.join(dataset_folder, 'test.csv'))
-	dftrain_step, df_test = dftrain_step.values[::5, 1:], df_test.values[::5, 1:]
-	_, min_a, max_a = normalize(np.concatenate((dftrain_step, df_test), axis=0))
-	train, _, _ = normalize(dftrain_step, min_a, max_a)
+	df_train, df_test = df_train.values[::5, 1:], df_test.values[::5, 1:]
+	_, min_a, max_a = normalize(np.concatenate((df_train, df_test), axis=0))
+	train, _, _ = normalize(df_train, min_a, max_a)
 	test, _, _ = normalize(df_test, min_a, max_a)
 	labels = pd.read_csv(os.path.join(dataset_folder, 'labels.csv'))
 	labels = labels.values[::1, 1:]
