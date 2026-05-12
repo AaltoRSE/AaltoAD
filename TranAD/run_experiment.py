@@ -17,6 +17,7 @@ from pprint import pprint
 import torch
 from tqdm import tqdm
 import numpy as np
+from sklearn.metrics import precision_recall_curve, confusion_matrix
 
 import TranAD
 from TranAD import models
@@ -30,6 +31,86 @@ from TranAD import utils
 import tempfile
 import shutil
 import re
+
+
+def loss_stats(name, x):
+	"""Print summary statistics (mean, asymmetric stds, percentiles, min/max) for a loss array."""
+	x = np.asarray(x)
+	mean = float(x.mean())
+	above = x[x > mean]
+	below = x[x < mean]
+	std_pos = float(above.std()) if above.size else 0.0
+	std_neg = float(below.std()) if below.size else 0.0
+	pcts = np.percentile(x, [1, 50, 90, 99, 99.9])
+	print(
+		f'{name}: n={x.size} mean={mean:.6g} '
+		f'std+={std_pos:.6g} std-={std_neg:.6g} '
+		f'p1={pcts[0]:.6g} p50={pcts[1]:.6g} '
+		f'p90={pcts[2]:.6g} p99={pcts[3]:.6g} p99.9={pcts[4]:.6g} '
+		f'min={float(x.min()):.6g} max={float(x.max()):.6g}'
+	)
+
+
+def oracle_f1(scores, labels):
+	"""Find the F1-maximising threshold on `scores` against `labels`.
+
+	This is a label leak (uses test labels) and is for diagnostic comparison only —
+	it tells you the upper bound on F1 achievable from the score series, regardless
+	of how the threshold is chosen at deployment.
+
+	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix counts.
+	Returns None if precision_recall_curve produced no thresholds.
+	"""
+	precision, recall, thresholds = precision_recall_curve(labels, scores)
+	if len(thresholds) == 0:
+		return None
+	f1 = 2 * precision[:-1] * recall[:-1] / (precision[:-1] + recall[:-1] + 1e-12)
+	best = int(np.nanargmax(f1))
+	thr = float(thresholds[best])
+	pred = (scores >= thr).astype(int)
+	tn, fp, fn, tp = confusion_matrix(labels, pred, labels=[0, 1]).ravel()
+	fpr = fp / (fp + tn) if (fp + tn) else 0.0
+	return {
+		'threshold': thr,
+		'f1': float(f1[best]),
+		'precision': float(precision[best]),
+		'recall': float(recall[best]),
+		'fpr': fpr,
+		'tp': int(tp), 'fp': int(fp), 'fn': int(fn), 'tn': int(tn),
+	}
+
+
+def _convert_json_types(obj):
+	"""Convert numpy/pandas types to native Python types for JSON serialisation."""
+	if isinstance(obj, (np.integer, np.floating)):
+		return obj.item()
+	if isinstance(obj, np.ndarray):
+		return obj.tolist()
+	if isinstance(obj, pd.Timestamp):
+		return obj.isoformat()
+	if isinstance(obj, (pd.Series, pd.DataFrame)):
+		return obj.to_dict(orient='records')
+	if isinstance(obj, (int, float, str, bool)):
+		return obj
+	return str(obj)
+
+
+def _safe_write_json(path, data):
+	"""Atomically write `data` as JSON to `path` via a tempfile + replace."""
+	tmp_fd, tmp_path = tempfile.mkstemp(suffix='.tmp', prefix='tmp_result_', dir=os.path.dirname(path))
+	os.close(tmp_fd)
+	try:
+		with open(tmp_path, 'w') as tf:
+			json.dump(data, tf, indent=2, default=_convert_json_types)
+			tf.flush()
+			os.fsync(tf.fileno())
+		shutil.move(tmp_path, path)
+	finally:
+		if os.path.exists(tmp_path):
+			try:
+				os.remove(tmp_path)
+			except Exception:
+				pass
 
 
 def _hyperparams_hash(hyperparams: dict) -> str:
@@ -144,17 +225,27 @@ def load_model(
 def append_benchmark_row(model_name, dataset_name, result_dict, bench_path=os.path.join('results', 'benchmarks.csv')):
 	"""Append a single benchmark row to CSV, creating file/header if needed.
 
-	Args:
-		model_name (str), dataset_name (str), result_dict (dict), bench_path (str)
+	Writes both POT and oracle metrics so downstream tracking can compare the
+	threshold-method result against the F1-optimal upper bound.
 	"""
+	pot = result_dict.get('pot') or {}
+	oracle = result_dict.get('oracle') or {}
 	try:
 		os.makedirs(os.path.dirname(bench_path) or '.', exist_ok=True)
 		write_header = (not os.path.exists(bench_path)) or os.path.getsize(bench_path) == 0
 		with open(bench_path, 'a', newline='') as csvfile:
 			writer = csv.writer(csvfile)
 			if write_header:
-				writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
-			writer.writerow([model_name, dataset_name, result_dict.get('precision'), result_dict.get('recall'), result_dict.get('ROC/AUC'), result_dict.get('f1')])
+				writer.writerow([
+					'model', 'dataset',
+					'pot_precision', 'pot_recall', 'pot_AUC', 'pot_f1',
+					'oracle_precision', 'oracle_recall', 'oracle_f1', 'oracle_threshold',
+				])
+			writer.writerow([
+				model_name, dataset_name,
+				pot.get('precision'), pot.get('recall'), pot.get('ROC/AUC'), pot.get('f1'),
+				oracle.get('precision'), oracle.get('recall'), oracle.get('f1'), oracle.get('threshold'),
+			])
 	except Exception as e:
 		print(f"Could not write benchmark CSV: {e}")
 
@@ -265,22 +356,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	lossCfinal = np.mean(lossC, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
 
-	def _loss_stats(name, x):
-		x = np.asarray(x)
-		mean = float(x.mean())
-		above = x[x > mean]
-		below = x[x < mean]
-		std_pos = float(above.std()) if above.size else 0.0
-		std_neg = float(below.std()) if below.size else 0.0
-		pcts = np.percentile(x, [1, 50, 90, 99, 99.9])
-		print(
-			f'{name}: n={x.size} mean={mean:.6g} '
-			f'std+={std_pos:.6g} std-={std_neg:.6g} '
-			f'p1={pcts[0]:.6g} p50={pcts[1]:.6g} '
-			f'p90={pcts[2]:.6g} p99={pcts[3]:.6g} p99.9={pcts[4]:.6g} '
-			f'min={float(x.min()):.6g} max={float(x.max()):.6g}'
-		)
-
 	# Sanity checks: are inputs and predictions actually in the range we expect?
 	_trainD_arr = trainD.detach().cpu().numpy() if hasattr(trainD, 'detach') else np.asarray(trainD)
 	_testD_arr  = testD.detach().cpu().numpy()  if hasattr(testD,  'detach') else np.asarray(testD)
@@ -300,32 +375,31 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	loss_test_normal = lossFinal[labelsFinal == 0]
 	loss_test_attack = lossFinal[labelsFinal == 1]
 
-	_loss_stats('train loss (mean over feats)', lossTfinal)
-	_loss_stats('calib  loss (mean over feats)', lossCfinal)
-	_loss_stats('test  loss | label=0 (normal)', loss_test_normal)
+	loss_stats('train loss (mean over feats)', lossTfinal)
+	loss_stats('calib  loss (mean over feats)', lossCfinal)
+	loss_stats('test  loss | label=0 (normal)', loss_test_normal)
 	if loss_test_attack.size:
-		_loss_stats('test  loss | label=1 (attack)', loss_test_attack)
-	_loss_stats('test  loss (mean over feats)', lossFinal)
+		loss_stats('test  loss | label=1 (attack)', loss_test_attack)
+	loss_stats('test  loss (mean over feats)', lossFinal)
 
-	# Oracle: F1-maximising threshold on the test labels.
-	# This is a leak (uses test labels) and is for diagnostic comparison only.
-	from sklearn.metrics import precision_recall_curve, confusion_matrix
-	_precision, _recall, _thresholds = precision_recall_curve(labelsFinal, lossFinal)
-	_f1 = 2 * _precision[:-1] * _recall[:-1] / (_precision[:-1] + _recall[:-1] + 1e-12)
-	if len(_thresholds) > 0:
-		_best = int(np.nanargmax(_f1))
-		_thr_oracle = float(_thresholds[_best])
-		_pred_oracle = (lossFinal >= _thr_oracle).astype(int)
-		_tn, _fp, _fn, _tp = confusion_matrix(labelsFinal, _pred_oracle, labels=[0, 1]).ravel()
-		_fpr = _fp / (_fp + _tn) if (_fp + _tn) else 0.0
+	oracle = oracle_f1(lossFinal, labelsFinal)
+	if oracle is not None:
 		print(
-			f'oracle (F1-max on test): threshold={_thr_oracle:.6g} '
-			f'f1={float(_f1[_best]):.4f} precision={float(_precision[_best]):.4f} '
-			f'recall={float(_recall[_best]):.4f} fpr={_fpr:.6f} '
-			f'TP={int(_tp)} FP={int(_fp)} FN={int(_fn)} TN={int(_tn)}'
+			f'oracle (F1-max on test): threshold={oracle["threshold"]:.6g} '
+			f'f1={oracle["f1"]:.4f} precision={oracle["precision"]:.4f} '
+			f'recall={oracle["recall"]:.4f} fpr={oracle["fpr"]:.6f} '
+			f'TP={oracle["tp"]} FP={oracle["fp"]} FN={oracle["fn"]} TN={oracle["tn"]}'
 		)
+		oracle_pred = (lossFinal >= oracle['threshold']).astype(int)
+	else:
+		oracle_pred = np.zeros_like(labelsFinal)
 
-	result, pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal)
+	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal)
+
+	result = {
+		'pot': pot_result,
+		'oracle': oracle,
+	}
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
 
@@ -333,13 +407,14 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
 	labels_df = pd.DataFrame({
 		'timestamp': timestamps,
-		'label': pred,
-		'ground_truth': labelsFinal
+		'pot_label': pot_pred,
+		'oracle_label': oracle_pred,
+		'ground_truth': labelsFinal,
 	})
 	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_exp{experiment_id}_labels.csv')
 	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)
 	labels_df.to_csv(labels_csv_path, index=False)
-	
+
 	# Add metadata to results
 	result['git_hash'] = utils.get_git_hash()
 	result['model'] = model_name
@@ -348,54 +423,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	if experiment_id is not None:
 		result['experiment_id'] = experiment_id
 	
-	# Save detailed results with metadata to JSON (atomic write + numpy/pandas type handling)
-	def _convert_json_types(obj):
-		# Convert numpy and pandas types to native Python types for JSON
-		try:
-			import numpy as _np
-			import pandas as _pd
-		except Exception:
-			_np = None
-			_pd = None
-
-		# numpy scalar
-		if _np is not None and isinstance(obj, (_np.integer, _np.floating)):
-			return obj.item()
-		# numpy ndarray
-		if _np is not None and isinstance(obj, _np.ndarray):
-			return obj.tolist()
-		# pandas types
-		if _pd is not None:
-			if isinstance(obj, _pd.Timestamp):
-				return obj.isoformat()
-			if isinstance(obj, (_pd.Series, _pd.DataFrame)):
-				return obj.to_dict(orient='records')
-
-		# Fallback: try to convert common Python numeric types
-		if isinstance(obj, (int, float, str, bool)):
-			return obj
-
-		# Last resort: stringify
-		return str(obj)
-
-	def _safe_write_json(path: str, data: Dict):
-		tmp_fd, tmp_path = tempfile.mkstemp(suffix='.tmp', prefix='tmp_result_', dir=os.path.dirname(path))
-		os.close(tmp_fd)
-		try:
-			with open(tmp_path, 'w') as tf:
-				json.dump(data, tf, indent=2, default=_convert_json_types)
-				tf.flush()
-				os.fsync(tf.fileno())
-			# Atomic replace
-			shutil.move(tmp_path, path)
-		finally:
-			if os.path.exists(tmp_path):
-				try:
-					os.remove(tmp_path)
-				except Exception:
-					pass
-
-
 	results_dir = os.path.join('results', dataset_name)
 	os.makedirs(results_dir, exist_ok=True)
 
