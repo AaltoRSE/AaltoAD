@@ -23,7 +23,7 @@ def test_adjust_predicts_basic():
     assert pred[0] == False
 
 
-def test_poteval_step_with_dummy_spot(monkeypatch):
+def test_pot_eval_with_dummy_spot(monkeypatch):
     # small synthetic arrays
     init_score = np.array([0.1, 0.2, 0.05])
     score = np.array([0.2, 0.6, 0.1])
@@ -41,13 +41,13 @@ def test_poteval_step_with_dummy_spot(monkeypatch):
             self.level = level
 
         def run(self, dynamic=False):
-            # return a thresholds array so poteval_step computes a threshold
+            # return a thresholds array so pot_eval computes a threshold
             return {"thresholds": np.array([0.6]), "alarms": []}
 
     # monkeypatch SPOT used inside pot module
     monkeypatch.setattr(pot, "SPOT", DummySPOT)
 
-    res, preds = pot.poteval_step(init_score, score, label)
+    res, preds = pot.pot_eval(init_score, score, label)
     assert isinstance(res, dict)
     # expected keys
     for k in ("f1", "precision", "recall", "TP", "TN", "FP", "FN", "ROC/AUC", "threshold"):

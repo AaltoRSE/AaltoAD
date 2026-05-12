@@ -245,13 +245,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	feats = trainO.shape[1]
 	for i in tqdm(range(loss.shape[1]), desc='Evaluating features'):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
-		result, pred = pot.poteval_step(lt, l, ls)
+		result, pred = pot.pot_eval(lt, l, ls)
 		preds.append(pred)
 		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
 
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
-	result, pred = pot.poteval_step(lossTfinal, lossFinal, labelsFinal)
+	result, pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
 

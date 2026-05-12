@@ -5,7 +5,7 @@ output_folder = DEFAULT_OUTPUT_FOLDER
 data_folder = DEFAULT_DATA_FOLDER
 
 # These dictionaries define dataset-specific configuration values
-_LM_D = {
+POT_INIT = {
     'SMD': [(0.99995, 1.04), (0.99995, 1.06)],
     'synthetic': [(0.999, 1), (0.999, 1)],
     'SWaT': [(0.993, 1), (0.993, 1)],
@@ -16,6 +16,7 @@ _LM_D = {
     'WADI': [(0.99, 1), (0.999, 1)],
     'MSDS': [(0.91, 1), (0.9, 1.04)],
     'MBA': [(0.87, 1), (0.93, 1.04)],
+    'default': [(0.993, 1), (0.993, 1)],
 }
 
 _LR_D = {
@@ -65,7 +66,7 @@ def initialize(dataset: str, model: str):
     global lm, lr, percentile_merlin, cvp
     
     # Set learning rate threshold based on dataset
-    lm_pair = _LM_D.get(dataset, _LM_D['synthetic'])
+    lm_pair = POT_INIT.get(dataset, POT_INIT['default'])
     # Use second value for TranAD models, first for others
     lm = lm_pair[1 if 'TranAD' in model else 0]
     

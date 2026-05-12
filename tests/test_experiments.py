@@ -148,11 +148,11 @@ def test_append_benchmark_row_handles_missing_values(tmp_path):
 @patch('TranAD.utils.convert_to_windows')
 @patch('TranAD.utils.load_timestamps')
 @patch('TranAD.plotting.plotter')
-@patch('TranAD.pot.poteval_step')
+@patch('TranAD.pot.pot_eval')
 @patch('TranAD.diagnosis.hit_att')
 @patch('TranAD.diagnosis.ndcg')
 @patch('TranAD.utils.get_git_hash')
-def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_poteval_step,
+def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
                                mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment function with mocked models."""
     monkeypatch.chdir(tmp_path)
@@ -193,9 +193,9 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_potev
         (np.random.rand(100, 5), np.random.rand(100, 5))
     ])
     
-    # Mock poteval_step to return result and predictions
+    # Mock pot_eval to return result and predictions
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
-    mock_poteval_step.return_value = (mock_pot_result, np.random.rand(50))
+    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
     
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
@@ -226,11 +226,11 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_potev
 @patch('TranAD.run_experiment.save_model')
 @patch('TranAD.utils.plot_accuracies')
 @patch('TranAD.plotting.plotter')
-@patch('TranAD.pot.poteval_step')
+@patch('TranAD.pot.pot_eval')
 @patch('TranAD.diagnosis.hit_att')
 @patch('TranAD.diagnosis.ndcg')
 @patch('TranAD.utils.get_git_hash')
-def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att, mock_poteval_step,
+def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
                                       mock_plotter, mock_plot_accuracies, mock_save_model, mock_load_timestamps,
                                       mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment with training enabled."""
@@ -269,7 +269,7 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     ])
 
     mock_pot_result = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
-    mock_poteval_step.return_value = (mock_pot_result, np.random.rand(50))
+    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
 
     mock_hit_att.return_value = {'hit_rate': 0.85}
     mock_ndcg.return_value = {'ndcg': 0.78}
@@ -321,11 +321,11 @@ def test_run_experiment_merlin(mock_append, mock_load_dataset, mock_run_merlin, 
 @patch('TranAD.utils.convert_to_windows')
 @patch('TranAD.utils.load_timestamps')
 @patch('TranAD.plotting.plotter')
-@patch('TranAD.pot.poteval_step')
+@patch('TranAD.pot.pot_eval')
 @patch('TranAD.diagnosis.hit_att')
 @patch('TranAD.diagnosis.ndcg')
 @patch('TranAD.utils.get_git_hash')
-def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit_att, mock_poteval_step,
+def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
                                               mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model,
                                               tmp_path, monkeypatch):
     """Test run_experiment with experiment_index parameter."""
@@ -353,7 +353,7 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
     ])
     
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
-    mock_poteval_step.return_value = (mock_pot_result, np.random.rand(50))
+    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
     
