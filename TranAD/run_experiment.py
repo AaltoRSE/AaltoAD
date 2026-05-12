@@ -268,6 +268,19 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			f'min={float(x.min()):.6g} max={float(x.max()):.6g}'
 		)
 
+	# Sanity checks: are inputs and predictions actually in the range we expect?
+	_trainD_arr = trainD.detach().cpu().numpy() if hasattr(trainD, 'detach') else np.asarray(trainD)
+	_testD_arr  = testD.detach().cpu().numpy()  if hasattr(testD,  'detach') else np.asarray(testD)
+	print(f'trainD range: min={_trainD_arr.min():.4g} max={_trainD_arr.max():.4g} '
+	      f'<0: {(_trainD_arr < 0).sum()}/{_trainD_arr.size} '
+	      f'>1: {(_trainD_arr > 1).sum()}/{_trainD_arr.size}')
+	print(f'testD  range: min={_testD_arr.min():.4g} max={_testD_arr.max():.4g} '
+	      f'<0: {(_testD_arr < 0).sum()}/{_testD_arr.size} '
+	      f'>1: {(_testD_arr > 1).sum()}/{_testD_arr.size}')
+	print(f'y_pred range: min={float(y_pred.min()):.4g} max={float(y_pred.max()):.4g}')
+	print(f'raw loss [N, F] shape={loss.shape} min={float(loss.min()):.4g} max={float(loss.max()):.4g}')
+	print(f'NaN/Inf in loss? nan={int(np.isnan(loss).sum())} inf={int(np.isinf(loss).sum())}')
+
 	_loss_stats('train loss (mean over feats)', lossTfinal)
 	_loss_stats('test  loss (mean over feats)', lossFinal)
 	print(f'attack base rate: {labelsFinal.mean():.4f} ({int(labelsFinal.sum())}/{len(labelsFinal)})')
