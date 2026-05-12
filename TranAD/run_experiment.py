@@ -272,6 +272,24 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	_loss_stats('test  loss (mean over feats)', lossFinal)
 	print(f'attack base rate: {labelsFinal.mean():.4f} ({int(labelsFinal.sum())}/{len(labelsFinal)})')
 
+	# Oracle: F1-maximising threshold on the test labels.
+	# This is a leak (uses test labels) and is for diagnostic comparison only.
+	from sklearn.metrics import precision_recall_curve, confusion_matrix
+	_precision, _recall, _thresholds = precision_recall_curve(labelsFinal, lossFinal)
+	_f1 = 2 * _precision[:-1] * _recall[:-1] / (_precision[:-1] + _recall[:-1] + 1e-12)
+	if len(_thresholds) > 0:
+		_best = int(np.nanargmax(_f1))
+		_thr_oracle = float(_thresholds[_best])
+		_pred_oracle = (lossFinal >= _thr_oracle).astype(int)
+		_tn, _fp, _fn, _tp = confusion_matrix(labelsFinal, _pred_oracle, labels=[0, 1]).ravel()
+		_fpr = _fp / (_fp + _tn) if (_fp + _tn) else 0.0
+		print(
+			f'oracle (F1-max on test): threshold={_thr_oracle:.6g} '
+			f'f1={float(_f1[_best]):.4f} precision={float(_precision[_best]):.4f} '
+			f'recall={float(_recall[_best]):.4f} fpr={_fpr:.6f} '
+			f'TP={int(_tp)} FP={int(_fp)} FN={int(_fn)} TN={int(_tn)}'
+		)
+
 	result, pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
