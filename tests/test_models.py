@@ -264,7 +264,7 @@ def test_backprop_omni_scalar_loss():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
 
     # This should not raise "grad can be implicitly created only for scalar outputs"
-    result = model._backproptrain_step(epoch=0, data=data, optimizer=optimizer,
+    result = model.train_step(epoch=0, data=data, optimizer=optimizer,
                              scheduler=scheduler, feats=feats)
     loss_val, lr = result
     assert isinstance(loss_val, float), f"Loss should be a float scalar, got {type(loss_val)}"
@@ -337,13 +337,13 @@ def test_mtad_gat_hidden_threading(feats):
         out2, h2 = model(x, h)
     assert h2.shape == (1, 1, expected_hidden)
 
-    # Training step: _backproptrain_step threads hidden across iterations under autograd;
+    # Training step: train_step threads hidden across iterations under autograd;
     # without detach() this raises 'backward through the graph a second time'.
     model.train()
     data = torch.randn(3, feats * feats, dtype=torch.float64)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
-    loss, lr = model._backproptrain_step(epoch=0, data=data, optimizer=optimizer,
+    loss, lr = model.train_step(epoch=0, data=data, optimizer=optimizer,
                                scheduler=scheduler, feats=feats)
     assert isinstance(loss, float)
     assert isinstance(lr, float)
@@ -506,8 +506,8 @@ def test_model_fixed_input_outputs(ModelClass, input_shape):
     TranAD_Adversarial, TranAD_SelfConditioning, TranAD,
 ])
 def test_all_models_have_backprop(ModelClass):
-    """Every model class must have _backproptrain_step and eval_step methods."""
-    assert hasattr(ModelClass, '_backproptrain_step'), f"{ModelClass.__name__} is missing _backproptrain_step method"
-    assert callable(getattr(ModelClass, '_backproptrain_step')), f"{ModelClass.__name__}._backproptrain_step is not callable"
+    """Every model class must have train_step and eval_step methods."""
+    assert hasattr(ModelClass, 'train_step'), f"{ModelClass.__name__} is missing train_step method"
+    assert callable(getattr(ModelClass, 'train_step')), f"{ModelClass.__name__}.train_step is not callable"
     assert hasattr(ModelClass, 'eval_step'), f"{ModelClass.__name__} is missing eval_step method"
     assert callable(getattr(ModelClass, 'eval_step')), f"{ModelClass.__name__}.eval_step is not callable"

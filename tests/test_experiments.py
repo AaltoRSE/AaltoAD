@@ -259,9 +259,9 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
 
-    # Mock _backproptrain_step for training (5 epochs) and eval_step for testing + train loss
+    # Mock train_step for training (5 epochs) and eval_step for testing + train loss
     training_returns = [(0.5 - i*0.1, 0.001 - i*0.0001) for i in range(5)]
-    mock_model._backproptrain_step = Mock(side_effect=training_returns)
+    mock_model.train_step = Mock(side_effect=training_returns)
     mock_model.eval_step = Mock(side_effect=[
         (np.random.rand(50, 5), np.random.rand(50, 5)),  # test
         (np.random.rand(100, 5), np.random.rand(100, 5))  # train loss
@@ -277,7 +277,7 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     result = run_experiment.run_experiment('USAD', 'MSL', test=False, plot=True)
 
     # Verify training was performed
-    assert mock_model._backproptrain_step.call_count >= 5  # at least 5 training epochs
+    assert mock_model.train_step.call_count >= 5  # at least 5 training epochs
     assert mock_save_model.called
     assert mock_plot_accuracies.called
     

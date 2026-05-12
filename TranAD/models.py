@@ -44,7 +44,7 @@ class LSTM_Univariate(nn.Module):
 			outputs.append(output)
 		return torch.stack(outputs)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='mean')
 		total = 0.0
 		n_samples = 0
@@ -91,7 +91,7 @@ class Attention(nn.Module):
 			g = torch.matmul(g, ats)
 		return g, ats
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		#n = epoch + 1
 		l1s = []
@@ -145,7 +145,7 @@ class LSTM_AD(nn.Module):
 		out = self.fcn(out)
 		return out
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		data_x = torch.as_tensor(data, dtype=torch.float64)
 		if data_x.ndim != 3:
 			print(data_x.shape)
@@ -262,7 +262,7 @@ class DAGMM(nn.Module):
 		gamma = self.estimate(z)
 		return z_c, x_hat.view(-1), z, gamma.view(-1)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		#compute = models.ComputeLoss(self, 0.1, 0.005, 'cpu', self.n_gmm)
 		#n = epoch + 1
@@ -333,7 +333,7 @@ class OmniAnomaly(nn.Module):
 		x = self.decoder(x)
 		return x.view(-1), mu.view(-1), logvar.view(-1), hidden
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		mses, klds = [], []
 		for i, d in enumerate(data):
@@ -402,7 +402,7 @@ class USAD(nn.Module):
 		ae2ae1 = self.decoder2(self.encoder(ae1))
 		return ae1.view(-1), ae2.view(-1), ae2ae1.view(-1)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		n = epoch + 1
 		l1s, l2s = [], []
@@ -467,7 +467,7 @@ class MSCRED(nn.Module):
 		x = self.decoder(z)
 		return x.view(-1)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		n = epoch + 1
 		l1s = []
@@ -523,7 +523,7 @@ class CAE_M(nn.Module):
 		x = self.decoder(z)
 		return x.view(-1)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		n = epoch + 1
 		l1s = []
@@ -584,7 +584,7 @@ class MTAD_GAT(nn.Module):
 		x, h = self.gru(x, hidden)
 		return x.view(-1), h
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		n = epoch + 1
 		l1s = []
@@ -652,7 +652,7 @@ class GDN(nn.Module):
 		x = self.fcn(feat_r)
 		return x.view(-1)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		n = epoch + 1
 		l1s = []
@@ -712,7 +712,7 @@ class MAD_GAN(nn.Module):
 		fake_score = self.discriminator(z.view(1,-1))
 		return z.view(-1), real_score.view(-1), fake_score.view(-1)
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		bcel = nn.BCELoss(reduction='mean')
 		msel = nn.MSELoss(reduction='mean')
@@ -754,7 +754,7 @@ class MAD_GAN(nn.Module):
 
 ## Shared backprop logic for all TranAD variants
 class TranADBase:
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		data_x = torch.DoubleTensor(data)
 		dataset = TensorDataset(data_x, data_x)
@@ -1025,7 +1025,7 @@ class STAGNN(nn.Module):
 		out = out.squeeze(-1)
 		return out, alpha
 
-	def _backproptrain_step(self, epoch, data, optimizer, scheduler, feats):
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='none')
 		data_x = torch.DoubleTensor(data)
 		dataset = TensorDataset(data_x, data_x)

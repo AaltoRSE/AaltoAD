@@ -210,7 +210,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
 			feats = trainO.shape[1]
-			lossT, lr = model._backproptrain_step(e, trainD, optimizer, scheduler, feats)
+			lossT, lr = model.train_step(e, trainD, optimizer, scheduler, feats)
 			accuracy_list.append((lossT, lr))
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 		data_metadata = {
