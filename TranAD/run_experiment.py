@@ -183,6 +183,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	preds = []
 	train_loader, test_loader, labels = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+
+	calib_fraction = 0.2
+	trainD = next(iter(train_loader))
+	split_index = int(len(trainD) * (1 - calib_fraction))
+	train_data = trainD[:split_index]
+	calib_data = trainD[split_index:]
+	trainD, trainO = train_data, train_data
+	calibD, calibO = calib_data, calib_data
+	
+
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
 		res = merlin.run_merlin(test_loader, labels, dataset_name)
@@ -194,10 +204,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	)
 
 	## Prepare data
-	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
-	trainO, testO = trainD, testD
+	testD = next(iter(test_loader))
+	testO = testD
 	if hasattr(model, 'n_window'):
 		trainD, testD = utils.convert_to_windows(trainD, model), utils.convert_to_windows(testD, model)
+		calibD = utils.convert_to_windows(calibD, model)
 
 	### Training phase
 	if not test:
@@ -232,6 +243,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	with torch.no_grad():
 		loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
 		lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
+		lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
 	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 
 	### Plot curves
@@ -244,12 +256,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	df = pd.DataFrame()
 	feats = trainO.shape[1]
 	for i in tqdm(range(loss.shape[1]), desc='Evaluating features'):
-		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
+		lt, l, ls = lossC[:, i], loss[:, i], labels[:, i]
 		result, pred = pot.pot_eval(lt, l, ls)
 		preds.append(pred)
 		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
 
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
+	lossCfinal = np.mean(lossC, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
 
 	def _loss_stats(name, x):
@@ -274,6 +287,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	print(f'trainD range: min={_trainD_arr.min():.4g} max={_trainD_arr.max():.4g} '
 	      f'<0: {(_trainD_arr < 0).sum()}/{_trainD_arr.size} '
 	      f'>1: {(_trainD_arr > 1).sum()}/{_trainD_arr.size}')
+	print(f'calibD range: min={float(lossC.min()):.4g} max={float(lossC.max()):.4g}'
+	   	  f'<0: {(lossC < 0).sum()}/{lossC.size} '
+		  f'>1: {(lossC > 1).sum()}/{lossC.size}')
 	print(f'testD  range: min={_testD_arr.min():.4g} max={_testD_arr.max():.4g} '
 	      f'<0: {(_testD_arr < 0).sum()}/{_testD_arr.size} '
 	      f'>1: {(_testD_arr > 1).sum()}/{_testD_arr.size}')
@@ -282,16 +298,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	print(f'NaN/Inf in loss? nan={int(np.isnan(loss).sum())} inf={int(np.isinf(loss).sum())}')
 
 	_loss_stats('train loss (mean over feats)', lossTfinal)
+	_loss_stats('calib  loss (mean over feats)', lossCfinal)
 	_loss_stats('test  loss (mean over feats)', lossFinal)
-	# Split test losses by label to compare normal-test vs train (the calibration question
-	# for POT) and normal-test vs attack-test (the separability question for thresholding).
-	_test_normal = lossFinal[labelsFinal == 0]
-	_test_attack = lossFinal[labelsFinal == 1]
-	if _test_normal.size:
-		_loss_stats('test  loss | label=0 (normal)', _test_normal)
-	if _test_attack.size:
-		_loss_stats('test  loss | label=1 (attack)', _test_attack)
-	print(f'attack base rate: {labelsFinal.mean():.4f} ({int(labelsFinal.sum())}/{len(labelsFinal)})')
 
 	# Oracle: F1-maximising threshold on the test labels.
 	# This is a leak (uses test labels) and is for diagnostic comparison only.
@@ -311,7 +319,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			f'TP={int(_tp)} FP={int(_fp)} FN={int(_fn)} TN={int(_tn)}'
 		)
 
-	result, pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
+	result, pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
 
