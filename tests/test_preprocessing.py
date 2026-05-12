@@ -60,7 +60,7 @@ def test_normalize_constant_array_no_nan():
     assert np.allclose(out, 0.0)
 
 
-def test_normalize_constant_train_with_varying_test():
+def test_normalize_constanttrain_step_with_varying_test():
     """Non-zero test values for a constant-train column blow up by ~1/eps."""
     train = np.array([1.0, 1.0, 1.0])
     test = np.array([1.0, 2.0])
@@ -93,7 +93,7 @@ def test_normalize_2d_shared_flag():
     assert out.shape == a.shape
 
 
-def test_normalize_train_lands_in_unit_range():
+def test_normalizetrain_step_lands_in_unit_range():
     """After fitting on itself, every train element must be in [0, 1)."""
     rng = np.random.default_rng(0)
     a = rng.uniform(-50, 50, size=200)
@@ -125,7 +125,7 @@ def test_normalize_signature_preserves_input_shape():
 # [0, 1], and labels/train/test shapes are consistent.
 # ---------------------------------------------------------------------------
 
-def _assert_clean_train(path):
+def _assert_cleantrain_step(path):
     a = np.load(path)
     assert a.size > 0
     assert not np.isnan(a).any(), f"NaN in {path}"
@@ -150,8 +150,8 @@ def test_load_NAB(tmp_path):
     npy_files = list(out.glob("*.npy"))
     assert npy_files, "load_NAB produced no .npy files"
     for f in npy_files:
-        if f.name.endswith("_train.npy"):
-            _assert_clean_train(f)
+        if f.name.endswith("train_step.npy"):
+            _assert_cleantrain_step(f)
         else:
             _assert_clean_finite(f)
 
@@ -165,7 +165,7 @@ def test_load_synthetic(tmp_path):
     train = np.load(out / "train.npy")
     test = np.load(out / "test.npy")
     labels = np.load(out / "labels.npy")
-    _assert_clean_train(out / "train.npy")
+    _assert_cleantrain_step(out / "train.npy")
     _assert_clean_finite(out / "test.npy")
     assert labels.shape == test.shape
     assert set(np.unique(labels.astype(int))) <= {0, 1}
@@ -176,10 +176,10 @@ def test_load_UCR(tmp_path):
     out = tmp_path / "UCR"
     out.mkdir()
     load_UCR(str(out), data_folder=DATA_DIR)
-    train_files = list(out.glob("*_train.npy"))
-    assert train_files, "load_UCR produced no _train.npy files"
-    for f in out.glob("*_train.npy"):
-        _assert_clean_train(f)
+    train_files = list(out.glob("*train_step.npy"))
+    assert train_files, "load_UCR produced no train_step.npy files"
+    for f in out.glob("*train_step.npy"):
+        _assert_cleantrain_step(f)
     for f in out.glob("*_test.npy"):
         _assert_clean_finite(f)
     for f in out.glob("*_labels.npy"):
@@ -192,7 +192,7 @@ def test_load_MBA(tmp_path):
     out = tmp_path / "MBA"
     out.mkdir()
     load_MBA(str(out), data_folder=DATA_DIR)
-    _assert_clean_train(out / "train.npy")
+    _assert_cleantrain_step(out / "train.npy")
     _assert_clean_finite(out / "test.npy")
     labels = np.load(out / "labels.npy")
     test = np.load(out / "test.npy")
@@ -204,10 +204,10 @@ def test_load_SMAP(tmp_path):
     out = tmp_path / "SMAP"
     out.mkdir()
     load_SMAP_MSL(str(out), "SMAP", data_folder=DATA_DIR)
-    train_files = list(out.glob("*_train.npy"))
-    assert train_files, "load_SMAP_MSL(SMAP) produced no _train.npy files"
+    train_files = list(out.glob("*train_step.npy"))
+    assert train_files, "load_SMAP_MSL(SMAP) produced no train_step.npy files"
     for f in train_files:
-        _assert_clean_train(f)
+        _assert_cleantrain_step(f)
     for f in out.glob("*_test.npy"):
         _assert_clean_finite(f)
 
@@ -217,10 +217,10 @@ def test_load_MSL(tmp_path):
     out = tmp_path / "MSL"
     out.mkdir()
     load_SMAP_MSL(str(out), "MSL", data_folder=DATA_DIR)
-    train_files = list(out.glob("*_train.npy"))
-    assert train_files, "load_SMAP_MSL(MSL) produced no _train.npy files"
+    train_files = list(out.glob("*train_step.npy"))
+    assert train_files, "load_SMAP_MSL(MSL) produced no train_step.npy files"
     for f in train_files:
-        _assert_clean_train(f)
+        _assert_cleantrain_step(f)
 
 
 def test_load_SMD(tmp_path, monkeypatch):
@@ -236,8 +236,8 @@ def test_load_SMD(tmp_path, monkeypatch):
 
     load_SMD(str(tmp_path / "processed" / "SMD"))
     smd_dir = tmp_path / "processed" / "SMD"
-    train_files = list(smd_dir.glob("*_train.npy"))
-    assert train_files, "load_SMD produced no _train.npy files"
+    train_files = list(smd_dir.glob("*train_step.npy"))
+    assert train_files, "load_SMD produced no train_step.npy files"
     for f in train_files:
         a = np.load(f)
         assert not np.isnan(a).any()

@@ -210,7 +210,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
 			feats = trainO.shape[1]
-			lossT, lr = model._backprop(e, trainD, optimizer, scheduler, True, feats)
+			lossT, lr = model._backproptrain_step(e, trainD, optimizer, scheduler, feats)
 			accuracy_list.append((lossT, lr))
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 		data_metadata = {
@@ -230,8 +230,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	feats = testO.shape[1]
 	start = time()
 	with torch.no_grad():
-		loss, y_pred = model._backprop(0, testD, optimizer, scheduler, False, feats)
-		lossT, _ = model._backprop(0, trainD, optimizer, scheduler, False, feats)
+		loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
+		lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
 	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 
 	### Plot curves
@@ -245,13 +245,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	feats = trainO.shape[1]
 	for i in tqdm(range(loss.shape[1]), desc='Evaluating features'):
 		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
-		result, pred = pot.pot_eval(lt, l, ls)
+		result, pred = pot.poteval_step(lt, l, ls)
 		preds.append(pred)
 		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
 
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
-	result, pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
+	result, pred = pot.poteval_step(lossTfinal, lossFinal, labelsFinal)
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
 
