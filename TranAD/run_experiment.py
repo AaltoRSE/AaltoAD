@@ -314,7 +314,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		'label': pred,
 		'ground_truth': labelsFinal
 	})
-	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_labels.csv')
+	labels_csv_path = os.path.join('results', dataset_name, f"{model}_exp{experiment_id}_labels.csv')
 	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)
 	labels_df.to_csv(labels_csv_path, index=False)
 	
