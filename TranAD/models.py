@@ -133,7 +133,7 @@ class LSTM_AD(nn.Module):
 		self.epochs = epochs
 		self.batch_size = batch_size
 		self.lstm = nn.LSTM(feats, self.n_hidden, n_layers, batch_first=True)
-		self.fcn = nn.Sequential(nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid())
+		self.fcn = nn.Linear(self.n_hidden, self.n_feats)
 		self.lstm = self.lstm.double()
 		self.fcn = self.fcn.double()
 
