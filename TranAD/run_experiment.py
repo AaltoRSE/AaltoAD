@@ -283,6 +283,14 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	_loss_stats('train loss (mean over feats)', lossTfinal)
 	_loss_stats('test  loss (mean over feats)', lossFinal)
+	# Split test losses by label to compare normal-test vs train (the calibration question
+	# for POT) and normal-test vs attack-test (the separability question for thresholding).
+	_test_normal = lossFinal[labelsFinal == 0]
+	_test_attack = lossFinal[labelsFinal == 1]
+	if _test_normal.size:
+		_loss_stats('test  loss | label=0 (normal)', _test_normal)
+	if _test_attack.size:
+		_loss_stats('test  loss | label=1 (attack)', _test_attack)
 	print(f'attack base rate: {labelsFinal.mean():.4f} ({int(labelsFinal.sum())}/{len(labelsFinal)})')
 
 	# Oracle: F1-maximising threshold on the test labels.
