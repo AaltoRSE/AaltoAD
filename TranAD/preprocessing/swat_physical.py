@@ -99,9 +99,9 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
         df_train[col] = train_col
         df_test[col] = test_col
 
-    # The physical dataset has NaN rows. These are anomalous, of course. Replace with a placeholder after normalization
-    df_train = df_train.fillna(-99)
-    df_test = df_test.fillna(-99)
+    # The physical datasethas NaN rows. These are anomalous, of course. Replace with a placeholder after normalization
+    df_train = df_train.fillna(0)
+    df_test = df_test.fillna(0)
 
     train = df_train.values
     test = df_test.values
