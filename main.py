@@ -8,7 +8,6 @@ from itertools import product
 import re
 import time
 
-import TranAD
 from TranAD.parser import parser
 from TranAD import constants
 from TranAD.run_experiment import run_experiment, run_all
