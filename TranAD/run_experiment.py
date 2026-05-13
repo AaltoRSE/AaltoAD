@@ -52,10 +52,12 @@ def loss_stats(name, x):
 
 
 def _adjusted_f1(scores, labels, threshold):
-	"""Apply pot.adjust_predicts then compute pointwise precision/recall/F1.
+	"""Apply pot.adjust_predicts on the time-ordered series, then compute precision/recall/F1.
 
 	Matches what `pot.poteval_step` reports — segment-level point adjustment that
 	expands any in-segment detection across the whole ground-truth attack episode.
+	Caller must pass `scores` and `labels` in original time order; otherwise the
+	segment expansion in `adjust_predicts` operates on the wrong adjacencies.
 	"""
 	pred = (scores >= threshold).astype(int)
 	adj = np.asarray(pot.adjust_predicts(scores, labels, pred=pred))
@@ -70,54 +72,40 @@ def _adjusted_f1(scores, labels, threshold):
 	return f1, prec, rec, fpr, tp, fp, fn, tn
 
 
-def oracle_f1(scores, labels, calib_fraction=0.5, seed=0):
-	"""Pick the adjusted-F1-optimal threshold on a calibration split, score the held-out split.
+def oracle_f1(scores, labels):
+	"""Find the adjusted-F1-optimal threshold on the full time-ordered test series.
 
-	Splits `(scores, labels)` into a stratified-random calibration set (size `calib_fraction`)
-	and a held-out evaluation set (remainder). The threshold is chosen to maximise *adjusted*
-	F1 (after `pot.adjust_predicts`) on calibration; metrics are reported on evaluation, also
-	after adjustment. This makes the oracle a fair upper bound on `pot.pot_eval`'s reported F1,
-	which uses the same point adjustment.
+	Sweeps every candidate threshold, applies `pot.adjust_predicts` (segment expansion
+	in time order), and returns the threshold that maximises adjusted F1 along with
+	its metrics. This is in-sample (uses test labels for both threshold selection and
+	evaluation) — a label leak intentional for an upper-bound diagnostic. POT itself
+	uses test labels via `adjust_predicts`, so oracle's leak is the same kind, just
+	more of it.
 
-	Stratified rather than sequential because attack timestamps in real datasets are clustered
-	in time — a sequential split can leave one half with a wildly different attack base rate
-	than the other, producing thresholds calibrated to the wrong distribution.
+	Held-out evaluation was attempted but the only honest way to do it requires
+	splitting that doesn't break segment adjacency, which is hard to do well when
+	attacks cluster in time. The simpler in-sample upper bound is what we want.
 
-	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix counts
-	on the evaluation set. Returns None if calibration has no usable thresholds.
+	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix
+	counts. Returns None if precision_recall_curve produced no thresholds.
 	"""
 	scores = np.asarray(scores)
 	labels = np.asarray(labels)
-	n = len(scores)
 
-	rng = np.random.default_rng(seed)
-	pos_idx = np.where(labels == 1)[0]
-	neg_idx = np.where(labels == 0)[0]
-	rng.shuffle(pos_idx)
-	rng.shuffle(neg_idx)
-	n_calib_pos = int(len(pos_idx) * calib_fraction)
-	n_calib_neg = int(len(neg_idx) * calib_fraction)
-	calib_idx = np.concatenate([pos_idx[:n_calib_pos], neg_idx[:n_calib_neg]])
-	eval_idx  = np.concatenate([pos_idx[n_calib_pos:], neg_idx[n_calib_neg:]])
-	calib_scores, calib_labels = scores[calib_idx], labels[calib_idx]
-	eval_scores,  eval_labels  = scores[eval_idx],  labels[eval_idx]
-	n_calib = len(calib_idx)
-
-	# Use precision_recall_curve only to enumerate candidate thresholds — the precision/recall
-	# values it reports are pointwise (no adjustment), so we recompute adjusted F1 here.
-	_, _, thresholds = precision_recall_curve(calib_labels, calib_scores)
+	# Use precision_recall_curve only to enumerate candidate thresholds.
+	_, _, thresholds = precision_recall_curve(labels, scores)
 	if len(thresholds) == 0:
 		return None
 
 	best_thr = float(thresholds[0])
 	best_f1 = -1.0
 	for thr in thresholds:
-		f1_thr, *_ = _adjusted_f1(calib_scores, calib_labels, float(thr))
+		f1_thr, *_ = _adjusted_f1(scores, labels, float(thr))
 		if f1_thr > best_f1:
 			best_f1 = f1_thr
 			best_thr = float(thr)
 
-	f1, prec, rec, fpr, tp, fp, fn, tn = _adjusted_f1(eval_scores, eval_labels, best_thr)
+	f1, prec, rec, fpr, tp, fp, fn, tn = _adjusted_f1(scores, labels, best_thr)
 	return {
 		'threshold': best_thr,
 		'f1': float(f1),
@@ -125,9 +113,6 @@ def oracle_f1(scores, labels, calib_fraction=0.5, seed=0):
 		'recall': float(rec),
 		'fpr': float(fpr),
 		'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
-		'calib_fraction': calib_fraction,
-		'n_calib': int(n_calib),
-		'n_eval': int(n - n_calib),
 	}
 
 
