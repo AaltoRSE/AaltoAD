@@ -89,8 +89,8 @@ parser.add_argument('--report',
                     help="Generate tables of top results for each model and dataset")
 parser.add_argument('--metric',
                     type=str,
-                    default='f1',
-                    help="Metric to optimize for in report (default: f1)")
+                    default='pot.f1',
+                    help="Metric to optimize for in report; dotted path into the nested result schema (default: pot.f1; also try oracle.f1, pot.precision, etc.)")
 
 def parse_arguments():
 	"""Parse command-line arguments and return the args object."""

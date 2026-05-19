@@ -10,7 +10,20 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from jinja2 import Template
 
-DISPLAY_METRICS = ['f1', 'precision', 'recall', 'ROC/AUC', 'TP', 'TN', 'FP', 'FN', 'threshold']
+DISPLAY_METRICS = [
+    'pot.f1', 'pot.precision', 'pot.recall', 'pot.threshold',
+    'oracle.f1', 'oracle.precision', 'oracle.recall', 'oracle.threshold',
+]
+
+
+def _get(d, dotted_key):
+    """Look up a possibly-dotted key like 'pot.f1' in a nested dict, returning None if absent."""
+    cur = d
+    for part in dotted_key.split('.'):
+        if not isinstance(cur, dict) or part not in cur:
+            return None
+        cur = cur[part]
+    return cur
 
 
 def _load_results(dataset, results_folder='results'):
@@ -27,11 +40,22 @@ def _load_results(dataset, results_folder='results'):
 
 
 def _best_result(results, metric):
-    """Return the result dict with the highest non-NaN metric value."""
-    valid = [r for r in results if not math.isnan(float(r.get(metric, float('nan'))))]
+    """Return the result dict with the highest non-NaN metric value.
+
+    `metric` may be a dotted path like 'pot.f1' to reach into the nested schema.
+    """
+    def _val(r):
+        v = _get(r, metric)
+        if v is None:
+            return float('nan')
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return float('nan')
+    valid = [r for r in results if not math.isnan(_val(r))]
     if not valid:
         return None
-    return max(valid, key=lambda r: float(r[metric]))
+    return max(valid, key=_val)
 
 
 def _fmt(value):
@@ -69,14 +93,15 @@ def _build_summary(by_model, metric):
         m_row = {'model': model}
         h_row = {'model': model}
         for m in DISPLAY_METRICS:
-            m_row[m] = _fmt(best.get(m)) if best else 'N/A'
+            m_row[m] = _fmt(_get(best, m)) if best else 'N/A'
         hp = best.get('applied_hyperparameters', {}) if best else {}
         for k in all_hp_keys:
             h_row[k] = _fmt(hp[k]) if k in hp else ''
         metric_rows.append(m_row)
         hp_rows.append(h_row)
 
-    sort_key = lambda r: float(r[metric]) if r[metric] not in ('N/A', 'NaN') else -1
+    # Sort by the metric we optimized for (which is one of DISPLAY_METRICS).
+    sort_key = lambda r: float(r[metric]) if metric in r and r[metric] not in ('N/A', 'NaN') else -1
     order = sorted(range(len(metric_rows)), key=lambda i: sort_key(metric_rows[i]), reverse=True)
     metric_rows = [metric_rows[i] for i in order]
     hp_rows = [hp_rows[i] for i in order]
