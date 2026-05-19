@@ -4,7 +4,7 @@ import numpy as np
 import re
 
 from TranAD.constants import DEFAULT_DATA_FOLDER
-from TranAD.preprocessing.utils import normalize3
+from TranAD.preprocessing.utils import normalize
 
 
 def parse_timestamp_column(series):
@@ -280,9 +280,9 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 	valid = features[test_start + test_seconds:test_start + test_seconds + valid_seconds]
 	if train.size == 0:
 		raise ValueError('Training partition is empty after split; cannot normalize')
-	train, min_a, max_a = normalize3(train)
+	train, min_a, max_a = normalize(train)
 	if test.size != 0:
-		test, _, _ = normalize3(test, min_a, max_a)
+		test, _, _ = normalize(test, min_a, max_a)
 
 	# Generate anomaly labels for test and validation partitions
 	labels = np.zeros_like(test)

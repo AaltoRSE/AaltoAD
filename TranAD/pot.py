@@ -158,8 +158,6 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
                 }, pred
             lms = lms * 0.95
         else: break
-    if retries > 0:
-        print(f'SPOT threshold: {retries} retries, lms decayed from {constants.lm[0]} to {lms}')
     ret = s.run(dynamic=False)  # run
     pot_th = np.mean(ret['thresholds']) * constants.lm[1]
     pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)

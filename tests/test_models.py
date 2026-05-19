@@ -113,7 +113,7 @@ VARIATIONS = {
 MODEL_INPUT_SHAPES = {
     "LSTM_Univariate": (5, 5, 1),
     "Attention": (5, 5),
-    "LSTM_AD": (5, 5),
+    "LSTM_AD": (1, 5, 5),
     "DAGMM": (1, 25),
     "OmniAnomaly": (5,),
     "USAD": (1, 25),
@@ -264,8 +264,8 @@ def test_backprop_omni_scalar_loss():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
 
     # This should not raise "grad can be implicitly created only for scalar outputs"
-    result = model._backprop(epoch=0, data=data, optimizer=optimizer,
-                             scheduler=scheduler, training=True, feats=feats)
+    result = model.train_step(epoch=0, data=data, optimizer=optimizer,
+                             scheduler=scheduler, feats=feats)
     loss_val, lr = result
     assert isinstance(loss_val, float), f"Loss should be a float scalar, got {type(loss_val)}"
     assert isinstance(lr, float)
@@ -314,10 +314,45 @@ def test_mtad_gat_feature_variations(feats):
     assert any((g.abs().sum() > 0) for g in grads)
 
 
+@pytest.mark.parametrize("feats", [3, 5, 8])
+def test_mtad_gat_hidden_threading(feats):
+    """MTAD_GAT must thread the GRU hidden state across timesteps without crashing.
+
+    Regression test: forward() previously had an inverted None check that
+    overwrote a passed-in hidden with a fresh random tensor, masking both a
+    GRU-size mismatch and a missing detach() in _backprop's BPTT loop.
+    """
+    model = MTAD_GAT(feats)
+    expected_hidden = feats * feats
+
+    # Forward pass with hidden=None (initial step).
+    model.eval()
+    x = torch.randn(1, feats * feats, dtype=torch.float64)
+    with torch.no_grad():
+        out, h = model(x)
+    assert h.shape == (1, 1, expected_hidden)
+
+    # Forward pass that reuses the returned hidden.
+    with torch.no_grad():
+        out2, h2 = model(x, h)
+    assert h2.shape == (1, 1, expected_hidden)
+
+    # Training step: train_step threads hidden across iterations under autograd;
+    # without detach() this raises 'backward through the graph a second time'.
+    model.train()
+    data = torch.randn(3, feats * feats, dtype=torch.float64)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
+    loss, lr = model.train_step(epoch=0, data=data, optimizer=optimizer,
+                               scheduler=scheduler, feats=feats)
+    assert isinstance(loss, float)
+    assert isinstance(lr, float)
+
+
 @pytest.mark.parametrize("ModelClass, input_shape", [
     (LSTM_Univariate, (5, 5, 1)),      # feats=1, batch=5, seq_len=5
     (Attention, (5, 5)),               # seq_len=5, feats=5
-    (LSTM_AD, (5, 5)),                 # seq_len=5, feats=5
+    (LSTM_AD, (1, 5, 5)),                 # seq_len=5, feats=5
     (DAGMM, (1, 25)),                  # batch=1, flattened seq_len*feats=25
     (OmniAnomaly, (5,)),               # feats=5
     (USAD, (1, 25)),                   # batch=1, flattened seq_len*feats=25
@@ -351,7 +386,7 @@ def test_model_forward(ModelClass, input_shape):
 @pytest.mark.parametrize("ModelClass, input_shape", [
     (LSTM_Univariate, (5, 5, 1)),
     (Attention, (5, 5)),
-    (LSTM_AD, (5, 5)),
+    (LSTM_AD, (1, 5, 5)),
     (DAGMM, (1, 25)),
     (OmniAnomaly, (5,)),
     (USAD, (1, 25)),
@@ -403,7 +438,7 @@ def test_model_backward(ModelClass, input_shape):
 @pytest.mark.parametrize("ModelClass, input_shape", [
     (LSTM_Univariate, (5, 5, 1)),
     (Attention, (5, 5)),
-    (LSTM_AD, (5, 5)),
+    (LSTM_AD, (1, 5, 5)),
     (DAGMM, (1, 25)),
     (OmniAnomaly, (5,)),
     (USAD, (1, 25)),
@@ -471,6 +506,8 @@ def test_model_fixed_input_outputs(ModelClass, input_shape):
     TranAD_Adversarial, TranAD_SelfConditioning, TranAD,
 ])
 def test_all_models_have_backprop(ModelClass):
-    """Every model class must have a _backprop method."""
-    assert hasattr(ModelClass, '_backprop'), f"{ModelClass.__name__} is missing _backprop method"
-    assert callable(getattr(ModelClass, '_backprop')), f"{ModelClass.__name__}._backprop is not callable"
+    """Every model class must have train_step and eval_step methods."""
+    assert hasattr(ModelClass, 'train_step'), f"{ModelClass.__name__} is missing train_step method"
+    assert callable(getattr(ModelClass, 'train_step')), f"{ModelClass.__name__}.train_step is not callable"
+    assert hasattr(ModelClass, 'eval_step'), f"{ModelClass.__name__} is missing eval_step method"
+    assert callable(getattr(ModelClass, 'eval_step')), f"{ModelClass.__name__}.eval_step is not callable"

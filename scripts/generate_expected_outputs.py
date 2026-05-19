@@ -12,7 +12,7 @@ from TranAD import models as _models_module
 MODEL_LIST = [
     ("LSTM_Univariate", (5, 5, 1)),
     ("Attention", (5, 5)),
-    ("LSTM_AD", (5, 5)),
+    ("LSTM_AD", (1, 5, 5)),
     ("DAGMM", (1, 25)),
     ("OmniAnomaly", (5,)),
     ("USAD", (1, 25)),

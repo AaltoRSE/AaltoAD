@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from typing import Dict, Tuple
 import matplotlib.pyplot as plt
 import os
+import pandas as pd
 
 
 class color:
@@ -86,27 +87,27 @@ def load_hyperparams_from_string(hyperparams_str: str) -> Dict:
 	raise ValueError(f"Could not parse hyperparameters: not valid JSON and not an existing file path: {hyperparams_str!r}")
 
 
-def convert_to_windows(data: torch.Tensor, model_obj, model_name: str) -> torch.Tensor:
+def convert_to_windows(data: torch.Tensor, model_obj) -> torch.Tensor:
 	"""Convert time series data into sliding windows for model input.
 	
 	Args:
 		data (torch.Tensor): Input time series data with shape (num_samples, num_features).
-		model_obj: Model object that contains the n_window attribute specifying window size.
-		model_name (str): Name of the model (to determine window format).
+		model_obj: Model object that contains the n_window and flat_window attributes.
 	
 	Returns:
-		torch.Tensor: Stacked windows with shape (num_samples, window_size, num_features) for TranAD/Attention
-			models or (num_samples, window_size * num_features) for other models.
+		torch.Tensor: Stacked windows with shape (num_samples, window_size, num_features)
+			when flat_window is False, or (num_samples, window_size * num_features)
+			when flat_window is True.
 	"""
 	windows = []
 	w_size = model_obj.n_window
+	flatten = getattr(model_obj, 'flat_window', False)
 	for i, g in enumerate(data):
 		if i >= w_size:
 			w = data[i - w_size:i]
 		else:
 			w = torch.cat([data[0].repeat(w_size - i, 1), data[0:i]])
-		# TranAD and Attention models use 3D windows, others use flattened
-		windows.append(w if 'TranAD' in model_name or 'Attention' in model_name else w.view(-1))
+		windows.append(w.view(-1) if flatten else w)
 	return torch.stack(windows)
 
 
@@ -156,3 +157,30 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 	labels = loader[2]
 	
 	return train_loader, test_loader, labels
+
+def load_timestamps(dataset: str, output_folder: str = 'processed') -> np.ndarray:
+	"""Load timestamps for a given dataset.
+	
+
+		Args:
+			dataset (str): Name of the dataset (e.g., 'SMD', 'SMAP', 'MSL', 'UCR', 'NAB').
+				Must have corresponding processed .npy files in the output folder.
+			output_folder (str): Path to the processed data folder (default: 'processed').
+		Returns:
+			pd.Series: Timestamps corresponding to the test data samples.
+	"""
+
+	folder = os.path.join(output_folder, dataset)
+	if not os.path.exists(folder):
+		raise Exception('Processed Data not found.')
+	
+	timestamps_file = os.path.join(folder, 'timestamps.csv')
+	if not os.path.exists(timestamps_file):
+		# If no timestamps, create a simple numerical index
+		test_file = os.path.join(folder, 'test.npy')
+		n = np.load(test_file, mmap_mode='r').shape[0]
+		return pd.Series(np.arange(n), name='index')
+	timestamps_df = pd.read_csv(timestamps_file, header=None).iloc[:, 0]
+	return timestamps_df
+
+	

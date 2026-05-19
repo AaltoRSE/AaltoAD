@@ -5,7 +5,7 @@ import argparse
 from TranAD.constants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
 
 # dataset-specific implementations live under TranAD.preprocessing
-datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL']
+datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL', 'SWaT_physical', 'SWaT_netflow', 'SWaT_payload_netflow']
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
@@ -40,6 +40,12 @@ def load_data(dataset, csv_path=None, output_folder=DEFAULT_OUTPUT_FOLDER, data_
 		TranAD.preprocessing.load_WADI(folder, data_folder=data_folder)
 	elif dataset == 'MBA':
 		TranAD.preprocessing.load_MBA(folder, data_folder=data_folder)
+	elif dataset == 'SWaT_physical':
+		TranAD.preprocessing.load_SWaT_physical(folder, data_folder=data_folder)
+	elif dataset == 'SWaT_netflow':
+		TranAD.preprocessing.load_SWaT_netflow(folder, data_folder=data_folder)
+	elif dataset == 'SWaT_payload_netflow':
+		TranAD.preprocessing.load_SWaT_payload_netflow(folder, data_folder=data_folder)
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 
@@ -56,7 +62,4 @@ if __name__ == '__main__':
 		if ds not in datasets:
 			print(f"Skipping unknown dataset '{ds}'. Supported: {datasets}")
 			continue
-		try:
-			load_data(ds, csv_path=args.csv, anomaly_start_sec=args.anomaly_start, anomaly_duration_sec=args.anomaly_duration)
-		except Exception as e:
-			print(f"Error processing {ds}: {e}")
+		load_data(ds, csv_path=args.csv, anomaly_start_sec=args.anomaly_start, anomaly_duration_sec=args.anomaly_duration)

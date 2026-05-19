@@ -1,12 +1,9 @@
 from TranAD import run_experiment
-from TranAD import utils
-from TranAD import constants
 import torch
-import pytest
-import os
 import csv
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 import numpy as np
 
 
@@ -149,21 +146,23 @@ def test_append_benchmark_row_handles_missing_values(tmp_path):
 @patch('TranAD.run_experiment.load_model')
 @patch('TranAD.utils.load_dataset')
 @patch('TranAD.utils.convert_to_windows')
+@patch('TranAD.utils.load_timestamps')
 @patch('TranAD.plotting.plotter')
 @patch('TranAD.pot.pot_eval')
 @patch('TranAD.diagnosis.hit_att')
 @patch('TranAD.diagnosis.ndcg')
 @patch('TranAD.utils.get_git_hash')
 def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
-                               mock_plotter, mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
+                               mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment function with mocked models."""
     monkeypatch.chdir(tmp_path)
 
     # Setup mocks
     mock_git_hash.return_value = 'abc123'
+    mock_load_timestamps.return_value = np.arange(50)
 
     # Create mock model
-    mock_model = Mock()
+    mock_model = Mock(spec=['name', 'lr', 'batch', 'n_window', 'eval', 'eval_step'])
     mock_model.name = 'TranAD'
     mock_model.lr = 0.001
     mock_model.batch = 128
@@ -185,12 +184,12 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
 
-    # Mock _backprop to return loss and predictions
+    # Mock eval_step to return loss and predictions
     # Since test=True, no training calls, only testing and train loss
-    mock_model._backprop = Mock(side_effect=[
-        # Testing call (training=False)
+    mock_model.eval_step = Mock(side_effect=[
+        # Testing call
         (np.random.rand(50, 5), np.random.rand(50, 5)),
-        # Train loss for POT (training=False)
+        # Train loss for POT
         (np.random.rand(100, 5), np.random.rand(100, 5))
     ])
     
@@ -223,6 +222,7 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 @patch('TranAD.run_experiment.load_model')
 @patch('TranAD.utils.load_dataset')
 @patch('TranAD.utils.convert_to_windows')
+@patch('TranAD.utils.load_timestamps')
 @patch('TranAD.run_experiment.save_model')
 @patch('TranAD.utils.plot_accuracies')
 @patch('TranAD.plotting.plotter')
@@ -230,16 +230,17 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 @patch('TranAD.diagnosis.hit_att')
 @patch('TranAD.diagnosis.ndcg')
 @patch('TranAD.utils.get_git_hash')
-def test_run_experiment_with_training(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
-                                      mock_plotter, mock_plot_accuracies, mock_save_model,
+def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
+                                      mock_plotter, mock_plot_accuracies, mock_save_model, mock_load_timestamps,
                                       mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment with training enabled."""
     monkeypatch.chdir(tmp_path)
 
     # Setup mocks
     mock_git_hash.return_value = 'def456'
+    mock_load_timestamps.return_value = np.arange(50)
 
-    mock_model = Mock()
+    mock_model = Mock(spec=['name', 'lr', 'n_window', 'train_step', 'eval', 'eval_step'])
     mock_model.name = 'USAD'
     mock_model.lr = 0.001
     mock_model.n_window = 10
@@ -259,9 +260,10 @@ def test_run_experiment_with_training(mock_git_hash, mock_ndcg, mock_hit_att, mo
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
 
-    # Mock _backprop for training (5 epochs) + testing + train loss
+    # Mock train_step for training (5 epochs) and eval_step for testing + train loss
     training_returns = [(0.5 - i*0.1, 0.001 - i*0.0001) for i in range(5)]
-    mock_model._backprop = Mock(side_effect=training_returns + [
+    mock_model.train_step = Mock(side_effect=training_returns)
+    mock_model.eval_step = Mock(side_effect=[
         (np.random.rand(50, 5), np.random.rand(50, 5)),  # test
         (np.random.rand(100, 5), np.random.rand(100, 5))  # train loss
     ])
@@ -273,10 +275,10 @@ def test_run_experiment_with_training(mock_git_hash, mock_ndcg, mock_hit_att, mo
     mock_ndcg.return_value = {'ndcg': 0.78}
 
     # Run experiment with training
-    result = run_experiment.run_experiment('USAD', 'MSL', test=False)
+    result = run_experiment.run_experiment('USAD', 'MSL', test=False, plot=True)
 
     # Verify training was performed
-    assert mock_model._backprop.call_count >= 5  # at least 5 training epochs
+    assert mock_model.train_step.call_count >= 5  # at least 5 training epochs
     assert mock_save_model.called
     assert mock_plot_accuracies.called
     
@@ -317,23 +319,25 @@ def test_run_experiment_merlin(mock_append, mock_load_dataset, mock_run_merlin, 
 @patch('TranAD.run_experiment.load_model')
 @patch('TranAD.utils.load_dataset')
 @patch('TranAD.utils.convert_to_windows')
+@patch('TranAD.utils.load_timestamps')
 @patch('TranAD.plotting.plotter')
 @patch('TranAD.pot.pot_eval')
 @patch('TranAD.diagnosis.hit_att')
 @patch('TranAD.diagnosis.ndcg')
 @patch('TranAD.utils.get_git_hash')
 def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
-                                              mock_plotter, mock_convert_to_windows, mock_load_dataset, mock_load_model,
+                                              mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model,
                                               tmp_path, monkeypatch):
     """Test run_experiment with experiment_index parameter."""
     monkeypatch.chdir(tmp_path)
 
     # Setup mocks (simplified)
     mock_git_hash.return_value = 'xyz789'
-    mock_model = Mock()
+    mock_model = Mock(spec=['name', 'n_window', 'eval', 'eval_step'])
     mock_model.name = 'TranAD'
     mock_model.n_window = 10
     mock_load_model.return_value = (mock_model, Mock(), Mock(), -1, [], {}, 'default')
+    mock_load_timestamps.return_value = np.arange(50)
 
     train_data = torch.randn(100, 5).numpy()
     test_data = torch.randn(50, 5).numpy()
@@ -343,7 +347,7 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
 
-    mock_model._backprop = Mock(side_effect=[
+    mock_model.eval_step = Mock(side_effect=[
         (np.random.rand(50, 5), np.random.rand(50, 5)),
         (np.random.rand(100, 5), np.random.rand(100, 5))
     ])
@@ -454,8 +458,7 @@ def test_run_all_with_retrain(mock_reload, mock_init, mock_run_experiment, tmp_p
     mock_run_experiment.return_value = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
     
     # Create mock args object with retrain=True
-    args_obj = Mock()
-    args_obj.retrain = True
+    args_obj = SimpleNamespace(retrain=True)
     
     # Run all with retrain flag
     summary, report = run_experiment.run_all(

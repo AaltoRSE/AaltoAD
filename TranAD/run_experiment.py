@@ -15,10 +15,9 @@ from time import time
 from pprint import pprint
 
 import torch
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import numpy as np
+from sklearn.metrics import precision_recall_curve, confusion_matrix
 
 import TranAD
 from TranAD import models
@@ -32,6 +31,122 @@ from TranAD import utils
 import tempfile
 import shutil
 import re
+
+
+def loss_stats(name, x):
+	"""Print summary statistics (mean, asymmetric stds, percentiles, min/max) for a loss array."""
+	x = np.asarray(x)
+	mean = float(x.mean())
+	above = x[x > mean]
+	below = x[x < mean]
+	std_pos = float(above.std()) if above.size else 0.0
+	std_neg = float(below.std()) if below.size else 0.0
+	pcts = np.percentile(x, [1, 50, 90, 99, 99.9])
+	print(
+		f'{name}: n={x.size} mean={mean:.6g} '
+		f'std+={std_pos:.6g} std-={std_neg:.6g} '
+		f'p1={pcts[0]:.6g} p50={pcts[1]:.6g} '
+		f'p90={pcts[2]:.6g} p99={pcts[3]:.6g} p99.9={pcts[4]:.6g} '
+		f'min={float(x.min()):.6g} max={float(x.max()):.6g}'
+	)
+
+
+def _adjusted_f1(scores, labels, threshold):
+	"""Apply pot.adjust_predicts on the time-ordered series, then compute precision/recall/F1.
+
+	Matches what `pot.poteval_step` reports — segment-level point adjustment that
+	expands any in-segment detection across the whole ground-truth attack episode.
+	Caller must pass `scores` and `labels` in original time order; otherwise the
+	segment expansion in `adjust_predicts` operates on the wrong adjacencies.
+	"""
+	pred = (scores >= threshold).astype(int)
+	adj = np.asarray(pot.adjust_predicts(scores, labels, pred=pred))
+	tp = int(np.sum(adj * labels))
+	fp = int(np.sum(adj * (1 - labels)))
+	fn = int(np.sum((1 - adj) * labels))
+	tn = int(np.sum((1 - adj) * (1 - labels)))
+	prec = tp / (tp + fp) if (tp + fp) else 0.0
+	rec  = tp / (tp + fn) if (tp + fn) else 0.0
+	f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+	fpr = fp / (fp + tn) if (fp + tn) else 0.0
+	return f1, prec, rec, fpr, tp, fp, fn, tn
+
+
+def oracle_f1(scores, labels):
+	"""Find the adjusted-F1-optimal threshold on the full time-ordered test series.
+
+	Sweeps every candidate threshold, applies `pot.adjust_predicts` (segment expansion
+	in time order), and returns the threshold that maximises adjusted F1 along with
+	its metrics. This is in-sample (uses test labels for both threshold selection and
+	evaluation) — a label leak intentional for an upper-bound diagnostic. POT itself
+	uses test labels via `adjust_predicts`, so oracle's leak is the same kind, just
+	more of it.
+
+	Held-out evaluation was attempted but the only honest way to do it requires
+	splitting that doesn't break segment adjacency, which is hard to do well when
+	attacks cluster in time. The simpler in-sample upper bound is what we want.
+
+	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix
+	counts. Returns None if precision_recall_curve produced no thresholds.
+	"""
+	scores = np.asarray(scores)
+	labels = np.asarray(labels)
+
+	# Use precision_recall_curve only to enumerate candidate thresholds.
+	_, _, thresholds = precision_recall_curve(labels, scores)
+	if len(thresholds) == 0:
+		return None
+
+	best_thr = float(thresholds[0])
+	best_f1 = -1.0
+	for thr in thresholds:
+		f1_thr, *_ = _adjusted_f1(scores, labels, float(thr))
+		if f1_thr > best_f1:
+			best_f1 = f1_thr
+			best_thr = float(thr)
+
+	f1, prec, rec, fpr, tp, fp, fn, tn = _adjusted_f1(scores, labels, best_thr)
+	return {
+		'threshold': best_thr,
+		'f1': float(f1),
+		'precision': float(prec),
+		'recall': float(rec),
+		'fpr': float(fpr),
+		'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
+	}
+
+
+def _convert_json_types(obj):
+	"""Convert numpy/pandas types to native Python types for JSON serialisation."""
+	if isinstance(obj, (np.integer, np.floating)):
+		return obj.item()
+	if isinstance(obj, np.ndarray):
+		return obj.tolist()
+	if isinstance(obj, pd.Timestamp):
+		return obj.isoformat()
+	if isinstance(obj, (pd.Series, pd.DataFrame)):
+		return obj.to_dict(orient='records')
+	if isinstance(obj, (int, float, str, bool)):
+		return obj
+	return str(obj)
+
+
+def _safe_write_json(path, data):
+	"""Atomically write `data` as JSON to `path` via a tempfile + replace."""
+	tmp_fd, tmp_path = tempfile.mkstemp(suffix='.tmp', prefix='tmp_result_', dir=os.path.dirname(path))
+	os.close(tmp_fd)
+	try:
+		with open(tmp_path, 'w') as tf:
+			json.dump(data, tf, indent=2, default=_convert_json_types)
+			tf.flush()
+			os.fsync(tf.fileno())
+		shutil.move(tmp_path, path)
+	finally:
+		if os.path.exists(tmp_path):
+			try:
+				os.remove(tmp_path)
+			except Exception:
+				pass
 
 
 def _hyperparams_hash(hyperparams: dict) -> str:
@@ -146,17 +261,27 @@ def load_model(
 def append_benchmark_row(model_name, dataset_name, result_dict, bench_path=os.path.join('results', 'benchmarks.csv')):
 	"""Append a single benchmark row to CSV, creating file/header if needed.
 
-	Args:
-		model_name (str), dataset_name (str), result_dict (dict), bench_path (str)
+	Writes both POT and oracle metrics so downstream tracking can compare the
+	threshold-method result against the F1-optimal upper bound.
 	"""
+	pot = result_dict.get('pot') or {}
+	oracle = result_dict.get('oracle') or {}
 	try:
 		os.makedirs(os.path.dirname(bench_path) or '.', exist_ok=True)
 		write_header = (not os.path.exists(bench_path)) or os.path.getsize(bench_path) == 0
 		with open(bench_path, 'a', newline='') as csvfile:
 			writer = csv.writer(csvfile)
 			if write_header:
-				writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
-			writer.writerow([model_name, dataset_name, result_dict.get('precision'), result_dict.get('recall'), result_dict.get('ROC/AUC'), result_dict.get('f1')])
+				writer.writerow([
+					'model', 'dataset',
+					'pot_precision', 'pot_recall', 'pot_AUC', 'pot_f1',
+					'oracle_precision', 'oracle_recall', 'oracle_f1', 'oracle_threshold',
+				])
+			writer.writerow([
+				model_name, dataset_name,
+				pot.get('precision'), pot.get('recall'), pot.get('ROC/AUC'), pot.get('f1'),
+				oracle.get('precision'), oracle.get('recall'), oracle.get('f1'), oracle.get('threshold'),
+			])
 	except Exception as e:
 		print(f"Could not write benchmark CSV: {e}")
 
@@ -185,6 +310,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	preds = []
 	train_loader, test_loader, labels = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+
+	calib_fraction = 0.2
+	trainD = next(iter(train_loader))
+	split_index = int(len(trainD) * (1 - calib_fraction))
+	train_data = trainD[:split_index]
+	calib_data = trainD[split_index:]
+	trainD, trainO = train_data, train_data
+	calibD, calibO = calib_data, calib_data
+	
+
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
 		res = merlin.run_merlin(test_loader, labels, dataset_name)
@@ -196,20 +331,24 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	)
 
 	## Prepare data
-	trainD, testD = next(iter(train_loader)), next(iter(test_loader))
-	trainO, testO = trainD, testD
-	if model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'MERLIN'] or 'TranAD' in model.name:
-		trainD, testD = utils.convert_to_windows(trainD, model, model_name), utils.convert_to_windows(testD, model, model_name)
+	testD = next(iter(test_loader))
+	testO = testD
+	if hasattr(model, 'n_window'):
+		trainD, testD = utils.convert_to_windows(trainD, model), utils.convert_to_windows(testD, model)
+		calibD = utils.convert_to_windows(calibD, model)
 
 	### Training phase
 	if not test:
 		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
-		num_epochs = 5
+		if hasattr(model, 'epochs'):
+			num_epochs = model.epochs
+		else:
+			num_epochs = 5
 		e = epoch + 1
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
 			feats = trainO.shape[1]
-			lossT, lr = model._backprop(e, trainD, optimizer, scheduler, True, feats)
+			lossT, lr = model.train_step(e, trainD, optimizer, scheduler, feats)
 			accuracy_list.append((lossT, lr))
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 		data_metadata = {
@@ -229,8 +368,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	feats = testO.shape[1]
 	start = time()
 	with torch.no_grad():
-		loss, y_pred = model._backprop(0, testD, optimizer, scheduler, False, feats)
-		lossT, _ = model._backprop(0, trainD, optimizer, scheduler, False, feats)
+		loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
+		lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
+		lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
 	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 
 	### Plot curves
@@ -242,18 +382,75 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	### Scores
 	df = pd.DataFrame()
 	feats = trainO.shape[1]
-	for i in range(loss.shape[1]):
-		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
+	for i in tqdm(range(loss.shape[1]), desc='Evaluating features'):
+		lt, l, ls = lossC[:, i], loss[:, i], labels[:, i]
 		result, pred = pot.pot_eval(lt, l, ls)
 		preds.append(pred)
 		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
 
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
+	lossCfinal = np.mean(lossC, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
-	result, _ = pot.pot_eval(lossTfinal, lossFinal, labelsFinal)
+
+	# Sanity checks: are inputs and predictions actually in the range we expect?
+	_trainD_arr = trainD.detach().cpu().numpy() if hasattr(trainD, 'detach') else np.asarray(trainD)
+	_testD_arr  = testD.detach().cpu().numpy()  if hasattr(testD,  'detach') else np.asarray(testD)
+	print(f'trainD range: min={_trainD_arr.min():.4g} max={_trainD_arr.max():.4g} '
+	      f'<0: {(_trainD_arr < 0).sum()}/{_trainD_arr.size} '
+	      f'>1: {(_trainD_arr > 1).sum()}/{_trainD_arr.size}')
+	print(f'calibD range: min={float(lossC.min()):.4g} max={float(lossC.max()):.4g}'
+	   	  f'<0: {(lossC < 0).sum()}/{lossC.size} '
+		  f'>1: {(lossC > 1).sum()}/{lossC.size}')
+	print(f'testD  range: min={_testD_arr.min():.4g} max={_testD_arr.max():.4g} '
+	      f'<0: {(_testD_arr < 0).sum()}/{_testD_arr.size} '
+	      f'>1: {(_testD_arr > 1).sum()}/{_testD_arr.size}')
+	print(f'y_pred range: min={float(y_pred.min()):.4g} max={float(y_pred.max()):.4g}')
+	print(f'raw loss [N, F] shape={loss.shape} min={float(loss.min()):.4g} max={float(loss.max()):.4g}')
+	print(f'NaN/Inf in loss? nan={int(np.isnan(loss).sum())} inf={int(np.isinf(loss).sum())}')
+
+	loss_test_normal = lossFinal[labelsFinal == 0]
+	loss_test_attack = lossFinal[labelsFinal == 1]
+
+	loss_stats('train loss (mean over feats)', lossTfinal)
+	loss_stats('calib  loss (mean over feats)', lossCfinal)
+	loss_stats('test  loss | label=0 (normal)', loss_test_normal)
+	if loss_test_attack.size:
+		loss_stats('test  loss | label=1 (attack)', loss_test_attack)
+	loss_stats('test  loss (mean over feats)', lossFinal)
+
+	oracle = oracle_f1(lossFinal, labelsFinal)
+	if oracle is not None:
+		print(
+			f'oracle (F1-max on test): threshold={oracle["threshold"]:.6g} '
+			f'f1={oracle["f1"]:.4f} precision={oracle["precision"]:.4f} '
+			f'recall={oracle["recall"]:.4f} fpr={oracle["fpr"]:.6f} '
+			f'TP={oracle["tp"]} FP={oracle["fp"]} FN={oracle["fn"]} TN={oracle["tn"]}'
+		)
+		oracle_pred = (lossFinal >= oracle['threshold']).astype(int)
+	else:
+		oracle_pred = np.zeros_like(labelsFinal)
+
+	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal)
+
+	result = {
+		'pot': pot_result,
+		'oracle': oracle,
+	}
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
-	
+
+	# Write labels with timestamps to a csv
+	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
+	labels_df = pd.DataFrame({
+		'timestamp': timestamps,
+		'pot_label': pot_pred,
+		'oracle_label': oracle_pred,
+		'ground_truth': labelsFinal,
+	})
+	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_exp{experiment_id}_labels.csv')
+	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)
+	labels_df.to_csv(labels_csv_path, index=False)
+
 	# Add metadata to results
 	result['git_hash'] = utils.get_git_hash()
 	result['model'] = model_name
@@ -262,54 +459,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	if experiment_id is not None:
 		result['experiment_id'] = experiment_id
 	
-	# Save detailed results with metadata to JSON (atomic write + numpy/pandas type handling)
-	def _convert_json_types(obj):
-		# Convert numpy and pandas types to native Python types for JSON
-		try:
-			import numpy as _np
-			import pandas as _pd
-		except Exception:
-			_np = None
-			_pd = None
-
-		# numpy scalar
-		if _np is not None and isinstance(obj, (_np.integer, _np.floating)):
-			return obj.item()
-		# numpy ndarray
-		if _np is not None and isinstance(obj, _np.ndarray):
-			return obj.tolist()
-		# pandas types
-		if _pd is not None:
-			if isinstance(obj, _pd.Timestamp):
-				return obj.isoformat()
-			if isinstance(obj, (_pd.Series, _pd.DataFrame)):
-				return obj.to_dict(orient='records')
-
-		# Fallback: try to convert common Python numeric types
-		if isinstance(obj, (int, float, str, bool)):
-			return obj
-
-		# Last resort: stringify
-		return str(obj)
-
-	def _safe_write_json(path: str, data: Dict):
-		tmp_fd, tmp_path = tempfile.mkstemp(suffix='.tmp', prefix='tmp_result_', dir=os.path.dirname(path))
-		os.close(tmp_fd)
-		try:
-			with open(tmp_path, 'w') as tf:
-				json.dump(data, tf, indent=2, default=_convert_json_types)
-				tf.flush()
-				os.fsync(tf.fileno())
-			# Atomic replace
-			shutil.move(tmp_path, path)
-		finally:
-			if os.path.exists(tmp_path):
-				try:
-					os.remove(tmp_path)
-				except Exception:
-					pass
-
-
 	results_dir = os.path.join('results', dataset_name)
 	os.makedirs(results_dir, exist_ok=True)
 
