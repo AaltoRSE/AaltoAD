@@ -25,6 +25,8 @@
       "learning_rate": [0.001],
       "n_layers": [1,2],
       "n_hidden": [16,32],
+      "batch_size": [64,128,256],
+      "sequence_length": [16,32],
       "notes": "LSTM_AD"
     },
     {
@@ -152,6 +154,17 @@
       "dropout": [0.1, 0.2],
       "learning_rate": [0.00005, 0.0001, 0.0002],
       "notes": "TranAD"
+    },
+    {
+      "index": 17,
+      "dataset": "TOL",
+      "model": "LSTM_AE",
+      "learning_rate": [0.001],
+      "n_layers": [1,2],
+      "n_hidden": [16,32],
+      "batch_size": [64,128,256],
+      "sequence_length": [16,32],
+      "notes": "LSTM_AE"
     }
   ]
 }
