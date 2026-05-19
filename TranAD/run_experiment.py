@@ -309,15 +309,20 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		model_name_full = f'{model_name}_{dataset_name}'
 
 	preds = []
-	train_loader, test_loader, labels = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+	train_loader, test_loader, labels, calib_loader = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
-	calib_fraction = 0.2
 	trainD = next(iter(train_loader))
-	split_index = int(len(trainD) * (1 - calib_fraction))
-	train_data = trainD[:split_index]
-	calib_data = trainD[split_index:]
-	trainD, trainO = train_data, train_data
-	calibD, calibO = calib_data, calib_data
+	trainO = trainD
+	# Calibration data for POT: use a real held-out calib partition if the
+	# preprocessor wrote one (calib.npy), otherwise fall back to the training
+	# data itself. The old "last 20% of train" split is gone — it didn't
+	# represent test-time normal behavior any better than train itself.
+	if calib_loader is not None:
+		calibD = next(iter(calib_loader))
+		print(f'Using held-out calib partition: shape={tuple(calibD.shape)}')
+	else:
+		calibD = trainD
+	calibO = calibD
 	
 
 	if model_name in ['MERLIN']:

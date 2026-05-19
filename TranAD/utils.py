@@ -125,16 +125,19 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 			- train_loader (DataLoader): PyTorch DataLoader for training data.
 			- test_loader (DataLoader): PyTorch DataLoader for test data.
 			- labels (np.ndarray): Ground truth anomaly labels with shape (num_test_samples, num_features).
-	
+			- calib_loader (DataLoader or None): DataLoader for a held-out calibration partition
+			  if `calib.npy` exists in the processed folder, else None. Callers that need calibration
+			  data should fall back to training data when this is None.
+
 	Raises:
 		Exception: If processed data folder does not exist for the given dataset.
 	"""
 	from TranAD.utils import cut_array
-	
+
 	folder = os.path.join(output_folder, dataset)
 	if not os.path.exists(folder):
 		raise Exception('Processed Data not found.')
-	
+
 	loader = []
 	for file in ['train', 'test', 'labels']:
 		if dataset == 'SMD':
@@ -148,15 +151,22 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 		if dataset == 'NAB':
 			file = 'ec2_request_latency_system_failure_' + file
 		loader.append(np.load(os.path.join(folder, f'{file}.npy')))
-	
+
 	if less:
 		loader[0] = cut_array(0.2, loader[0])
-	
+
 	train_loader = DataLoader(loader[0], batch_size=loader[0].shape[0])
 	test_loader = DataLoader(loader[1], batch_size=loader[1].shape[0])
 	labels = loader[2]
-	
-	return train_loader, test_loader, labels
+
+	calib_path = os.path.join(folder, 'calib.npy')
+	if os.path.exists(calib_path):
+		calib_arr = np.load(calib_path)
+		calib_loader = DataLoader(calib_arr, batch_size=calib_arr.shape[0]) if calib_arr.shape[0] > 0 else None
+	else:
+		calib_loader = None
+
+	return train_loader, test_loader, labels, calib_loader
 
 def load_timestamps(dataset: str, output_folder: str = 'processed') -> np.ndarray:
 	"""Load timestamps for a given dataset.
