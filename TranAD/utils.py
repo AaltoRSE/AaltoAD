@@ -176,7 +176,10 @@ def load_timestamps(dataset: str, output_folder: str = 'processed') -> np.ndarra
 	
 	timestamps_file = os.path.join(folder, 'timestamps.csv')
 	if not os.path.exists(timestamps_file):
-		raise Exception('Timestamps file not found.')
+		# If no timestamps, create a simple numerical index
+		test_file = os.path.join(folder, 'test.npy')
+		n = np.load(test_file, mmap_mode='r').shape[0]
+		return pd.Series(np.arange(n), name='index')
 	timestamps_df = pd.read_csv(timestamps_file, header=None).iloc[:, 0]
 	return timestamps_df
 
