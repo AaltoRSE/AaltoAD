@@ -135,7 +135,41 @@ def _shannon_entropy(series):
 
 
 
-def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, train_seconds=300, calibration_seconds=60, test_seconds=240, valid_seconds=120, extended_features=False, anomaly_start_sec=480, anomaly_duration_sec=None):
+DEFAULT_SEGMENTS = [
+	('train', False, 300),
+	('calib', False, 60),
+	('test',  False, 120),
+	('test',  True,  240),
+	('test',  False, 120),
+	('valid', False, 120),
+]
+
+
+def _validate_segments(segments):
+	"""Check segments form a valid layout: each partition appears as one contiguous block."""
+	valid_partitions = {'train', 'calib', 'test', 'valid'}
+	seen_blocks = {}  # partition -> (first_idx, last_idx)
+	for i, (partition, anomalous, seconds) in enumerate(segments):
+		if partition not in valid_partitions:
+			raise ValueError(f'Unknown partition {partition!r}; must be one of {sorted(valid_partitions)}')
+		if not isinstance(anomalous, bool):
+			raise ValueError(f'Anomalous flag for segment {i} must be bool, got {type(anomalous).__name__}')
+		if not isinstance(seconds, int) or seconds <= 0:
+			raise ValueError(f'Seconds for segment {i} must be a positive int, got {seconds!r}')
+		if partition in seen_blocks:
+			first, last = seen_blocks[partition]
+			if i != last + 1:
+				raise ValueError(
+					f'Partition {partition!r} is not contiguous: appears at index {first} and again at {i} '
+					f'after a gap. Group all segments of the same partition together.'
+				)
+			seen_blocks[partition] = (first, i)
+		else:
+			seen_blocks[partition] = (i, i)
+
+
+def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10,
+             segments=None, extended_features=False):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 
 	Groups by integer unix-second and IP to produce per-second per-IP features.
@@ -145,7 +179,16 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 
 	Non-top-k IPs are replaced by 'other_internal' or 'other_external' before
 	grouping, so they naturally aggregate in a single groupby pass.
+
+	`segments` is an ordered list of (partition, anomalous, seconds) tuples
+	describing the data layout. Partitions are 'train', 'calib', 'test', 'valid'.
+	Each partition's segments must be contiguous in the ordering (a partition
+	cannot be split by another). Labels are produced for 'test' and 'valid'
+	partitions from the anomalous flags.
 	"""
+	if segments is None:
+		segments = DEFAULT_SEGMENTS
+	_validate_segments(segments)
 	if csv_path:
 		df = pd.read_csv(csv_path)
 	else:
@@ -270,38 +313,55 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10, t
 		for n in feature_names:
 			print(' ', n, ':', row[n])
 
-	# Partition order: train → calib → test → valid
-	# Calib comes before test to ensure it uses only normal (pre-anomaly) data.
+	# Walk segments in order, slicing features and accumulating per-partition
+	# label arrays. Each segment claims `seconds` rows from the feature stream.
 	features = features_df.values.astype(float)
-	train = features[:train_seconds]
-	calib = features[train_seconds:train_seconds + calibration_seconds]
-	test_start = train_seconds + calibration_seconds
-	test  = features[test_start:test_start + test_seconds]
-	valid = features[test_start + test_seconds:test_start + test_seconds + valid_seconds]
+	total_needed = sum(s[2] for s in segments)
+	if features.shape[0] < total_needed:
+		raise ValueError(
+			f'Segments require {total_needed} rows but only {features.shape[0]} available after aggregation'
+		)
+
+	partitions = {}  # name -> list of feature slices, in order
+	label_segs = {}  # name -> list of (seconds, anomalous) for label construction
+	offset = 0
+	for partition, anomalous, seconds in segments:
+		partitions.setdefault(partition, []).append(features[offset:offset + seconds])
+		label_segs.setdefault(partition, []).append((seconds, anomalous))
+		offset += seconds
+
+	# Concatenate per-partition slices into single arrays. Missing partitions
+	# become zero-row arrays of the right width so downstream save/load works.
+	n_feat = features.shape[1]
+	train = np.concatenate(partitions['train'], axis=0) if 'train' in partitions else np.empty((0, n_feat))
+	calib = np.concatenate(partitions['calib'], axis=0) if 'calib' in partitions else np.empty((0, n_feat))
+	test  = np.concatenate(partitions['test'],  axis=0) if 'test'  in partitions else np.empty((0, n_feat))
+	valid = np.concatenate(partitions['valid'], axis=0) if 'valid' in partitions else np.empty((0, n_feat))
+
 	if train.size == 0:
 		raise ValueError('Training partition is empty after split; cannot normalize')
 	train, min_a, max_a = normalize(train)
+	if calib.size != 0:
+		calib, _, _ = normalize(calib, min_a, max_a)
 	if test.size != 0:
 		test, _, _ = normalize(test, min_a, max_a)
+	if valid.size != 0:
+		valid, _, _ = normalize(valid, min_a, max_a)
 
-	# Generate anomaly labels for test and validation partitions
-	labels = np.zeros_like(test)
-	valid_labels = np.zeros_like(valid)
-	if anomaly_start_sec is not None:
-		anomaly_end_sec = anomaly_start_sec + anomaly_duration_sec if anomaly_duration_sec is not None else len(features)
-		# Test labels: convert absolute seconds to test-relative indices
-		label_start = max(0, anomaly_start_sec - test_start)
-		label_end = max(0, anomaly_end_sec - test_start)
-		if label_start < labels.shape[0]:
-			labels[label_start:label_end] = 1
-		# Validation labels: convert absolute seconds to valid-relative indices
-		valid_start = test_start + test_seconds
-		vlabel_start = max(0, anomaly_start_sec - valid_start)
-		vlabel_end = max(0, anomaly_end_sec - valid_start)
-		if vlabel_start < valid_labels.shape[0]:
-			valid_labels[vlabel_start:vlabel_end] = 1
-		n_feat = max(labels.shape[1], 1)
-		print(f"  Anomaly labels: {int(labels.sum() / n_feat)}/{labels.shape[0]} test rows, {int(valid_labels.sum() / n_feat)}/{valid_labels.shape[0]} valid rows (absolute seconds {anomaly_start_sec}-{anomaly_end_sec})")
+	def _build_labels(arr, name):
+		out = np.zeros_like(arr)
+		row = 0
+		for seconds, anomalous in label_segs.get(name, []):
+			if anomalous:
+				out[row:row + seconds] = 1
+			row += seconds
+		return out
+
+	labels = _build_labels(test, 'test')
+	valid_labels = _build_labels(valid, 'valid')
+	n_feat_lbl = max(labels.shape[1] if labels.size else 1, 1)
+	print(f"  Anomaly labels: {int(labels.sum() / n_feat_lbl)}/{labels.shape[0]} test rows, "
+	      f"{int(valid_labels.sum() / n_feat_lbl) if valid_labels.size else 0}/{valid_labels.shape[0]} valid rows")
 
 	for name, arr in [('train', train), ('test', test), ('calib', calib), ('valid', valid), ('labels', labels), ('valid_labels', valid_labels)]:
 		np.save(os.path.join(folder, f'{name}.npy'), arr.astype('float64'))
