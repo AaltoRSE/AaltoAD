@@ -214,21 +214,41 @@ def load_TOL(folder, csv_path=None, data_folder=DEFAULT_DATA_FOLDER, top_k=10,
 	df = df.dropna(subset=['ts_sec'])
 	df['ts_sec'] = df['ts_sec'].astype(int)
 
-	# Find top-k IPs by combined occurrence count
+	# Find top-k IPs from the BASELINE rows only (train + calib segments).
+	# Letting test/valid rows influence the ranking would leak attack-time IPs
+	# into the feature columns: an attacker IP active only during a test- segment
+	# could rank into top-k, become a dedicated column that is all-zero in
+	# training, and then trivially flag itself at test time.
+	ts_min = df['ts_sec'].min()
+	baseline_ranges = []
+	offset = 0
+	for partition, _, seconds in segments:
+		if partition in ('train', 'calib'):
+			baseline_ranges.append((ts_min + offset, ts_min + offset + seconds))
+		offset += seconds
+	if baseline_ranges:
+		baseline_mask = pd.Series(False, index=df.index)
+		for lo, hi in baseline_ranges:
+			baseline_mask |= (df['ts_sec'] >= lo) & (df['ts_sec'] < hi)
+	else:
+		# No train/calib segments declared — fall back to using all rows so we
+		# can still produce features at all.
+		baseline_mask = pd.Series(True, index=df.index)
+
 	all_ips = pd.concat([
-		df[src_col].dropna().astype(str).str.strip(),
-		df[dst_col].dropna().astype(str).str.strip(),
+		df.loc[baseline_mask, src_col].dropna().astype(str).str.strip(),
+		df.loc[baseline_mask, dst_col].dropna().astype(str).str.strip(),
 	])
 	all_ips = all_ips[all_ips != '']
 	counts = all_ips.value_counts()
 	if counts.empty:
-		raise ValueError('No IP addresses found in source/destination columns')
+		raise ValueError('No IP addresses found in baseline source/destination columns')
 	most_common_ip = counts.idxmax()
 	internal_prefix = most_common_ip.split('.')[0]
 	top_ips = set(counts.head(top_k).index)
-	print('TOL: total unique IPs', len(counts))
+	print(f'TOL: unique IPs in baseline {len(counts)} (baseline rows: {int(baseline_mask.sum())}/{len(df)})')
 	print('TOL: most common IP', most_common_ip, '=> internal prefix', internal_prefix)
-	print(f'TOL: selecting top_{top_k} IPs (keeps {len(top_ips)})')
+	print(f'TOL: selecting top_{top_k} IPs from baseline (keeps {len(top_ips)})')
 
 	# Replace non-top-k IPs with 'other_internal' / 'other_external'
 	def _classify(ip_str):
