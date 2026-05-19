@@ -31,18 +31,16 @@ class LSTM_Univariate(nn.Module):
 		self.lstm = self.lstm.double()
 
 	def forward(self, x):
-		hidden = [(torch.rand(self.n_layers, 1, self.n_hidden, dtype=torch.float64), 
-			torch.randn(self.n_layers, 1, self.n_hidden, dtype=torch.float64)) for i in range(self.n_feats)]
+		T = x.shape[0]
+		x = x.to(torch.float64)
 		outputs = []
-		for i, g in enumerate(x):
-			multivariate_output = []
-			for j in range(self.n_feats):
-				univariate_input = g.view(-1)[j].view(1, 1, -1).to(torch.float64)
-				out, hidden[j] = self.lstm[j](univariate_input, hidden[j])
-				multivariate_output.append(2 * out[:, :, -1].view(-1))
-			output = torch.cat(multivariate_output)
-			outputs.append(output)
-		return torch.stack(outputs)
+		for j in range(self.n_feats):
+			seq = x[:, j].view(T, 1, 1)  # (seq_len=T, batch=1, input=1)
+			h0 = torch.rand(self.n_layers, 1, self.n_hidden, dtype=torch.float64)
+			c0 = torch.randn(self.n_layers, 1, self.n_hidden, dtype=torch.float64)
+			out, _ = self.lstm[j](seq, (h0, c0))
+			outputs.append(2 * out[:, 0, -1])  # (T,) — last hidden unit, *2 matches original scaling
+		return torch.stack(outputs, dim=1)  # (T, F)
 
 	def train_step(self, epoch, data, optimizer, scheduler, feats):
 		l = nn.MSELoss(reduction='mean')

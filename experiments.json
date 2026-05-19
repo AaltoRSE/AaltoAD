@@ -6,8 +6,9 @@
       "dataset": "TOL",
       "model": "LSTM_Univariate",
       "learning_rate": [0.001, 0.002, 0.003],
-      "n_hidden": [1,4,8,16],
-      "n_layers": [1,2,4],
+      "n_hidden": [1,4,8],
+      "n_layers": [1,2],
+      "batch_size": [256, 512],
       "notes": "LSTM_Univariate"
     },
     {
