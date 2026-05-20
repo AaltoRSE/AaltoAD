@@ -1,0 +1,171 @@
+{
+  "description": "Experiment configurations. Each experiment is numbered and fully self-contained. Change the index to force rerun. Results are saved with the index.",
+  "experiments": [
+    {
+      "index": 1,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "LSTM_Univariate",
+      "learning_rate": [0.003],
+      "n_hidden": [1],
+      "n_layers": [1],
+      "batch_size": [512],
+      "notes": "LSTM_Univariate"
+    },
+    {
+      "index": 2,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "Attention",
+      "learning_rate": [0.0001],
+      "n_window": [10],
+      "notes": "Attention"
+    },
+    {
+      "index": 3,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "LSTM_AD",
+      "learning_rate": [0.001],
+      "n_layers": [1],
+      "n_hidden": [16],
+      "batch_size": [256],
+      "sequence_length": [16],
+      "notes": "LSTM_AD"
+    },
+    {
+      "index": 4,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "DAGMM",
+      "n_latent": [16],
+      "n_hidden": [32],
+      "n_window": [10],
+      "learning_rate": [0.0001],
+      "notes": "DAGMM"
+    },
+    {
+      "index": 5,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "OmniAnomaly",
+      "learning_rate": [0.001],
+      "beta": [0.1],
+      "n_hidden": [16],
+      "n_latent": [16],
+      "notes": "OmniAnomaly"
+    },
+    {
+      "index": 6,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "USAD",
+      "learning_rate": [0.0001],
+      "n_hidden": [16],
+      "n_latent": [5],
+      "n_window": [10],
+      "notes": "USAD"
+    },
+    {
+      "index": 7,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "MSCRED",
+      "learning_rate": [0.0001],
+      "n_window": [5],
+      "notes": "MSCRED"
+    },
+    {
+      "index": 8,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "CAE_M",
+      "learning_rate": [0.0001],
+      "n_window": [null],
+      "notes": "CAE_M"
+    },
+    {
+      "index": 9,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "MTAD_GAT",
+      "learning_rate": [0.00005, 0.0001, 0.0002],
+      "n_window": [10, 20, null],
+      "notes": "MTAD_GAT"
+    },
+    {
+      "index": 10,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "GDN",
+      "learning_rate": [0.0001],
+      "n_window": [5],
+      "n_hidden": [16],
+      "notes": "GDN"
+    },
+    {
+      "index": 11,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "MAD_GAN",
+      "n_window": [10],
+      "n_hidden": [16],
+      "learning_rate": [0.0001],
+      "notes": "MAD_GAN"
+    },
+    {
+      "index": 12,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "TranAD_Basic",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "learning_rate": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_Basic"
+    },
+    {
+      "index": 13,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "TranAD_Transformer",
+      "n_window": [5],
+      "batch_size": [128],
+      "n_hidden": [16],
+      "learning_rate": [0.0001],
+      "notes": "TranAD_Transformer"
+    },
+    {
+      "index": 14,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "TranAD_Adversarial",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "learning_rate": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_Adversarial"
+    },
+    {
+      "index": 15,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "TranAD_SelfConditioning",
+      "n_window": [5, 10],
+      "batch_size": [64, 128],
+      "dim_feedforward": [16, 32],
+      "dropout": [0.1, 0.2],
+      "learning_rate": [0.00005, 0.0001, 0.0002],
+      "notes": "TranAD_SelfConditioning"
+    },
+    { 
+      "index": 16,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "TranAD",
+      "n_window": [5],
+      "batch_size": [128],
+      "dim_feedforward": [32],
+      "dropout": [0.1],
+      "learning_rate": [0.0001],
+      "notes": "TranAD"
+    },
+    {
+      "index": 17,
+      "dataset": ["TOL_1_1", "TOL_2_1_1", "TOL_2_2_1", "TOL_3_2_1", "TOL_3_3_1", "TOL_1_2", "TOL_2_1_2", "TOL_2_2_2", "TOL_3_2_2", "TOL_3_3_2"],
+      "model": "LSTM_AE",
+      "learning_rate": [0.001],
+      "n_layers": [1],
+      "n_hidden": [16],
+      "batch_size": [64],
+      "sequence_length": [32],
+      "notes": "LSTM_AE"
+    }
+  ]
+}

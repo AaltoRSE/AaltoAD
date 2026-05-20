@@ -5,8 +5,8 @@
       "index": 1,
       "dataset": "TOL",
       "model": "LSTM_Univariate",
-      "learning_rate": [0.001, 0.002, 0.003],
-      "n_hidden": [1,4,8],
+      "learning_rate": [0.002, 0.003, 0.004],
+      "n_hidden": [1,4],
       "n_layers": [1,2],
       "batch_size": [256, 512],
       "notes": "LSTM_Univariate"
@@ -16,7 +16,7 @@
       "dataset": "TOL",
       "model": "Attention",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [10,20],
+      "n_window": [5, 10,20],
       "notes": "TranAD higher LR"
     },
     {
@@ -25,16 +25,16 @@
       "model": "LSTM_AD",
       "learning_rate": [0.001],
       "n_layers": [1,2],
-      "n_hidden": [16,32],
-      "batch_size": [64,128,256],
-      "sequence_length": [16,32],
+      "n_hidden": [8,16,32],
+      "batch_size": [128,256,512],
+      "sequence_length": [8,16,32],
       "notes": "LSTM_AD"
     },
     {
       "index": 4,
       "dataset": "TOL",
       "model": "DAGMM",
-      "n_latent": [8, 16],
+      "n_latent": [16, 32],
       "n_hidden": [16, 32],
       "n_window": [5, 10],
       "learning_rate": [0.00005, 0.0001, 0.0002],
@@ -47,7 +47,7 @@
       "learning_rate": [0.0002, 0.0005, 0.001],
       "beta": [0.0002, 0.01, 0.1],
       "n_hidden": [16, 32],
-      "n_latent": [8, 16],
+      "n_latent": [16, 32],
       "notes": "OmniAnomaly"
     },
     {
@@ -55,7 +55,7 @@
       "dataset": "TOL",
       "model": "USAD",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_hidden": [16, 32],
+      "n_hidden": [8, 16, 32],
       "n_latent": [5, 8],
       "n_window": [5, 10],
       "notes": "USAD"
@@ -65,7 +65,7 @@
       "dataset": "TOL",
       "model": "MSCRED",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10, null],
+      "n_window": [5, 10],
       "notes": "MSCRED"
     },
     {
@@ -73,7 +73,7 @@
       "dataset": "TOL",
       "model": "CAE_M",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10, null],
+      "n_window": [10, null],
       "notes": "CAE_M"
     },
     {
@@ -81,7 +81,7 @@
       "dataset": "TOL",
       "model": "MTAD_GAT",
       "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_hidden": [16, 32, 64, 0],
+      "n_hidden": [16, 32, null],
       "notes": "MTAD_GAT"
     },
     {
@@ -107,9 +107,9 @@
       "dataset": "TOL",
       "model": "TranAD_Basic",
       "n_window": [5, 10],
-      "batch_size": [64, 128],
+      "batch_size": [64, 128, 256],
       "dim_feedforward": [16, 32],
-      "dropout": [0.1, 0.2],
+      "dropout": [0.1],
       "learning_rate": [0.00005, 0.0001, 0.0002],
       "notes": "TranAD_Basic"
     },
@@ -118,7 +118,7 @@
       "dataset": "TOL",
       "model": "TranAD_Transformer",
       "n_window": [5, 10],
-      "batch_size": [64, 128],
+      "batch_size": [64, 128, 256],
       "n_hidden": [16, 32],
       "learning_rate": [0.00005, 0.0001, 0.0002],
       "notes": "TranAD_Transformer"
@@ -128,9 +128,9 @@
       "dataset": "TOL",
       "model": "TranAD_Adversarial",
       "n_window": [5, 10],
-      "batch_size": [64, 128],
+      "batch_size": [64, 128, 256],
       "dim_feedforward": [16, 32],
-      "dropout": [0.1, 0.2],
+      "dropout": [0.1],
       "learning_rate": [0.00005, 0.0001, 0.0002],
       "notes": "TranAD_Adversarial"
     },
@@ -139,9 +139,9 @@
       "dataset": "TOL",
       "model": "TranAD_SelfConditioning",
       "n_window": [5, 10],
-      "batch_size": [64, 128],
+      "batch_size": [64, 128, 256],
       "dim_feedforward": [16, 32],
-      "dropout": [0.1, 0.2],
+      "dropout": [0.1],
       "learning_rate": [0.00005, 0.0001, 0.0002],
       "notes": "TranAD_SelfConditioning"
     },
@@ -150,9 +150,9 @@
       "dataset": "TOL",
       "model": "TranAD",
       "n_window": [5, 10],
-      "batch_size": [64, 128],
+      "batch_size": [64, 128, 256],
       "dim_feedforward": [16, 32],
-      "dropout": [0.1, 0.2],
+      "dropout": [0.1],
       "learning_rate": [0.00005, 0.0001, 0.0002],
       "notes": "TranAD"
     },
@@ -162,9 +162,9 @@
       "model": "LSTM_AE",
       "learning_rate": [0.001],
       "n_layers": [1,2],
-      "n_hidden": [16,32],
-      "batch_size": [64,128,256],
-      "sequence_length": [16,32],
+      "n_hidden": [8,16,32],
+      "batch_size": [64,128],
+      "sequence_length": [16,32,48],
       "notes": "LSTM_AE"
     }
   ]
