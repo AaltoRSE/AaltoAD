@@ -5,167 +5,467 @@
       "index": 1,
       "dataset": "TOL",
       "model": "LSTM_Univariate",
-      "learning_rate": [0.002, 0.003, 0.004],
-      "n_hidden": [1,4],
-      "n_layers": [1,2],
-      "batch_size": [256, 512],
-      "notes": "LSTM_Univariate"
+      "learning_rate": [
+        0.002,
+        0.003,
+        0.004
+      ],
+      "n_hidden": [
+        1,
+        4
+      ],
+      "n_layers": [
+        1,
+        2
+      ],
+      "batch_size": [
+        256,
+        512
+      ],
+      "notes": "LSTM_Univariate",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 2,
       "dataset": "TOL",
       "model": "Attention",
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10,20],
-      "notes": "TranAD higher LR"
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        5,
+        10,
+        20
+      ],
+      "notes": "TranAD higher LR",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 3,
       "dataset": "TOL",
       "model": "LSTM_AD",
-      "learning_rate": [0.001],
-      "n_layers": [1,2],
-      "n_hidden": [8,16,32],
-      "batch_size": [128,256,512],
-      "sequence_length": [8,16,32],
-      "notes": "LSTM_AD"
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        1,
+        2
+      ],
+      "n_hidden": [
+        8,
+        16,
+        32
+      ],
+      "batch_size": [
+        128,
+        256,
+        512
+      ],
+      "sequence_length": [
+        8,
+        16,
+        32
+      ],
+      "notes": "LSTM_AD",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 4,
       "dataset": "TOL",
       "model": "DAGMM",
-      "n_latent": [16, 32],
-      "n_hidden": [16, 32],
-      "n_window": [5, 10],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "DAGMM"
+      "n_latent": [
+        16,
+        32
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "DAGMM",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 5,
       "dataset": "TOL",
       "model": "OmniAnomaly",
-      "learning_rate": [0.0002, 0.0005, 0.001],
-      "beta": [0.0002, 0.01, 0.1],
-      "n_hidden": [16, 32],
-      "n_latent": [16, 32],
-      "notes": "OmniAnomaly"
+      "learning_rate": [
+        0.0002,
+        0.0005,
+        0.001
+      ],
+      "beta": [
+        0.0002,
+        0.01,
+        0.1
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "n_latent": [
+        16,
+        32
+      ],
+      "notes": "OmniAnomaly",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 6,
       "dataset": "TOL",
       "model": "USAD",
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_hidden": [8, 16, 32],
-      "n_latent": [5, 8],
-      "n_window": [5, 10],
-      "notes": "USAD"
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_hidden": [
+        8,
+        16,
+        32
+      ],
+      "n_latent": [
+        5,
+        8
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "notes": "USAD",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 7,
       "dataset": "TOL",
       "model": "MSCRED",
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10],
-      "notes": "MSCRED"
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "notes": "MSCRED",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 8,
       "dataset": "TOL",
       "model": "CAE_M",
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [10, null],
-      "notes": "CAE_M"
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        10,
+        null
+      ],
+      "notes": "CAE_M",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 9,
       "dataset": "TOL",
       "model": "MTAD_GAT",
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_hidden": [16, 32, null],
-      "notes": "MTAD_GAT"
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_hidden": [
+        16,
+        32,
+        null
+      ],
+      "notes": "MTAD_GAT",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 10,
       "dataset": "TOL",
       "model": "GDN",
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "n_window": [5, 10],
-      "n_hidden": [16, 32],
-      "notes": "GDN"
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "notes": "GDN",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 11,
       "dataset": "TOL",
       "model": "MAD_GAN",
-      "n_window": [5, 10],
-      "n_hidden": [16, 32],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "MAD_GAN"
+      "n_window": [
+        5,
+        10
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "MAD_GAN",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 12,
       "dataset": "TOL",
       "model": "TranAD_Basic",
-      "n_window": [5, 10],
-      "batch_size": [64, 128, 256],
-      "dim_feedforward": [16, 32],
-      "dropout": [0.1],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "TranAD_Basic"
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        64,
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "TranAD_Basic",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 13,
       "dataset": "TOL",
       "model": "TranAD_Transformer",
-      "n_window": [5, 10],
-      "batch_size": [64, 128, 256],
-      "n_hidden": [16, 32],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "TranAD_Transformer"
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        64,
+        128,
+        256
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "TranAD_Transformer",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 14,
       "dataset": "TOL",
       "model": "TranAD_Adversarial",
-      "n_window": [5, 10],
-      "batch_size": [64, 128, 256],
-      "dim_feedforward": [16, 32],
-      "dropout": [0.1],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "TranAD_Adversarial"
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        64,
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "TranAD_Adversarial",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 15,
       "dataset": "TOL",
       "model": "TranAD_SelfConditioning",
-      "n_window": [5, 10],
-      "batch_size": [64, 128, 256],
-      "dim_feedforward": [16, 32],
-      "dropout": [0.1],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "TranAD_SelfConditioning"
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        64,
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "TranAD_SelfConditioning",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
-    { 
+    {
       "index": 16,
       "dataset": "TOL",
       "model": "TranAD",
-      "n_window": [5, 10],
-      "batch_size": [64, 128, 256],
-      "dim_feedforward": [16, 32],
-      "dropout": [0.1],
-      "learning_rate": [0.00005, 0.0001, 0.0002],
-      "notes": "TranAD"
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        64,
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "notes": "TranAD",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     },
     {
       "index": 17,
       "dataset": "TOL",
       "model": "LSTM_AE",
-      "learning_rate": [0.001],
-      "n_layers": [1,2],
-      "n_hidden": [8,16,32],
-      "batch_size": [64,128],
-      "sequence_length": [16,32,48],
-      "notes": "LSTM_AE"
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        1,
+        2
+      ],
+      "n_hidden": [
+        8,
+        16,
+        32
+      ],
+      "batch_size": [
+        64,
+        128
+      ],
+      "sequence_length": [
+        16,
+        32,
+        48
+      ],
+      "notes": "LSTM_AE",
+      "q": [
+        0.001,
+        0.0001,
+        1e-05
+      ]
     }
   ]
 }

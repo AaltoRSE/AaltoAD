@@ -241,7 +241,9 @@ def load_model(
 	model_class = getattr(models, modelname)
 
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
-	model = model_class(dims, **hyperparams).double()
+	POT_KEYS = {'q'}
+	model_kwargs = {k: v for k, v in hyperparams.items() if k not in POT_KEYS}
+	model = model_class(dims, **model_kwargs).double()
 	applied_hyperparams = hyperparams
 	hp_hash = _hyperparams_hash(applied_hyperparams)
 
@@ -393,14 +395,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)
 
 	### Scores
-	df = pd.DataFrame()
-	feats = trainO.shape[1]
-	for i in tqdm(range(loss.shape[1]), desc='Evaluating features'):
-		lt, l, ls = lossC[:, i], loss[:, i], labels[:, i]
-		result, pred = pot.pot_eval(lt, l, ls)
-		preds.append(pred)
-		df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
-
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	lossCfinal = np.mean(lossC, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
@@ -434,8 +428,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	oracle_expanded, oracle_expanded_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=True)
 	oracle, oracle_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=False)
 
-	pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, expand_segments=True)
-	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, expand_segments=False)
+	q = applied_hyperparams.get('q', 1e-5)
+	pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
+	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 
 	result = {
 		'pot': pot_result,
