@@ -111,17 +111,23 @@ def collect_all_subexperiments(experiments: List[Dict]) -> List[Tuple[str, str, 
 		List of (exp_id, dataset, model, hyperparams) tuples for all sub-experiments
 	"""
 	all_subexps = []
-	
+
 	for exp in experiments:
-		dataset = exp.get('dataset')
+		datasets = exp.get('dataset')
 		model = exp.get('model')
-		if not dataset or not model:
+		if not datasets or not model:
 			continue
-			
+		# Allow `dataset` to be either a string or a list. A list means: run this
+		# experiment (and all its hyperparam combinations) against each dataset
+		# independently. Each (dataset, model, exp_id) gets its own result file.
+		if isinstance(datasets, str):
+			datasets = [datasets]
+
 		sub_experiments = expand_experiment_to_subexperiments(exp)
-		for exp_id, hyperparams in sub_experiments:
-			all_subexps.append((exp_id, dataset, model, hyperparams))
-	
+		for ds in datasets:
+			for exp_id, hyperparams in sub_experiments:
+				all_subexps.append((exp_id, ds, model, hyperparams))
+
 	return all_subexps
 
 
