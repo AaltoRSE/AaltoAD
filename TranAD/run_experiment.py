@@ -51,7 +51,7 @@ def loss_stats(name, x):
 	)
 
 
-def _adjusted_f1(scores, labels, threshold):
+def _adjusted_f1(scores, labels, threshold, segment_expansion=True):
 	"""Apply pot.adjust_predicts on the time-ordered series, then compute precision/recall/F1.
 
 	Matches what `pot.poteval_step` reports — segment-level point adjustment that
@@ -60,7 +60,10 @@ def _adjusted_f1(scores, labels, threshold):
 	segment expansion in `adjust_predicts` operates on the wrong adjacencies.
 	"""
 	pred = (scores >= threshold).astype(int)
-	adj = np.asarray(pot.adjust_predicts(scores, labels, pred=pred))
+	if segment_expansion:
+		adj = np.asarray(pot.adjust_predicts(scores, labels, pred=pred))
+	else:
+		adj = pred
 	tp = int(np.sum(adj * labels))
 	fp = int(np.sum(adj * (1 - labels)))
 	fn = int(np.sum((1 - adj) * labels))
@@ -72,7 +75,7 @@ def _adjusted_f1(scores, labels, threshold):
 	return f1, prec, rec, fpr, tp, fp, fn, tn
 
 
-def oracle_f1(scores, labels):
+def oracle_f1(scores, labels, expand_segments=True):
 	"""Find the adjusted-F1-optimal threshold on the full time-ordered test series.
 
 	Sweeps every candidate threshold, applies `pot.adjust_predicts` (segment expansion
@@ -86,8 +89,10 @@ def oracle_f1(scores, labels):
 	splitting that doesn't break segment adjacency, which is hard to do well when
 	attacks cluster in time. The simpler in-sample upper bound is what we want.
 
-	Returns a dict with threshold, f1, precision, recall, fpr, and confusion-matrix
-	counts. Returns None if precision_recall_curve produced no thresholds.
+	Returns a tuple of
+	  - a dict with threshold, f1, precision, recall, fpr, and confusion-matrix
+		counts. Returns None if precision_recall_curve produced no thresholds.
+	  - a numpy array of predictions corresponding to the optimal threshold.
 	"""
 	scores = np.asarray(scores)
 	labels = np.asarray(labels)
@@ -100,12 +105,14 @@ def oracle_f1(scores, labels):
 	best_thr = float(thresholds[0])
 	best_f1 = -1.0
 	for thr in thresholds:
-		f1_thr, *_ = _adjusted_f1(scores, labels, float(thr))
+		f1_thr, *_ = _adjusted_f1(scores, labels, float(thr), segment_expansion=expand_segments)
 		if f1_thr > best_f1:
 			best_f1 = f1_thr
 			best_thr = float(thr)
 
-	f1, prec, rec, fpr, tp, fp, fn, tn = _adjusted_f1(scores, labels, best_thr)
+	f1, prec, rec, fpr, tp, fp, fn, tn = _adjusted_f1(scores, labels, best_thr, segment_expansion=expand_segments)
+	predictions = (scores >= best_thr).astype(int)
+	p_latency = pot.segment_latency(predictions, labels)
 	return {
 		'threshold': best_thr,
 		'f1': float(f1),
@@ -113,7 +120,8 @@ def oracle_f1(scores, labels):
 		'recall': float(rec),
 		'fpr': float(fpr),
 		'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
-	}
+		'p_latency': p_latency,
+	}, predictions
 
 
 def _convert_json_types(obj):
@@ -423,23 +431,17 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		loss_stats('test  loss | label=1 (attack)', loss_test_attack)
 	loss_stats('test  loss (mean over feats)', lossFinal)
 
-	oracle = oracle_f1(lossFinal, labelsFinal)
-	if oracle is not None:
-		print(
-			f'oracle (F1-max on test): threshold={oracle["threshold"]:.6g} '
-			f'f1={oracle["f1"]:.4f} precision={oracle["precision"]:.4f} '
-			f'recall={oracle["recall"]:.4f} fpr={oracle["fpr"]:.6f} '
-			f'TP={oracle["tp"]} FP={oracle["fp"]} FN={oracle["fn"]} TN={oracle["tn"]}'
-		)
-		oracle_pred = (lossFinal >= oracle['threshold']).astype(int)
-	else:
-		oracle_pred = np.zeros_like(labelsFinal)
+	oracle_expanded, oracle_expanded_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=True)
+	oracle, oracle_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=False)
 
-	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal)
+	pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, expand_segments=True)
+	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, expand_segments=False)
 
 	result = {
 		'pot': pot_result,
+		'pot_expanded': pot_expanded_result,
 		'oracle': oracle,
+		'oracle_expanded': oracle_expanded,
 	}
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
@@ -448,9 +450,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
 	labels_df = pd.DataFrame({
 		'timestamp': timestamps,
-		'pot_label': pot_pred,
-		'oracle_label': oracle_pred,
 		'ground_truth': labelsFinal,
+		'pot_label': pot_pred,
+		'pot_expanded_label': pot_expanded_pred,
+		'oracle_label': oracle_pred,
+		'oracle_expanded_label': oracle_expanded_pred,
 	})
 	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_exp{experiment_id}_labels.csv')
 	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)

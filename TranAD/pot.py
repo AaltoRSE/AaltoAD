@@ -75,6 +75,33 @@ def adjust_predicts(score, label,
         return predict
 
 
+def segment_latency(pred, label):
+    """Average latency to first alarm per labeled anomaly segment.
+
+    For each contiguous run of label==1, latency is the offset from the
+    segment start to the first pred==1 inside it. A segment with no alarm
+    contributes its full length. Returns None if there are no segments.
+    """
+    pred = np.asarray(pred).astype(bool)
+    label = np.asarray(label).astype(bool)
+    if len(pred) != len(label):
+        raise ValueError("pred and label must have the same length")
+    padded = np.concatenate(([False], label, [False]))
+    diff = np.diff(padded.astype(np.int8))
+    starts = np.where(diff == 1)[0]
+    ends = np.where(diff == -1)[0]  # exclusive
+    if len(starts) == 0:
+        return None
+    latencies = []
+    for s, e in zip(starts, ends):
+        seg = pred[s:e]
+        if seg.any():
+            latencies.append(int(np.argmax(seg)))
+        else:
+            latencies.append(int(e - s))
+    return float(np.mean(latencies))
+
+
 def calc_seq(score, label, threshold, calc_latency=False):
     """
     Calculate f1 score for a score sequence
@@ -117,7 +144,7 @@ def bf_search(score, label, start, end=None, step_num=1, display_freq=1, verbose
     return m, m_t
 
 
-def pot_eval(init_score, score, label, q=1e-5, level=0.02):
+def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False):
     """
     Run POT method on given score.
     Args:
@@ -128,6 +155,7 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
         label:
         q (float): Detection level (risk)
         level (float): Probability associated with the initial threshold t
+        expanded_segments (bool): Whether to expand the detected anomaly segments to include adjacent points.
     Returns:
         dict: pot result dict
     """
@@ -160,7 +188,11 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
         else: break
     ret = s.run(dynamic=False)  # run
     pot_th = np.mean(ret['thresholds']) * constants.lm[1]
-    pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)
+    if expand_segments:
+        pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)
+    else:
+        pred = score > pot_th
+        p_latency = segment_latency(pred, label)
     p_t = calc_point2point(pred, label)
     return {
         'f1': p_t[0],
@@ -172,4 +204,5 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
         'FN': p_t[6],
         'ROC/AUC': p_t[7],
         'threshold': pot_th,
+        'p_latency': p_latency,
     }, np.array(pred)
