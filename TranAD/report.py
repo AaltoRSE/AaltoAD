@@ -10,10 +10,16 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from jinja2 import Template
 
-DISPLAY_METRICS = [
-    'pot.f1', 'pot.precision', 'pot.recall', 'pot.threshold',
-    'oracle.f1', 'oracle.precision', 'oracle.recall', 'oracle.threshold',
-]
+METHODS = ['pot', 'oracle']
+METHOD_METRICS = ['f1', 'precision', 'recall', 'fpr', 'threshold', 'p_latency']
+# Column display order: each metric paired with its point-adjusted (PA) counterpart.
+DISPLAY_COLUMNS = []
+for _m in METHOD_METRICS:
+    DISPLAY_COLUMNS.append(_m)
+    DISPLAY_COLUMNS.append(f'{_m} (PA)')
+
+# Used by --metric flag; default points at pot.f1 (raw, non-PA).
+DISPLAY_METRICS = [f'{method}.{m}' for method in METHODS for m in METHOD_METRICS]
 
 
 def _get(d, dotted_key):
@@ -74,7 +80,13 @@ def _fmt(value):
 
 
 def _build_summary(by_model, metric):
-    """Build metric rows and hyperparameter rows for best result per model."""
+    """Build metric rows and hyperparameter rows for best result per model.
+
+    Each model produces two metric rows — one for `pot`, one for `oracle` —
+    where each numeric column appears twice: raw (point-wise) and PA
+    (point-adjusted, i.e. segment-expanded). The row label is "<model> / <method>".
+    Sort order is by the row whose metric path matches the --metric argument.
+    """
     metric_rows = []
     hp_rows = []
     all_hp_keys = []
@@ -88,23 +100,34 @@ def _build_summary(by_model, metric):
                     all_hp_keys.append(k)
                     seen_hp.add(k)
 
+    sort_method, _, sort_metric = metric.partition('.')
+
+    grouped = []  # list of (sort_value, [method_rows], hp_row)
     for model, results in by_model.items():
         best = _best_result(results, metric)
-        m_row = {'model': model}
-        h_row = {'model': model}
-        for m in DISPLAY_METRICS:
-            m_row[m] = _fmt(_get(best, m)) if best else 'N/A'
+        method_rows = []
+        sort_val = -1.0
+        for method in METHODS:
+            row = {'row': f'{model} / {method}'}
+            for m in METHOD_METRICS:
+                row[m] = _fmt(_get(best, f'{method}.{m}')) if best else 'N/A'
+                row[f'{m} (PA)'] = _fmt(_get(best, f'{method}_expanded.{m}')) if best else 'N/A'
+            if method == sort_method:
+                try:
+                    sort_val = float(row[sort_metric]) if row[sort_metric] not in ('N/A', 'NaN') else -1.0
+                except (TypeError, ValueError):
+                    sort_val = -1.0
+            method_rows.append(row)
+        h_row = {'row': model}
         hp = best.get('applied_hyperparameters', {}) if best else {}
         for k in all_hp_keys:
             h_row[k] = _fmt(hp[k]) if k in hp else ''
-        metric_rows.append(m_row)
-        hp_rows.append(h_row)
+        grouped.append((sort_val, method_rows, h_row))
 
-    # Sort by the metric we optimized for (which is one of DISPLAY_METRICS).
-    sort_key = lambda r: float(r[metric]) if metric in r and r[metric] not in ('N/A', 'NaN') else -1
-    order = sorted(range(len(metric_rows)), key=lambda i: sort_key(metric_rows[i]), reverse=True)
-    metric_rows = [metric_rows[i] for i in order]
-    hp_rows = [hp_rows[i] for i in order]
+    grouped.sort(key=lambda t: t[0], reverse=True)
+    for _, method_rows, h_row in grouped:
+        metric_rows.extend(method_rows)
+        hp_rows.append(h_row)
 
     return metric_rows, hp_rows, all_hp_keys
 
@@ -139,15 +162,15 @@ _HTML_TEMPLATE = """\
 <table>
   <thead>
     <tr>
-      <th>Model</th>
-      {% for m in display_metrics %}<th>{{ m }}</th>{% endfor %}
+      <th>Model / method</th>
+      {% for m in display_columns %}<th>{{ m }}</th>{% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for row in metric_rows %}
     <tr>
-      <td>{{ row.model }}</td>
-      {% for m in display_metrics %}<td>{{ row[m] }}</td>{% endfor %}
+      <td>{{ row.row }}</td>
+      {% for m in display_columns %}<td>{{ row[m] }}</td>{% endfor %}
     </tr>
     {% endfor %}
   </tbody>
@@ -166,7 +189,7 @@ _HTML_TEMPLATE = """\
   <tbody>
     {% for row in hp_rows %}
     <tr>
-      <td>{{ row.model }}</td>
+      <td>{{ row.row }}</td>
       {% for k in hp_keys %}<td>{{ row[k] }}</td>{% endfor %}
     </tr>
     {% endfor %}
@@ -185,7 +208,7 @@ def _generate_html(dataset, metric, by_model, output_path):
     html = template.render(
         dataset=dataset,
         metric=metric,
-        display_metrics=DISPLAY_METRICS,
+        display_columns=DISPLAY_COLUMNS,
         metric_rows=metric_rows,
         hp_rows=hp_rows,
         hp_keys=hp_keys,
@@ -234,15 +257,17 @@ def _draw_table_page(pdf, title, columns, rows):
 def _generate_pdf(dataset, metric, by_model, output_path):
     metric_rows, hp_rows, hp_keys = _build_summary(by_model, metric)
 
-    # Rename 'model' to 'Model' for display
-    for row in metric_rows + hp_rows:
-        row['Model'] = row.pop('model')
+    # Rename internal 'row' key to a display label
+    for row in metric_rows:
+        row['Model / method'] = row.pop('row')
+    for row in hp_rows:
+        row['Model'] = row.pop('row')
 
     with PdfPages(output_path) as pdf:
         _draw_table_page(
             pdf,
             title=f'Metrics — Dataset: {dataset}  (best by {metric})',
-            columns=['Model'] + DISPLAY_METRICS,
+            columns=['Model / method'] + DISPLAY_COLUMNS,
             rows=metric_rows,
         )
         _draw_table_page(

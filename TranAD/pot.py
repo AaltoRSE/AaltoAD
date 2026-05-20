@@ -162,9 +162,9 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
         pred = np.zeros_like(label)
         return {
-            'f1': np.nan, 'precision': np.nan, 'recall': np.nan,
+            'f1': np.nan, 'precision': np.nan, 'recall': np.nan, 'fpr': np.nan,
             'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
-            'ROC/AUC': np.nan, 'threshold': np.nan,
+            'ROC/AUC': np.nan, 'threshold': np.nan, 'p_latency': None,
         }, pred
 
     lms = constants.lm[0]
@@ -188,16 +188,20 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False
         else: break
     ret = s.run(dynamic=False)  # run
     pot_th = np.mean(ret['thresholds']) * constants.lm[1]
+    raw_pred = score > pot_th
+    p_latency = segment_latency(raw_pred, label)
     if expand_segments:
-        pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)
+        pred = adjust_predicts(score, label, pot_th)
     else:
-        pred = score > pot_th
-        p_latency = segment_latency(pred, label)
+        pred = raw_pred
     p_t = calc_point2point(pred, label)
+    fp, tn = float(p_t[5]), float(p_t[4])
+    fpr = fp / (fp + tn) if (fp + tn) else 0.0
     return {
         'f1': p_t[0],
         'precision': p_t[1],
         'recall': p_t[2],
+        'fpr': fpr,
         'TP': p_t[3],
         'TN': p_t[4],
         'FP': p_t[5],
