@@ -16,7 +16,7 @@ def load_SMAP_MSL(folder, dataset, data_folder=DEFAULT_DATA_FOLDER):
 		test = np.load(f'{dataset_folder}/test/{fn}.npy')
 		train, min_a, max_a = normalize(train)
 		test, _, _ = normalize(test, min_a, max_a)
-		np.save(f'{folder}/{fn}train_step.npy', train)
+		np.save(f'{folder}/{fn}_train.npy', train)
 		np.save(f'{folder}/{fn}_test.npy', test)
 		labels = np.zeros(test.shape)
 		indices = values[values['chan_id'] == fn]['anomaly_sequences'].values[0]

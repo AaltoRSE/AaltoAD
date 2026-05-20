@@ -485,7 +485,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			pass
 		raise
 	
-	print(df)
 	pprint(result)
 	# Append benchmark to CSV: model, dataset, precision, recall, AUC, f1
 	append_benchmark_row(model_name, dataset_name, result)

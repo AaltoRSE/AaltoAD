@@ -80,24 +80,25 @@ def test_append_benchmark_row_creates_file(tmp_path):
     bench_path = tmp_path / 'benchmarks.csv'
     
     result_dict = {
-        'precision': 0.85,
-        'recall': 0.90,
-        'ROC/AUC': 0.95,
-        'f1': 0.87
+        'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
+        'oracle': {'precision': 0.88, 'recall': 0.93, 'f1': 0.90, 'threshold': 0.42},
     }
-    
+
     run_experiment.append_benchmark_row('TranAD', 'TOL', result_dict, bench_path=str(bench_path))
-    
+
     # Verify file exists
     assert bench_path.exists()
-    
+
     # Verify contents
     with open(bench_path, 'r') as f:
         reader = csv.reader(f)
         rows = list(reader)
         assert len(rows) == 2  # header + 1 data row
-        assert rows[0] == ['model', 'dataset', 'precision', 'recall', 'AUC', 'f1']
-        assert rows[1] == ['TranAD', 'TOL', '0.85', '0.9', '0.95', '0.87']
+        assert rows[0] == ['model', 'dataset',
+                           'pot_precision', 'pot_recall', 'pot_AUC', 'pot_f1',
+                           'oracle_precision', 'oracle_recall', 'oracle_f1', 'oracle_threshold']
+        assert rows[1] == ['TranAD', 'TOL', '0.85', '0.9', '0.95', '0.87',
+                           '0.88', '0.93', '0.9', '0.42']
 
 
 def test_append_benchmark_row_appends_to_existing(tmp_path):
@@ -105,19 +106,21 @@ def test_append_benchmark_row_appends_to_existing(tmp_path):
     bench_path = tmp_path / 'benchmarks.csv'
     
     # Create first entry
-    result1 = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
+    result1 = {'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
+               'oracle': {'precision': 0.86, 'recall': 0.91, 'f1': 0.88, 'threshold': 0.5}}
     run_experiment.append_benchmark_row('TranAD', 'TOL', result1, bench_path=str(bench_path))
-    
+
     # Append second entry
-    result2 = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
+    result2 = {'pot': {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90},
+               'oracle': {'precision': 0.89, 'recall': 0.93, 'f1': 0.91, 'threshold': 0.6}}
     run_experiment.append_benchmark_row('USAD', 'MSL', result2, bench_path=str(bench_path))
-    
+
     # Verify contents
     with open(bench_path, 'r') as f:
         reader = csv.reader(f)
         rows = list(reader)
         assert len(rows) == 3  # header + 2 data rows
-        assert rows[0] == ['model', 'dataset', 'precision', 'recall', 'AUC', 'f1']
+        assert rows[0][:2] == ['model', 'dataset']
         assert rows[1][0] == 'TranAD'
         assert rows[2][0] == 'USAD'
 
@@ -127,20 +130,19 @@ def test_append_benchmark_row_handles_missing_values(tmp_path):
     bench_path = tmp_path / 'benchmarks.csv'
     
     result_dict = {
-        'precision': 0.85,
-        # missing recall, ROC/AUC, f1
+        'pot': {'precision': 0.85},  # missing recall, ROC/AUC, f1; oracle absent entirely
     }
-    
+
     run_experiment.append_benchmark_row('TranAD', 'TOL', result_dict, bench_path=str(bench_path))
-    
+
     # Verify file exists and handles None values
     assert bench_path.exists()
     with open(bench_path, 'r') as f:
         reader = csv.reader(f)
         rows = list(reader)
         assert len(rows) == 2
-        assert rows[1][2] == '0.85'
-        assert rows[1][3] == ''  # None becomes empty string in CSV
+        assert rows[1][2] == '0.85'  # pot_precision
+        assert rows[1][3] == ''      # pot_recall missing
 
 
 @patch('TranAD.run_experiment.load_model')
@@ -187,32 +189,30 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
     # Mock eval_step to return loss and predictions
     # Since test=True, no training calls, only testing and train loss
     mock_model.eval_step = Mock(side_effect=[
-        # Testing call
-        (np.random.rand(50, 5), np.random.rand(50, 5)),
-        # Train loss for POT
-        (np.random.rand(100, 5), np.random.rand(100, 5))
+        (np.random.rand(50, 5), np.random.rand(50, 5)),   # test
+        (np.random.rand(100, 5), np.random.rand(100, 5)), # train loss
+        (np.random.rand(100, 5), np.random.rand(100, 5)), # calib loss
     ])
-    
-    # Mock pot_eval to return result and predictions
+
+    # Mock pot_eval to return result and predictions (per-feature loop + 2 final calls)
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
     mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
-    
+
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
-    
+
     # Run experiment in test mode (no training)
     result = run_experiment.run_experiment('TranAD', 'TOL', test=True)
-    
-    # Verify results
-    assert result['precision'] == 0.85
-    assert result['recall'] == 0.90
-    assert result['ROC/AUC'] == 0.95
-    assert result['f1'] == 0.87
+
+    # Verify nested results schema
+    assert result['pot']['precision'] == 0.85
+    assert result['pot']['f1'] == 0.87
     assert result['hit_rate'] == 0.80
     assert result['ndcg'] == 0.75
     assert result['git_hash'] == 'abc123'
     assert result['model'] == 'TranAD'
     assert result['dataset'] == 'TOL'
+    assert 'oracle' in result
     
     # Verify results file was created
     results_file = tmp_path / 'results' / 'TOL' / 'TranAD_results.json'
@@ -264,8 +264,9 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     training_returns = [(0.5 - i*0.1, 0.001 - i*0.0001) for i in range(5)]
     mock_model.train_step = Mock(side_effect=training_returns)
     mock_model.eval_step = Mock(side_effect=[
-        (np.random.rand(50, 5), np.random.rand(50, 5)),  # test
-        (np.random.rand(100, 5), np.random.rand(100, 5))  # train loss
+        (np.random.rand(50, 5), np.random.rand(50, 5)),   # test
+        (np.random.rand(100, 5), np.random.rand(100, 5)), # train loss
+        (np.random.rand(100, 5), np.random.rand(100, 5)), # calib loss
     ])
 
     mock_pot_result = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
@@ -281,9 +282,9 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     assert mock_model.train_step.call_count >= 5  # at least 5 training epochs
     assert mock_save_model.called
     assert mock_plot_accuracies.called
-    
-    # Verify results
-    assert result['precision'] == 0.88
+
+    # Verify nested results schema
+    assert result['pot']['precision'] == 0.88
     assert result['git_hash'] == 'def456'
     assert result['applied_hyperparameters'] == {'lr': 0.001}
 
@@ -349,7 +350,8 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
 
     mock_model.eval_step = Mock(side_effect=[
         (np.random.rand(50, 5), np.random.rand(50, 5)),
-        (np.random.rand(100, 5), np.random.rand(100, 5))
+        (np.random.rand(100, 5), np.random.rand(100, 5)),
+        (np.random.rand(100, 5), np.random.rand(100, 5)),
     ])
     
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
