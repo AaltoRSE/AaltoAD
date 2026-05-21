@@ -255,8 +255,7 @@ def load_model(
 	applied_hyperparams = hyperparams
 	hp_hash = _hyperparams_hash(applied_hyperparams)
 
-	weight_decay = float(applied_hyperparams.get('weight_decay', 1e-5))
-	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=weight_decay)
+	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=model.weight_decay)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
 	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/{hp_hash}/model.ckpt'
 	if os.path.exists(fname) and (not retrain or test):
