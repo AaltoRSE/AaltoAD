@@ -157,18 +157,26 @@ def _safe_write_json(path, data):
 				pass
 
 
+POT_ONLY_KEYS = {'q'}
+RUNNER_KEYS = {'epochs'}
+
+
 def _hyperparams_hash(hyperparams: dict) -> str:
-	"""Return a short hash (first 8 chars of SHA256) of the sorted JSON representation of hyperparams.
+	"""Return a short hash (first 8 chars of SHA256) of the model-affecting hyperparams.
+
+	POT-only keys (like `q`) are stripped before hashing so that a sweep over
+	those values reuses the same trained checkpoint.
 
 	Args:
 		hyperparams (dict): Hyperparameter dictionary to hash.
 
 	Returns:
-		str: 8-character hex string, or "default" if hyperparams is empty or None.
+		str: 8-character hex string, or "default" if the model-affecting subset is empty.
 	"""
-	if not hyperparams:
+	model_only = {k: v for k, v in (hyperparams or {}).items() if k not in POT_ONLY_KEYS}
+	if not model_only:
 		return 'default'
-	serialized = json.dumps(hyperparams, sort_keys=True)
+	serialized = json.dumps(model_only, sort_keys=True)
 	return hashlib.sha256(serialized.encode()).hexdigest()[:8]
 
 
@@ -241,9 +249,13 @@ def load_model(
 	model_class = getattr(models, modelname)
 
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
-	POT_KEYS = {'q'}
-	model_kwargs = {k: v for k, v in hyperparams.items() if k not in POT_KEYS}
+	# Strip both POT-only and runner-only keys before passing to the constructor
+	model_kwargs = {k: v for k, v in hyperparams.items()
+	                if k not in POT_ONLY_KEYS and k not in RUNNER_KEYS}
 	model = model_class(dims, **model_kwargs).double()
+	# Apply runner-handled overrides.
+	if 'epochs' in hyperparams:
+		model.epochs = int(hyperparams['epochs'])
 	applied_hyperparams = hyperparams
 	hp_hash = _hyperparams_hash(applied_hyperparams)
 
