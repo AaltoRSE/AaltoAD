@@ -308,12 +308,10 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 		print(f"✓ SKIP   Exp {exp_id}: {model} (already cached)")
 		return False
 	
-	print(f"→ RUN    Exp {exp_id}: {model}", end="")
-	# Print hyperparams
 	hp_str = ", ".join([f"{k}={v}" for k, v in hyperparams.items() if k not in ['notes']])
-	if hp_str:
-		print(f" ({hp_str})", end="")
-	print()
+	# flush=True so this line lands in the SLURM log before any
+	# long-running / memory-hungry load, even when stdout is block-buffered.
+	print(f"→ RUN    Exp {exp_id}: {model} on {dataset} ({hp_str})", flush=True)
 	
 	try:
 		# Initialize config for this dataset/model combination
