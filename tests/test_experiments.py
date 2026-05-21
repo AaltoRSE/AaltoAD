@@ -164,7 +164,7 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
     mock_load_timestamps.return_value = np.arange(50)
 
     # Create mock model
-    mock_model = Mock(spec=['name', 'lr', 'batch', 'n_window', 'eval', 'eval_step'])
+    mock_model = Mock(spec=['name', 'lr', 'batch', 'n_window', 'eval', 'eval_step', 'epochs'])
     mock_model.name = 'TranAD'
     mock_model.lr = 0.001
     mock_model.batch = 128
@@ -240,10 +240,11 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     mock_git_hash.return_value = 'def456'
     mock_load_timestamps.return_value = np.arange(50)
 
-    mock_model = Mock(spec=['name', 'lr', 'n_window', 'train_step', 'eval', 'eval_step'])
+    mock_model = Mock(spec=['name', 'lr', 'n_window', 'train_step', 'eval', 'eval_step', 'epochs'])
     mock_model.name = 'USAD'
     mock_model.lr = 0.001
     mock_model.n_window = 10
+    mock_model.epochs = 5
     mock_optimizer = Mock()
     mock_scheduler = Mock()
 
@@ -334,7 +335,7 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
 
     # Setup mocks (simplified)
     mock_git_hash.return_value = 'xyz789'
-    mock_model = Mock(spec=['name', 'n_window', 'eval', 'eval_step'])
+    mock_model = Mock(spec=['name', 'n_window', 'eval', 'eval_step', 'epochs'])
     mock_model.name = 'TranAD'
     mock_model.n_window = 10
     mock_load_model.return_value = (mock_model, Mock(), Mock(), -1, [], {}, 'default')

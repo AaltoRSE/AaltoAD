@@ -92,10 +92,12 @@ def _build_summary(by_model, metric):
     all_hp_keys = []
     seen_hp = set()
 
-    for model, results in by_model.items():
-        best = _best_result(results, metric)
-        if best:
-            for k in best.get('applied_hyperparameters', {}).keys():
+    # Collect hyperparameter keys from *every* result, not just the best. This
+    # ensures any column that's ever been swept (e.g. `epochs` added later)
+    # appears in the table even when a given model's best result predates it.
+    for results in by_model.values():
+        for r in results:
+            for k in r.get('applied_hyperparameters', {}).keys():
                 if k not in seen_hp:
                     all_hp_keys.append(k)
                     seen_hp.add(k)
