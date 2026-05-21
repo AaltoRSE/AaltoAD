@@ -45,6 +45,7 @@
       ],
       "notes": "TranAD higher LR",
       "q": [
+	0.01,
         0.001,
         0.0001,
         1e-05
@@ -219,9 +220,7 @@
         0.0002
       ],
       "n_window": [
-	2,
-        5,
-	10
+	null
       ],
       "notes": "MTAD_GAT",
       "q": [
@@ -461,27 +460,6 @@
         48
       ],
       "notes": "LSTM_AE",
-      "q": [
-        0.001,
-        0.0001,
-        1e-05
-      ]
-    },
-    {
-      "index": 18,
-      "dataset": "TOL",
-      "model": "Attention",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "n_window": [
-        5,
-        10,
-        20
-      ],
-      "notes": "TranAD higher LR",
       "q": [
         0.001,
         0.0001,
