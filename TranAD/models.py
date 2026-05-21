@@ -19,10 +19,11 @@ torch.manual_seed(1)
 
 ## Separate LSTM for each variable
 class LSTM_Univariate(nn.Module):
-	def __init__(self, feats, n_hidden=1, n_layers=1, learning_rate=0.002, batch_size = 512):
+	def __init__(self, feats, n_hidden=1, n_layers=1, learning_rate=0.002, batch_size = 512, epochs=5):
 		super(LSTM_Univariate, self).__init__()
 		self.name = 'LSTM_Univariate'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
@@ -70,10 +71,11 @@ class LSTM_Univariate(nn.Module):
 
 ## Simple Multi-Head Self-Attention Model
 class Attention(nn.Module):
-	def __init__(self, feats, n_window=5, learning_rate=0.0001):
+	def __init__(self, feats, n_window=5, learning_rate=0.0001, epochs=5):
 		super(Attention, self).__init__()
 		self.name = 'Attention'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_window = n_window
 		self.flat_window = False
@@ -124,12 +126,12 @@ class LSTM_AE(nn.Module):
 		super().__init__()
 		self.name = 'LSTM_AE'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
 		self.n_window = sequence_length
 		self.flat_window = False
-		self.epochs = epochs
 		self.batch_size = batch_size
 		self.lstm = nn.LSTM(
 			input_size=feats,
@@ -230,12 +232,12 @@ class LSTM_AD(nn.Module):
 		super(LSTM_AD, self).__init__()
 		self.name = 'LSTM_AD'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_layers = n_layers
 		self.n_window = sequence_length
 		self.flat_window = False
-		self.epochs = epochs
 		self.batch_size = batch_size
 		self.lstm = nn.LSTM(feats, self.n_hidden, n_layers, batch_first=True)
 		self.fcn = nn.Sequential(nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid())
@@ -336,10 +338,11 @@ class LSTM_AD(nn.Module):
 
 ## DAGMM Model (ICLR 18)
 class DAGMM(nn.Module):
-	def __init__(self, feats, n_hidden=16, n_latent=8, n_window=5, learning_rate=0.0001):
+	def __init__(self, feats, n_hidden=16, n_latent=8, n_window=5, learning_rate=0.0001, epochs=5):
 		super(DAGMM, self).__init__()
 		self.name = 'DAGMM'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_latent = n_latent
@@ -414,10 +417,11 @@ class DAGMM(nn.Module):
 
 ## OmniAnomaly Model (KDD 19)
 class OmniAnomaly(nn.Module):
-	def __init__(self, feats, n_hidden=32, n_latent=8, n_layers=2, beta=0.01, learning_rate=0.002):
+	def __init__(self, feats, n_hidden=32, n_latent=8, n_layers=2, beta=0.01, learning_rate=0.002, epochs=5):
 		super(OmniAnomaly, self).__init__()
 		self.name = 'OmniAnomaly'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.beta = beta
 		self.n_feats = feats
 		self.n_hidden = n_hidden
@@ -482,10 +486,11 @@ class OmniAnomaly(nn.Module):
 
 ## USAD Model (KDD 20)
 class USAD(nn.Module):
-	def __init__(self, feats, n_hidden=16, n_latent=5, n_window=5, learning_rate=0.0001):
+	def __init__(self, feats, n_hidden=16, n_latent=5, n_window=5, learning_rate=0.0001, epochs=5):
 		super(USAD, self).__init__()
 		self.name = 'USAD'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_latent = n_latent
@@ -556,10 +561,11 @@ class USAD(nn.Module):
 
 ## MSCRED Model (AAAI 19)
 class MSCRED(nn.Module):
-	def __init__(self, feats, n_window=None, learning_rate=0.0001):
+	def __init__(self, feats, n_window=None, learning_rate=0.0001, epochs=5):
 		super(MSCRED, self).__init__()
 		self.name = 'MSCRED'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_window = n_window or feats
 		self.flat_window = True
@@ -615,10 +621,11 @@ class MSCRED(nn.Module):
 
 ## CAE-M Model (TKDE 21)
 class CAE_M(nn.Module):
-	def __init__(self, feats, n_window=None, learning_rate=0.0001):
+	def __init__(self, feats, n_window=None, learning_rate=0.0001, epochs=5):
 		super(CAE_M, self).__init__()
 		self.name = 'CAE_M'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_window = n_window or feats
 		self.flat_window = True
@@ -671,10 +678,11 @@ class CAE_M(nn.Module):
 
 ## MTAD_GAT Model (ICDM 20)
 class MTAD_GAT(nn.Module):
-	def __init__(self, feats, n_window=None, learning_rate=0.0001):
+	def __init__(self, feats, n_window=None, learning_rate=0.0001, epochs=5):
 		super(MTAD_GAT, self).__init__()
 		self.name = 'MTAD_GAT'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_window = n_window or feats
 		self.flat_window = True
@@ -732,10 +740,11 @@ class MTAD_GAT(nn.Module):
 
 ## GDN Model (AAAI 21)
 class GDN(nn.Module):
-	def __init__(self, feats, n_window=5, n_hidden=16, learning_rate=0.0001):
+	def __init__(self, feats, n_window=5, n_hidden=16, learning_rate=0.0001, epochs=5):
 		super(GDN, self).__init__()
 		self.name = 'GDN'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_window = n_window
 		self.flat_window = True
@@ -800,10 +809,11 @@ class GDN(nn.Module):
 
 # MAD_GAN (ICANN 19)
 class MAD_GAN(nn.Module):
-	def __init__(self, feats, n_window=5, n_hidden=16, learning_rate=0.0001):
+	def __init__(self, feats, n_window=5, n_hidden=16, learning_rate=0.0001, epochs=5):
 		super(MAD_GAN, self).__init__()
 		self.name = 'MAD_GAN'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_hidden = n_hidden
 		self.n_window = n_window
@@ -917,10 +927,11 @@ class TranADBase:
 
 # Proposed Model (VLDB 22)
 class TranAD_Basic(TranADBase, nn.Module):
-	def __init__(self, feats, n_window=10, batch_size=128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size=128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None, epochs=5):
 		super(TranAD_Basic, self).__init__()
 		self.name = 'TranAD_Basic'
 		self.lr = constants.lr if learning_rate is None else learning_rate
+		self.epochs = epochs
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
@@ -947,10 +958,11 @@ class TranAD_Basic(TranADBase, nn.Module):
 
 # Proposed Model (FCN) + Self Conditioning + Adversarial + MAML (VLDB 22)
 class TranAD_Transformer(TranADBase, nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, n_hidden=8, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, n_hidden=8, learning_rate=None, epochs=5):
 		super(TranAD_Transformer, self).__init__()
 		self.name = 'TranAD_Transformer'
 		self.lr = constants.lr if learning_rate is None else learning_rate
+		self.epochs = epochs
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_hidden = n_hidden
@@ -993,10 +1005,11 @@ class TranAD_Transformer(TranADBase, nn.Module):
 
 # Proposed Model + Self Conditioning + MAML (VLDB 22)
 class TranAD_Adversarial(TranADBase, nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None, epochs=5):
 		super(TranAD_Adversarial, self).__init__()
 		self.name = 'TranAD_Adversarial'
 		self.lr = constants.lr if learning_rate is None else learning_rate
+		self.epochs = epochs
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
@@ -1035,10 +1048,11 @@ class TranAD_Adversarial(TranADBase, nn.Module):
 
 # Proposed Model + Adversarial + MAML (VLDB 22)
 class TranAD_SelfConditioning(TranADBase, nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None, epochs=5):
 		super(TranAD_SelfConditioning, self).__init__()
 		self.name = 'TranAD_SelfConditioning'
 		self.lr = constants.lr if learning_rate is None else learning_rate
+		self.epochs = epochs
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
@@ -1077,10 +1091,11 @@ class TranAD_SelfConditioning(TranADBase, nn.Module):
 
 # Proposed Model + Self Conditioning + Adversarial + MAML (VLDB 22)
 class TranAD(TranADBase, nn.Module):
-	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None):
+	def __init__(self, feats, n_window=10, batch_size = 128, dim_feedforward=16, dropout=0.1, nheads=None, learning_rate=None, epochs=5):
 		super(TranAD, self).__init__()
 		self.name = 'TranAD'
 		self.lr = constants.lr if learning_rate is None else learning_rate
+		self.epochs = epochs
 		self.batch = batch_size
 		self.n_feats = feats
 		self.n_window = n_window
@@ -1121,10 +1136,11 @@ class TranAD(TranADBase, nn.Module):
 
 
 class STAGNN(nn.Module):
-	def __init__(self, feats, n_window=10, batch_size=128, embed_dim=64, topk=5, dropout=0.1, graph_num_heads=4, learning_rate=0.001):
+	def __init__(self, feats, n_window=10, batch_size=128, embed_dim=64, topk=5, dropout=0.1, graph_num_heads=4, learning_rate=0.001, epochs=5):
 		super(STAGNN, self).__init__()
 		self.name = 'STAGNN'
 		self.lr = learning_rate
+		self.epochs = epochs
 		self.n_feats = feats
 		self.n_window = n_window
 		self.flat_window = False

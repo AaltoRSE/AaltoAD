@@ -158,7 +158,6 @@ def _safe_write_json(path, data):
 
 
 POT_ONLY_KEYS = {'q'}
-RUNNER_KEYS = {'epochs'}
 
 
 def _hyperparams_hash(hyperparams: dict) -> str:
@@ -249,17 +248,15 @@ def load_model(
 	model_class = getattr(models, modelname)
 
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
-	# Strip both POT-only and runner-only keys before passing to the constructor
-	model_kwargs = {k: v for k, v in hyperparams.items()
-	                if k not in POT_ONLY_KEYS and k not in RUNNER_KEYS}
+	# Strip POT-only keys before passing to the constructor; every model now
+	# accepts `epochs` as a normal kwarg so no other special-casing is needed.
+	model_kwargs = {k: v for k, v in hyperparams.items() if k not in POT_ONLY_KEYS}
 	model = model_class(dims, **model_kwargs).double()
-	# Apply runner-handled overrides.
-	if 'epochs' in hyperparams:
-		model.epochs = int(hyperparams['epochs'])
 	applied_hyperparams = hyperparams
 	hp_hash = _hyperparams_hash(applied_hyperparams)
 
-	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=1e-5)
+	weight_decay = float(applied_hyperparams.get('weight_decay', 1e-5))
+	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=weight_decay)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
 	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/{hp_hash}/model.ckpt'
 	if os.path.exists(fname) and (not retrain or test):
@@ -367,10 +364,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	### Training phase
 	if not test:
 		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
-		if hasattr(model, 'epochs'):
-			num_epochs = model.epochs
-		else:
-			num_epochs = 5
+		num_epochs = model.epochs
 		e = epoch + 1
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
