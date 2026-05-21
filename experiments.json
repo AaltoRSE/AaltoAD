@@ -45,11 +45,7 @@
       ],
       "notes": "TranAD higher LR",
       "q": [
-<<<<<<< HEAD
-        0.01,
-=======
 	0.01,
->>>>>>> 4ae1ebde819c4300fe7f3b4d840d7a3b52decafc
         0.001,
         0.0001,
         1e-05
