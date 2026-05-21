@@ -218,9 +218,9 @@
         0.0001,
         0.0002
       ],
-      "n_hidden": [
-        16,
-        32,
+      "n_window": [
+        10,
+        20,
         null
       ],
       "notes": "MTAD_GAT",

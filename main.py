@@ -335,11 +335,39 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 			return True
 		else:
 			print(f"✗ ERROR  Exp {exp_id}: Result file not created")
+			_write_failure_marker(dataset, model, exp_id, hyperparams,
+			                     "run_experiment returned without writing a result file")
 			return False
 	except Exception as e:
 		print(f"✗ ERROR  Exp {exp_id}: {e}")
 		traceback.print_exc()
+		_write_failure_marker(dataset, model, exp_id, hyperparams,
+		                     f"{type(e).__name__}: {e}")
 		return False
+
+
+def _write_failure_marker(dataset: str, model: str, exp_id: str,
+                          hyperparams: dict, error: str):
+	"""Persist a minimal result file recording the failure so the worker
+	loop's has_matching_result() check skips this sub-experiment on rescan
+	instead of re-running it forever. The report's metric lookup returns
+	None for these and the row is dropped from best-result selection.
+	"""
+	result_path = get_result_path(dataset, model, exp_id)
+	os.makedirs(os.path.dirname(result_path), exist_ok=True)
+	marker = {
+		'experiment_id': exp_id,
+		'model': model,
+		'dataset': dataset,
+		'applied_hyperparameters': hyperparams,
+		'status': 'failed',
+		'error': error,
+	}
+	try:
+		with open(result_path, 'w') as f:
+			json.dump(marker, f, indent=2, default=str)
+	except Exception as write_err:
+		print(f"  (could not write failure marker: {write_err})")
 
 
 def run_worker_loop(experiments: list, retrain: bool = False):
