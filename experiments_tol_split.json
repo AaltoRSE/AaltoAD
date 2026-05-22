@@ -1,5 +1,5 @@
 {
-  "description": "Experiment configurations. Each experiment is numbered and fully self-contained. Change the index to force rerun. Results are saved with the index.",
+  "description": "Per-sub-dataset experiments using best combined-sweep hyperparameters. Two sets per applicable model: best-by-pot.f1 (raw) and best-by-pot_expanded.f1 (PA). Epochs scaled x10 to match combined total training steps on each ~1/10-size sub-dataset.",
   "experiments": [
     {
       "index": 1,
@@ -15,23 +15,23 @@
         "TOL_3_2_2",
         "TOL_3_3_2"
       ],
-      "model": "LSTM_Univariate",
+      "model": "Attention",
       "learning_rate": [
-        0.003
+        5e-05
       ],
-      "n_hidden": [
-        1
+      "n_window": [
+        10
       ],
-      "n_layers": [
-        1
-      ],
-      "batch_size": [
-        512
-      ],
-      "notes": "LSTM_Univariate",
       "q": [
-        0.0001
-      ]
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        30
+      ],
+      "notes": "Attention: best combined-sweep params, epochs scaled \u00d710"
     },
     {
       "index": 2,
@@ -47,20 +47,99 @@
         "TOL_3_2_2",
         "TOL_3_3_2"
       ],
-      "model": "Attention",
+      "model": "CAE_M",
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "n_window": [
-        10
+        null
       ],
-      "notes": "Attention",
       "q": [
-        0.0001
-      ]
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "CAE_M: best combined-sweep params, epochs scaled \u00d710"
     },
     {
       "index": 3,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "DAGMM",
+      "n_latent": [
+        32
+      ],
+      "n_hidden": [
+        32
+      ],
+      "n_window": [
+        5
+      ],
+      "learning_rate": [
+        0.0001
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "DAGMM: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 4,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "GDN",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        5
+      ],
+      "n_hidden": [
+        16
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "GDN: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 5,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -81,21 +160,27 @@
         1
       ],
       "n_hidden": [
-        16
+        32
       ],
       "batch_size": [
-        256
+        128
       ],
       "sequence_length": [
-        16
+        8
       ],
-      "notes": "LSTM_AD",
       "q": [
-        0.0001
-      ]
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "LSTM_AD: best combined-sweep params, epochs scaled \u00d710"
     },
     {
-      "index": 4,
+      "index": 6,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -108,26 +193,140 @@
         "TOL_3_2_2",
         "TOL_3_3_2"
       ],
-      "model": "DAGMM",
-      "n_latent": [
+      "model": "LSTM_AE",
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        2
+      ],
+      "n_hidden": [
+        8
+      ],
+      "batch_size": [
+        128
+      ],
+      "sequence_length": [
         16
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_AE: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 7,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_Univariate",
+      "learning_rate": [
+        0.003
+      ],
+      "n_hidden": [
+        4
+      ],
+      "n_layers": [
+        1
+      ],
+      "batch_size": [
+        512
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "LSTM_Univariate: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 8,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MAD_GAN",
+      "n_window": [
+        10
       ],
       "n_hidden": [
         32
       ],
-      "n_window": [
-        10
+      "learning_rate": [
+        0.0002
       ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MAD_GAN: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 9,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MSCRED",
       "learning_rate": [
         0.0001
       ],
-      "notes": "DAGMM",
+      "n_window": [
+        5
+      ],
       "q": [
-        0.0001
-      ]
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MSCRED: best combined-sweep params, epochs scaled \u00d710"
     },
     {
-      "index": 5,
+      "index": 10,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -145,7 +344,7 @@
         0.001
       ],
       "beta": [
-        0.1
+        0.0002
       ],
       "n_hidden": [
         16
@@ -153,13 +352,221 @@
       "n_latent": [
         16
       ],
-      "notes": "OmniAnomaly",
       "q": [
-        0.0001
-      ]
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "OmniAnomaly: best combined-sweep params, epochs scaled \u00d710"
     },
     {
-      "index": 6,
+      "index": 11,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        256
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 12,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD_Adversarial: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 13,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Basic",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0001
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Basic: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 14,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        256
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD_SelfConditioning: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 15,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Transformer",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        64
+      ],
+      "n_hidden": [
+        16
+      ],
+      "learning_rate": [
+        5e-05
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD_Transformer: best combined-sweep params, epochs scaled \u00d710"
+    },
+    {
+      "index": 16,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -180,348 +587,97 @@
         16
       ],
       "n_latent": [
-        5
-      ],
-      "n_window": [
-        10
-      ],
-      "notes": "USAD",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 7,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "MSCRED",
-      "learning_rate": [
-        0.0001
+        8
       ],
       "n_window": [
         5
       ],
-      "notes": "MSCRED",
       "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 8,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
+        0.001
       ],
-      "model": "CAE_M",
-      "learning_rate": [
-        0.0001
+      "weight_decay": [
+        0.001
       ],
-      "n_window": [
-        null
+      "epochs": [
+        50
       ],
-      "notes": "CAE_M",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 9,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "MTAD_GAT",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "n_window": [
-        10,
-        20,
-        null
-      ],
-      "notes": "MTAD_GAT",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 10,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "GDN",
-      "learning_rate": [
-        0.0001
-      ],
-      "n_window": [
-        5
-      ],
-      "n_hidden": [
-        16
-      ],
-      "notes": "GDN",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 11,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "MAD_GAN",
-      "n_window": [
-        10
-      ],
-      "n_hidden": [
-        16
-      ],
-      "learning_rate": [
-        0.0001
-      ],
-      "notes": "MAD_GAN",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 12,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_Basic",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        64,
-        128
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1,
-        0.2
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_Basic",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 13,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_Transformer",
-      "n_window": [
-        5
-      ],
-      "batch_size": [
-        128
-      ],
-      "n_hidden": [
-        16
-      ],
-      "learning_rate": [
-        0.0001
-      ],
-      "notes": "TranAD_Transformer",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 14,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_Adversarial",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        64,
-        128
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1,
-        0.2
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_Adversarial",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 15,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_SelfConditioning",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        64,
-        128
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1,
-        0.2
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_SelfConditioning",
-      "q": [
-        0.0001
-      ]
-    },
-    {
-      "index": 16,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD",
-      "n_window": [
-        5
-      ],
-      "batch_size": [
-        128
-      ],
-      "dim_feedforward": [
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        0.0001
-      ],
-      "notes": "TranAD",
-      "q": [
-        0.0001
-      ]
+      "notes": "USAD: best combined-sweep params, epochs scaled \u00d710"
     },
     {
       "index": 17,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "Attention",
+      "learning_rate": [
+        5e-05
+      ],
+      "n_window": [
+        5
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "Attention: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 18,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_AD",
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        2
+      ],
+      "n_hidden": [
+        16
+      ],
+      "batch_size": [
+        512
+      ],
+      "sequence_length": [
+        16
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_AD: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 19,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -539,21 +695,372 @@
         0.001
       ],
       "n_layers": [
-        1
+        2
       ],
       "n_hidden": [
-        16
+        8
       ],
       "batch_size": [
-        64
+        128
       ],
       "sequence_length": [
         32
       ],
-      "notes": "LSTM_AE",
       "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "LSTM_AE: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 20,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_Univariate",
+      "learning_rate": [
+        0.004
+      ],
+      "n_hidden": [
+        4
+      ],
+      "n_layers": [
+        2
+      ],
+      "batch_size": [
+        512
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "LSTM_Univariate: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 21,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MAD_GAN",
+      "n_window": [
+        10
+      ],
+      "n_hidden": [
+        32
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "MAD_GAN: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 22,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MSCRED",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        5
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MSCRED: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 23,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "OmniAnomaly",
+      "learning_rate": [
+        0.0005
+      ],
+      "beta": [
+        0.0002
+      ],
+      "n_hidden": [
+        32
+      ],
+      "n_latent": [
+        16
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "OmniAnomaly: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 24,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 25,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        256
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
         0.0001
-      ]
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD_Adversarial: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 26,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Basic",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        256
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0001
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        30
+      ],
+      "notes": "TranAD_Basic: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 27,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD_SelfConditioning: PA-tuned params, epochs scaled x10"
+    },
+    {
+      "index": 28,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Transformer",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "n_hidden": [
+        16
+      ],
+      "learning_rate": [
+        0.0001
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        10
+      ],
+      "notes": "TranAD_Transformer: PA-tuned params, epochs scaled x10"
     }
   ]
 }
