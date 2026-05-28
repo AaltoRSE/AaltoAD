@@ -1,6 +1,7 @@
 """Generate HTML and PDF reports from hyperparameter sweep result JSON files."""
 from glob import glob
 import os
+import csv
 import json
 import math
 
@@ -283,11 +284,73 @@ def _generate_pdf(dataset, metric, by_model, output_path):
 
 
 # ---------------------------------------------------------------------------
+# Slide-ready summary (CSV metrics + per-model hyperparameter markdown)
+# ---------------------------------------------------------------------------
+
+# Slim metric set for presentation tables. Each entry is (column_label, dotted_path).
+SLIDE_COLUMNS = [
+    ('POT F1',       'pot.f1'),
+    ('POT F1 (PA)',  'pot_expanded.f1'),
+    ('POT FPR',      'pot.fpr'),
+    ('POT latency',  'pot.p_latency'),
+    ('Oracle F1',    'oracle.f1'),
+]
+
+
+def _generate_csv(dataset, metric, by_model, output_path):
+    """One row per model, slim metric set, sorted by `metric` desc."""
+    rows = []
+    for model, results in by_model.items():
+        best = _best_result(results, metric)
+        row = {'model': model}
+        for label, path in SLIDE_COLUMNS:
+            row[label] = _fmt(_get(best, path)) if best else 'N/A'
+        try:
+            sort_val = float(_get(best, metric)) if best else float('-inf')
+        except (TypeError, ValueError):
+            sort_val = float('-inf')
+        if sort_val != sort_val:  # NaN
+            sort_val = float('-inf')
+        rows.append((sort_val, row))
+    rows.sort(key=lambda t: t[0], reverse=True)
+
+    with open(output_path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['model'] + [c for c, _ in SLIDE_COLUMNS])
+        writer.writeheader()
+        for _, row in rows:
+            writer.writerow(row)
+    print(f'CSV summary written to {output_path}')
+
+
+def _generate_hp_markdown(dataset, metric, by_model, output_path):
+    """One line per model listing its best-result hyperparameters."""
+    lines = [f'# Hyperparameters — {dataset}', f'_Best result per model by {metric}_', '']
+    entries = []
+    for model, results in by_model.items():
+        best = _best_result(results, metric)
+        hp = best.get('applied_hyperparameters', {}) if best else {}
+        try:
+            sort_val = float(_get(best, metric)) if best else float('-inf')
+        except (TypeError, ValueError):
+            sort_val = float('-inf')
+        if sort_val != sort_val:
+            sort_val = float('-inf')
+        parts = ', '.join(f'{k}={_fmt(v)}' for k, v in sorted(hp.items()))
+        entries.append((sort_val, f'- **{model}**: {parts if parts else "(defaults)"}'))
+    entries.sort(key=lambda t: t[0], reverse=True)
+    lines.extend(line for _, line in entries)
+
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    print(f'Hyperparameter summary written to {output_path}')
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
 def generate_report(dataset, metric='f1', results_folder='results'):
-    """Generate HTML and PDF reports for a dataset."""
+    """Generate HTML, PDF, CSV, and hyperparameter-markdown reports for a dataset."""
     by_model = _load_results(dataset, results_folder)
     if not by_model:
         print(f'No results found for dataset "{dataset}" in {results_folder}/')
@@ -296,6 +359,10 @@ def generate_report(dataset, metric='f1', results_folder='results'):
     os.makedirs('reports', exist_ok=True)
     html_path = os.path.join('reports', f'{dataset}_report.html')
     pdf_path = os.path.join('reports', f'{dataset}_report.pdf')
+    csv_path = os.path.join('reports', f'{dataset}_summary.csv')
+    hp_path = os.path.join('reports', f'{dataset}_hyperparams.md')
 
     _generate_html(dataset, metric, by_model, html_path)
     _generate_pdf(dataset, metric, by_model, pdf_path)
+    _generate_csv(dataset, metric, by_model, csv_path)
+    _generate_hp_markdown(dataset, metric, by_model, hp_path)
