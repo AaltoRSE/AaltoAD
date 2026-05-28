@@ -23,7 +23,7 @@
         10
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -31,7 +31,7 @@
       "epochs": [
         30
       ],
-      "notes": "Attention: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "Attention: best combined-sweep params"
     },
     {
       "index": 2,
@@ -63,7 +63,7 @@
       "epochs": [
         50
       ],
-      "notes": "CAE_M: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "CAE_M: best combined-sweep params"
     },
     {
       "index": 3,
@@ -101,7 +101,7 @@
       "epochs": [
         10
       ],
-      "notes": "DAGMM: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "DAGMM: best combined-sweep params"
     },
     {
       "index": 4,
@@ -136,7 +136,7 @@
       "epochs": [
         50
       ],
-      "notes": "GDN: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "GDN: best combined-sweep params"
     },
     {
       "index": 5,
@@ -169,7 +169,7 @@
         8
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -177,7 +177,7 @@
       "epochs": [
         10
       ],
-      "notes": "LSTM_AD: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "LSTM_AD: best combined-sweep params"
     },
     {
       "index": 6,
@@ -218,7 +218,7 @@
       "epochs": [
         50
       ],
-      "notes": "LSTM_AE: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "LSTM_AE: best combined-sweep params"
     },
     {
       "index": 7,
@@ -248,7 +248,7 @@
         512
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -256,7 +256,7 @@
       "epochs": [
         10
       ],
-      "notes": "LSTM_Univariate: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "LSTM_Univariate: best combined-sweep params"
     },
     {
       "index": 8,
@@ -283,7 +283,7 @@
         0.0002
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -291,7 +291,7 @@
       "epochs": [
         50
       ],
-      "notes": "MAD_GAN: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "MAD_GAN: best combined-sweep params"
     },
     {
       "index": 9,
@@ -315,7 +315,7 @@
         5
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -323,7 +323,7 @@
       "epochs": [
         50
       ],
-      "notes": "MSCRED: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "MSCRED: best combined-sweep params"
     },
     {
       "index": 10,
@@ -361,7 +361,7 @@
       "epochs": [
         50
       ],
-      "notes": "OmniAnomaly: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "OmniAnomaly: best combined-sweep params"
     },
     {
       "index": 11,
@@ -394,7 +394,7 @@
         0.0002
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -402,7 +402,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "TranAD: best combined-sweep params"
     },
     {
       "index": 12,
@@ -443,7 +443,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD_Adversarial: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "TranAD_Adversarial: best combined-sweep params"
     },
     {
       "index": 13,
@@ -476,7 +476,7 @@
         0.0001
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -484,7 +484,7 @@
       "epochs": [
         50
       ],
-      "notes": "TranAD_Basic: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "TranAD_Basic: best combined-sweep params"
     },
     {
       "index": 14,
@@ -525,7 +525,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD_SelfConditioning: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "TranAD_SelfConditioning: best combined-sweep params"
     },
     {
       "index": 15,
@@ -555,7 +555,7 @@
         5e-05
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -563,7 +563,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD_Transformer: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "TranAD_Transformer: best combined-sweep params"
     },
     {
       "index": 16,
@@ -593,7 +593,7 @@
         5
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -601,7 +601,7 @@
       "epochs": [
         50
       ],
-      "notes": "USAD: best combined-sweep params, epochs scaled \u00d710"
+      "notes": "USAD: best combined-sweep params"
     },
     {
       "index": 17,
@@ -633,7 +633,7 @@
       "epochs": [
         50
       ],
-      "notes": "Attention: PA-tuned params, epochs scaled x10"
+      "notes": "Attention: PA-tuned params"
     },
     {
       "index": 18,
@@ -666,7 +666,7 @@
         16
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -674,7 +674,7 @@
       "epochs": [
         50
       ],
-      "notes": "LSTM_AD: PA-tuned params, epochs scaled x10"
+      "notes": "LSTM_AD: PA-tuned params"
     },
     {
       "index": 19,
@@ -707,7 +707,7 @@
         32
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -715,7 +715,7 @@
       "epochs": [
         10
       ],
-      "notes": "LSTM_AE: PA-tuned params, epochs scaled x10"
+      "notes": "LSTM_AE: PA-tuned params"
     },
     {
       "index": 20,
@@ -745,7 +745,7 @@
         512
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -753,7 +753,7 @@
       "epochs": [
         10
       ],
-      "notes": "LSTM_Univariate: PA-tuned params, epochs scaled x10"
+      "notes": "LSTM_Univariate: PA-tuned params"
     },
     {
       "index": 21,
@@ -780,7 +780,7 @@
         0.0002
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -788,7 +788,7 @@
       "epochs": [
         10
       ],
-      "notes": "MAD_GAN: PA-tuned params, epochs scaled x10"
+      "notes": "MAD_GAN: PA-tuned params"
     },
     {
       "index": 22,
@@ -812,7 +812,7 @@
         5
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -820,7 +820,7 @@
       "epochs": [
         50
       ],
-      "notes": "MSCRED: PA-tuned params, epochs scaled x10"
+      "notes": "MSCRED: PA-tuned params"
     },
     {
       "index": 23,
@@ -858,7 +858,7 @@
       "epochs": [
         50
       ],
-      "notes": "OmniAnomaly: PA-tuned params, epochs scaled x10"
+      "notes": "OmniAnomaly: PA-tuned params"
     },
     {
       "index": 24,
@@ -891,7 +891,7 @@
         0.0002
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -899,7 +899,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD: PA-tuned params, epochs scaled x10"
+      "notes": "TranAD: PA-tuned params"
     },
     {
       "index": 25,
@@ -932,7 +932,7 @@
         0.0001
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         0.001
@@ -940,7 +940,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD_Adversarial: PA-tuned params, epochs scaled x10"
+      "notes": "TranAD_Adversarial: PA-tuned params"
     },
     {
       "index": 26,
@@ -973,7 +973,7 @@
         0.0001
       ],
       "q": [
-        0.001
+        1e-05
       ],
       "weight_decay": [
         1e-05
@@ -981,7 +981,7 @@
       "epochs": [
         30
       ],
-      "notes": "TranAD_Basic: PA-tuned params, epochs scaled x10"
+      "notes": "TranAD_Basic: PA-tuned params"
     },
     {
       "index": 27,
@@ -1022,7 +1022,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD_SelfConditioning: PA-tuned params, epochs scaled x10"
+      "notes": "TranAD_SelfConditioning: PA-tuned params"
     },
     {
       "index": 28,
@@ -1060,7 +1060,7 @@
       "epochs": [
         10
       ],
-      "notes": "TranAD_Transformer: PA-tuned params, epochs scaled x10"
+      "notes": "TranAD_Transformer: PA-tuned params"
     }
   ]
 }
