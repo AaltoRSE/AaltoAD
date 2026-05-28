@@ -450,6 +450,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
 	labels_df = pd.DataFrame({
 		'timestamp': timestamps,
+		'prediction_error': lossFinal,
 		'ground_truth': labelsFinal,
 		'pot_label': pot_pred,
 		'pot_expanded_label': pot_expanded_pred,
