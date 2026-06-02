@@ -345,7 +345,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
+		_merlin_start = time()
 		res = merlin.run_merlin(test_loader, labels, dataset_name)
+		res['eval_time'] = float(time() - _merlin_start)
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
 	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams, hp_hash = load_model(
@@ -388,10 +390,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	feats = testO.shape[1]
 	start = time()
 	with torch.no_grad():
+		_eval_start = time()
 		loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
+		eval_time = float(time() - _eval_start)
 		lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
 		lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
 	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
+	print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
 
 	### Plot curves
 	if plot:
@@ -445,6 +450,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	}
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
+	result['eval_time'] = eval_time
 
 	# Write labels with timestamps to a csv
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
