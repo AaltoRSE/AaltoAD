@@ -5,7 +5,7 @@ import argparse
 from TranAD.constants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
 
 # dataset-specific implementations live under TranAD.preprocessing
-datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL', 'SWaT_physical', 'SWaT_netflow', 'SWaT_payload_netflow']
+datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL', 'SWaT_physical', 'SWaT_netflow', 'SWaT_payload_netflow', 'nettraffic']
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
@@ -76,6 +76,12 @@ def load_data(dataset, csv_groups=None, output_folder=DEFAULT_OUTPUT_FOLDER, dat
 			folder, csv_groups=groups_arg, data_folder=data_folder,
 			top_k=top_k,
 			extended_features=extended_features,
+		)
+	elif dataset.startswith('nettraffic'):
+		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
+		TranAD.preprocessing.load_nettraffic(
+			folder, csv_groups=groups_arg, data_folder=data_folder,
+			top_k=top_k,
 		)
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
