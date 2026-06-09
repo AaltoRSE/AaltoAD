@@ -32,11 +32,14 @@ def _load_and_prepare(csv_path, interval = 1):
     src_col, dst_col = _detect_ip_columns(df)
     bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
     src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
-    temperature_col = _detect_column(df, ['temperature', 'temp'])
     df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
     df['interval'] = (df['ts_sec'] // interval) * interval
     df = df.dropna(subset=['interval'])
     df['interval'] = df['interval'].astype(int)
+    temperature_col = _detect_column(df, ['temperature', 'temp'])
+    if 'has_temp' in df.columns:
+        has_temp_mask = df['has_temp'].astype(bool)
+        df.loc[~has_temp_mask, temperature_col] = np.nan
     return {
 		'path': csv_path, 'df': df,
 		'src_col': src_col, 'dst_col': dst_col,
