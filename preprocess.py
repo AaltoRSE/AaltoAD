@@ -86,7 +86,8 @@ def load_data(
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
 		TranAD.preprocessing.load_nettraffic(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
-			top_k=top_k, interval=interval,
+			top_k=top_k, interval=interval, port_entropy=args.port_entropy,
+			bytes=args.bytes, temperature=args.temperature,
 		)
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
@@ -144,6 +145,9 @@ if __name__ == '__main__':
 	parser.add_argument('--top-k', type=int, default=100, help='[TOL] Keep the top-k most frequent IPs from baseline; the rest collapse into other_internal/other_external (default: 100)')
 	parser.add_argument('--interval', type=int, default=10, help='Number of seconds to aggregate to one row of data in nettraffic data.')
 	parser.add_argument('--extended-features', action='store_true', help='[TOL] Include bytes/ports/entropy features in addition to src/dst counts')
+	parser.add_argument('--port-entropy', action='store_true', help='[nettraffic] Include port entropy features', default=False)
+	parser.add_argument('--bytes', action='store_true', help='[nettraffic] Include byte count features', default=False)
+	parser.add_argument('--temperature', action='store_true', help='[nettraffic] Include temperature features', default=False)
 	args = parser.parse_args()
 	csv_groups = getattr(args, 'csv_groups', None)
 

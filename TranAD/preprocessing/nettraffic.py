@@ -33,10 +33,13 @@ def _load_and_prepare(csv_path, interval = 1):
     bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
     src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
     df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
-    df['interval'] = (df['ts_sec'] // interval) * interval
+    df['interval'] = (df['ts_sec'] // interval)
     df = df.dropna(subset=['interval'])
     df['interval'] = df['interval'].astype(int)
+    df.drop(columns=['ts_sec'], inplace=True)
+    df.drop(columns=[timestamp_col], inplace=True)
     temperature_col = _detect_column(df, ['temperature', 'temp'])
+    print(f"  Detected columns in {csv_path}: timestamp='{timestamp_col}', src_ip='{src_col}', dst_ip='{dst_col}', bytes='{bytes_col}', src_port='{src_port_col}', temp='{temperature_col}'")
     if 'has_temp' in df.columns:
         has_temp_mask = df['has_temp'].astype(bool)
         df.loc[~has_temp_mask, temperature_col] = np.nan
@@ -48,9 +51,11 @@ def _load_and_prepare(csv_path, interval = 1):
 	}
 
 
-def _canonical_columns(top_ips, has_bytes, has_ports, has_temp):
+def _canonical_columns(top_ips, has_bytes, has_ports, has_temp, include_other):
 	"""Build the canonical column list shared across all CSVs in a combined dataset."""
-	ip_keys = sorted(top_ips) + ['other_internal', 'other_external']
+	ip_keys = sorted(top_ips)
+	if include_other:
+		ip_keys += ['other_internal', 'other_external']
 	cols = []
 	# Outgoing block (per-IP num_dsts + extended)
 	for ip in ip_keys:
@@ -74,16 +79,19 @@ def _canonical_columns(top_ips, has_bytes, has_ports, has_temp):
 	if has_bytes:
 		for ip in ip_keys:
 			cols.append(f'{ip}_bytes_in')
-	# Derived
-	for ip in ip_keys:
-		cols.append(f'{ip}_rw_ratio')
+		# Derived
+		for ip in ip_keys:
+			cols.append(f'{ip}_rw_ratio')
 	# Global
 	cols.append('rows_per_interval')
 	cols.append('empty_rows')
 	return cols
 
 
-def _aggregate_to_features(parsed, top_ips, internal_prefix):
+def _aggregate_to_features(
+        parsed, top_ips, internal_prefix,
+        port_entropy=False, bytes=False, temperature=False
+    ):
     """Aggregate one parsed CSV into per second features dataframe.
     
     Uses the supplied 'top_ips' and 'internal_prefix' to map the columm
@@ -95,6 +103,8 @@ def _aggregate_to_features(parsed, top_ips, internal_prefix):
     bytes_col, port_col, temp_col = parsed['bytes_col'], parsed['port_col'], parsed['temp_col']
 
     def _classify_ip(ip):
+        if internal_prefix is None:
+            return str(ip).strip()
         ip_str = str(ip).strip()
         if ip_str in top_ips:
             return ip_str
@@ -115,17 +125,18 @@ def _aggregate_to_features(parsed, top_ips, internal_prefix):
     out_grp = df.groupby(['interval', src_col])
     out_agg = pd.DataFrame({'num_dsts': out_grp[dst_col].nunique()})
     out_agg['out_count'] = out_grp.size()
-    if bytes_col:
-        out_agg['out_count'] = out_grp[bytes_col].sum()
-    if port_col:
+    if bytes and bytes_col:
+        out_agg['bytes_out'] = out_grp[bytes_col].sum()
+    if port_entropy and port_col:
         out_agg['port_entropy'] = out_grp[port_col].apply(_shannon_entropy)
-    if temp_col:
+    if temperature and temp_col:
         out_agg['mean_temp'] = out_grp[temp_col].mean()
 
-    if_grp = df.groupby(['interval', dst_col])
-    in_agg = pd.DataFrame({'num_srcs': if_grp[src_col].nunique()})
+    in_grp = df.groupby(['interval', dst_col])
+    in_agg = pd.DataFrame({'num_srcs': in_grp[src_col].nunique()})
+    in_agg['in_count'] = in_grp.size()
     if bytes_col:
-        in_agg['bytes_in'] = if_grp[bytes_col].sum()
+        in_agg['bytes_in'] = in_grp[bytes_col].sum()
 
     out_wide = out_agg.unstack(fill_value=0)
     out_wide.columns = [f'{ip}_{metric}' for metric, ip in out_wide.columns]
@@ -146,7 +157,11 @@ def _aggregate_to_features(parsed, top_ips, internal_prefix):
     )
     features_df.index.name = 'interval'
 
-    for ip in list(top_ips) + ['other_internal', 'other_external']:
+    feature_list = list(top_ips)
+    if internal_prefix is not None:
+        feature_list += ['other_internal', 'other_external']
+
+    for ip in feature_list:
         b_in_col = f'{ip}_bytes_in'
         b_out_col = f'{ip}_bytes_out'
         if b_in_col in features_df.columns and b_out_col in features_df.columns:
@@ -157,7 +172,8 @@ def _aggregate_to_features(parsed, top_ips, internal_prefix):
 
 def load_nettraffic(
     folder, csv_groups=None, csv_path=None, segments=None,
-    data_folder=DEFAULT_DATA_FOLDER, top_k=10, interval=1
+    data_folder=DEFAULT_DATA_FOLDER, top_k=10, interval=1,
+    bytes=False, port_entropy=False, temperature=False
 ):
     """ Load and preprocess one or more CSV files containing network
     traffic data and temperature readings.
@@ -210,7 +226,7 @@ def load_nettraffic(
         for path in paths:
             parsed = _load_and_prepare(path, interval=interval)
             parsed_records.append((parsed, segs))
-            mask = _baseline_mask(parsed['df'], segs)
+            mask = _baseline_mask(parsed['df'], segs, interval_col='interval')
             if mask.any():
                 all_baseline_ips.append(parsed['df'].loc[mask, parsed['src_col']].dropna().astype(str).str.strip())
                 all_baseline_ips.append(parsed['df'].loc[mask, parsed['dst_col']].dropna().astype(str).str.strip())
@@ -221,31 +237,41 @@ def load_nettraffic(
     all_ips_concat = pd.concat(all_baseline_ips)
     all_ips_concat = all_ips_concat[all_ips_concat != '']
     counts = all_ips_concat.value_counts()
-    
     if counts.empty:
         raise ValueError('No valid IP addresses found in train segments across any CSV')
     
     most_common_ips = counts.idxmax()
-    internal_prefix = most_common_ips.split('.')[0]
     top_ips = set(counts.head(top_k).index)
-    total_baseline_rows = sum(len(s) for s in all_baseline_ips) // 2  # we appended src + dst
 
+    if len(top_ips) < top_k:
+        print("Using all IPs from baseline since unique IP count is less than top_k")
+        internal_prefix = None
+        use_all_ips = True
+    else:
+        internal_prefix = most_common_ips.split('.')[0]
+        use_all_ips = False
+
+    total_baseline_rows = sum(len(s) for s in all_baseline_ips) // 2  # we appended src + dst
     print(f'TOL: unique IPs across all baselines: {len(counts)} '
 	      f'(total baseline rows aggregated: {total_baseline_rows})')
-    print(f'TOL: most common IP {most_common_ips} => internal prefix {internal_prefix}')
-    print(f'TOL: selecting top_{top_k} IPs from combined baseline (keeps {len(top_ips)})')
+    if not use_all_ips:
+        print(f'TOL: most common IP {most_common_ips} => internal prefix {internal_prefix}')
+        print(f'TOL: selecting top_{top_k} IPs from combined baseline (keeps {len(top_ips)})')
 
     # Determine canonical column names.
-    has_bytes = any('framelen' in parsed['df'].columns for parsed, _ in parsed_records)
-    has_temp = any('temperature' in parsed['df'].columns for parsed, _ in parsed_records)
-    has_ports = any('src_port' in parsed['df'].columns and 'dst_port' in parsed['df'].columns for parsed, _ in parsed_records)
-    canonical_cols = _canonical_columns(top_ips, has_bytes, has_ports, has_temp)
+    has_bytes = bytes and any('framelen' in parsed['df'].columns for parsed, _ in parsed_records)
+    has_temp = temperature and any('temperature' in parsed['df'].columns for parsed, _ in parsed_records)
+    has_ports = port_entropy and any('src_port' in parsed['df'].columns and 'dst_port' in parsed['df'].columns for parsed, _ in parsed_records)
+    canonical_cols = _canonical_columns(top_ips, has_bytes, has_ports, has_temp, not use_all_ips)
 
     # Aggregate each csv reindex to canonical columns, slice and accumulate
     partitions = {'train': [], 'calib': [], 'test': [], 'valid': []}
     label_seqs = {'train': [], 'calib': [], 'test': [], 'valid': []}
     for parsed, segs in parsed_records:
-        features_df = _aggregate_to_features(parsed, top_ips, internal_prefix)
+        features_df = _aggregate_to_features(
+            parsed, top_ips, internal_prefix,
+            port_entropy=port_entropy, bytes=bytes, temperature=temperature
+        )
         print(f"  CSV {parsed['path']} aggregated to {features_df.shape[0]} intervals")
 
         features_df = features_df.reindex(columns=canonical_cols, fill_value=0)
@@ -264,10 +290,10 @@ def load_nettraffic(
             label_seqs[partition].append((seconds, anomalous))
             offset += seconds
     
-    # Concatenate per partition. Missing partitions before zero-rowa arrays
-    n_heat = len(canonical_cols)
+    # Concatenate per partition.
+    n_feat = len(canonical_cols)
     def _stack(parts):
-        return np.concatenate(parts, axis=0) if parts else np.empty((0, n_heat))
+        return np.concatenate(parts, axis=0) if parts else np.empty((0, n_feat))
     train = _stack(partitions['train'])
     calib = _stack(partitions['calib'])
     test = _stack(partitions['test'])
