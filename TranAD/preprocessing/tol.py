@@ -48,8 +48,8 @@ def parse_timestamp_column(series):
 		dt = pd.to_datetime(series, errors='coerce')
 		if dt.isna().all():
 			raise ValueError('Unable to parse timestamps from column')
-		# convert ns -> seconds integer
 		numeric_seconds = pd.Series((dt.view('int64') // 1_000_000_000), index=dt.index).astype('Int64')
+	print(f"TT Timestamp parsed: original='{first}' -> parsed={numeric_seconds.iloc[0]}")
 	return numeric_seconds
 
 
@@ -214,9 +214,9 @@ def _load_and_prepare(csv_path):
 	}
 
 
-def _baseline_mask(df, segments):
+def _baseline_mask(df, segments, interval_col = 'ts_sec'):
 	"""Mask selecting rows whose ts_sec falls in any train segment of the segment list."""
-	ts_min = df['ts_sec'].min()
+	ts_min = df[interval_col].min()
 	ranges = []
 	offset = 0
 	for partition, _, seconds in segments:
@@ -229,7 +229,7 @@ def _baseline_mask(df, segments):
 		return pd.Series(False, index=df.index)
 	mask = pd.Series(False, index=df.index)
 	for lo, hi in ranges:
-		mask |= (df['ts_sec'] >= lo) & (df['ts_sec'] < hi)
+		mask |= (df[interval_col] >= lo) & (df[interval_col] < hi)
 	return mask
 
 
