@@ -199,7 +199,7 @@ def _detect_ip_columns(df):
 
 def _load_and_prepare(csv_path):
 	"""Read CSV, detect needed columns, parse timestamps. Returns a parsed-CSV record."""
-	df = pd.read_csv(csv_path)
+	df = pd.read_csv(csv_path, on_bad_lines='warn')
 	timestamp_col = find_timestamp_column(df)
 	src_col, dst_col = _detect_ip_columns(df)
 	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])

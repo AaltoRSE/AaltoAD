@@ -27,7 +27,7 @@ DEFAULT_SEGMENTS = [
 
 def _load_and_prepare(csv_path, interval = 1):
     """Read CSV, detect needed columns, parse timestamps. Returns a     parsed-CSV record."""
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path, on_bad_lines='warn')
     timestamp_col = find_timestamp_column(df)
     src_col, dst_col = _detect_ip_columns(df)
     bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
@@ -243,11 +243,15 @@ def load_nettraffic(
     label_seqs = {'train': [], 'calib': [], 'test': [], 'valid': []}
     for parsed, segs in parsed_records:
         features_df = _aggregate_to_features(parsed, top_ips, internal_prefix)
+        print(f"  CSV {parsed['path']} aggregated to {features_df.shape[0]} intervals")
+
         features_df = features_df.reindex(columns=canonical_cols, fill_value=0)
         features = features_df.values.astype(float)
-        total_needed = sum(s[2] for s in segs)
+        total_needed = sum(s[2] for s in segs[:-1])
         if features.shape[0] < total_needed:
             raise ValueError(f"CSV {parsed['path']}: segments require {total_needed} rows but only {features.shape[0]} available after aggregation")
+        if features.shape[0] < total_needed + segs[-1][2]:
+            print(f"  Warning: CSV {parsed['path']} has fewer rows than total segments. Last segment will be truncated to fit available data.")
         offset = 0
         for partition, anomalous, seconds in segs:
             if partition == 'skip':
@@ -287,7 +291,6 @@ def load_nettraffic(
 
     labels = _build_labels(test, 'test')
     valid_labels = _build_labels(valid, 'valid')
-    n_feat_lbl = max(labels.shape[1] if labels.size else 1,1)
     print("   Anomaly lables: {int(labels.sum() / n_feat_lbl) if labels.size else 0}/{labels.shape[0]} test rows, "
 	      f"{int(valid_labels.sum() / n_feat_lbl) if valid_labels.size else 0}/{valid_labels.shape[0]} valid rows")
     print(f'  Feature columns ({len(canonical_cols)}): {canonical_cols}')
