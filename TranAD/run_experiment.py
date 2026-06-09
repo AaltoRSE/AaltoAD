@@ -320,6 +320,15 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		test (bool): Test mode (skip training)
 		retrain (bool): Force retrain
 
+	Reads multiple dataset splits from the dataset folder,
+	    train.npy: training data used to determine model weights and internal parameters
+		calib.npy: used to determine baseline prediction error and to calibrate the
+		           POT threshold. If not available, training data is used for POT, and
+				   worse performance can be expected.
+		test.npy:  test data containing anomalies, used to evaluate the model's 
+		           predictions and compute metrics
+		labels.npy: binary labels for test data (0 for normal, 1 for anomaly)
+
 	Returns:
 		dict: result dictionary produced at the end of the experiment.
 	"""
@@ -329,18 +338,15 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	preds = []
 	train_loader, test_loader, labels, calib_loader = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
+	## Prepare data
 	trainD = next(iter(train_loader))
 	trainO = trainD
-	# Calibration data for POT: use a real held-out calib partition if the
-	# preprocessor wrote one (calib.npy), otherwise fall back to the training
-	# data itself. The old "last 20% of train" split is gone — it didn't
-	# represent test-time normal behavior any better than train itself.
 	if calib_loader is not None:
 		calibD = next(iter(calib_loader))
-		print(f'Using held-out calib partition: shape={tuple(calibD.shape)}')
+		calibO = calibD
 	else:
-		calibD = trainD
-	calibO = calibD
+		calibD = None
+		calibO = calibD
 	
 
 	if model_name in ['MERLIN']:
@@ -355,12 +361,14 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
-	## Prepare data
 	testD = next(iter(test_loader))
 	testO = testD
 	if hasattr(model, 'n_window'):
-		trainD, testD = utils.convert_to_windows(trainD, model), utils.convert_to_windows(testD, model)
-		calibD = utils.convert_to_windows(calibD, model)
+		trainD = utils.convert_to_windows(trainD, model)
+		testD = utils.convert_to_windows(testD, model)
+		if calibD is not None:
+			calibD = utils.convert_to_windows(calibD, model)
+
 
 	### Training phase
 	if not test:
@@ -384,6 +392,17 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		if plot:
 			utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
 
+	### Find calibration error
+	if calibD is not None:
+		print(f'Calculating prediction error on calibration set')
+		with torch.no_grad():
+			feats = calibO.shape[1]
+			lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
+			lossCfinal = np.mean(lossC, axis=1)
+	else:
+		lossC = None
+		lossCfinal = None
+
 	### Testing phase
 	model.eval()
 	print(f'{utils.color.HEADER}Testing {model_name} on {utils.color.ENDC}')
@@ -394,7 +413,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
 		eval_time = float(time() - _eval_start)
 		lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
-		lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
 	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 	print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
 
@@ -406,7 +424,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	### Scores
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
-	lossCfinal = np.mean(lossC, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
 
 	# Sanity checks: are inputs and predictions actually in the range we expect?
@@ -415,9 +432,10 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	print(f'trainD range: min={_trainD_arr.min():.4g} max={_trainD_arr.max():.4g} '
 	      f'<0: {(_trainD_arr < 0).sum()}/{_trainD_arr.size} '
 	      f'>1: {(_trainD_arr > 1).sum()}/{_trainD_arr.size}')
-	print(f'calibD range: min={float(lossC.min()):.4g} max={float(lossC.max()):.4g}'
-	   	  f'<0: {(lossC < 0).sum()}/{lossC.size} '
-		  f'>1: {(lossC > 1).sum()}/{lossC.size}')
+	if calibD is not None:
+		print(f'calibD range: min={float(lossC.min()):.4g} max={float(lossC.max()):.4g}'
+	   		  f'<0: {(lossC < 0).sum()}/{lossC.size} '
+			  f'>1: {(lossC > 1).sum()}/{lossC.size}')
 	print(f'testD  range: min={_testD_arr.min():.4g} max={_testD_arr.max():.4g} '
 	      f'<0: {(_testD_arr < 0).sum()}/{_testD_arr.size} '
 	      f'>1: {(_testD_arr > 1).sum()}/{_testD_arr.size}')
@@ -429,7 +447,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	loss_test_attack = lossFinal[labelsFinal == 1]
 
 	loss_stats('train loss (mean over feats)', lossTfinal)
-	loss_stats('calib  loss (mean over feats)', lossCfinal)
+	if calibD is not None:
+		loss_stats('calib  loss (mean over feats)', lossCfinal)
 	loss_stats('test  loss | label=0 (normal)', loss_test_normal)
 	if loss_test_attack.size:
 		loss_stats('test  loss | label=1 (attack)', loss_test_attack)
@@ -439,8 +458,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	oracle, oracle_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=False)
 
 	q = applied_hyperparams.get('q', 1e-5)
-	pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
-	pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
+	if calibD is not None:
+		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
+		pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
+	else:
+		print(f"{utils.color.YELLOW}Warning: no calibration set found, using training data for POT thresholding. POT performance may be worse than expected.{utils.color.ENDC}")
+		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
+		pot_result, pot_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 
 	result = {
 		'pot': pot_result,
@@ -448,6 +472,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		'oracle': oracle,
 		'oracle_expanded': oracle_expanded,
 	}
+	if calibD is not None:
+		result['calibration_loss'] = float(lossCfinal.mean())
+
 	result.update(diagnosis.hit_att(loss, labels))
 	result.update(diagnosis.ndcg(loss, labels))
 	result['eval_time'] = eval_time

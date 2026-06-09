@@ -199,7 +199,7 @@ def _detect_ip_columns(df):
 
 def _load_and_prepare(csv_path):
 	"""Read CSV, detect needed columns, parse timestamps. Returns a parsed-CSV record."""
-	df = pd.read_csv(csv_path)
+	df = pd.read_csv(csv_path, on_bad_lines='warn')
 	timestamp_col = find_timestamp_column(df)
 	src_col, dst_col = _detect_ip_columns(df)
 	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
@@ -393,7 +393,6 @@ def load_TOL(folder, csv_groups=None, csv_path=None, segments=None,
 			mask = _baseline_mask(parsed['df'], segs)
 			if mask.any():
 				all_baseline_ips.append(parsed['df'].loc[mask, parsed['src_col']].dropna().astype(str).str.strip())
-				all_baseline_ips.append(parsed['df'].loc[mask, parsed['dst_col']].dropna().astype(str).str.strip())
 
 	if not all_baseline_ips:
 		raise ValueError('No train segments found across any CSV — cannot determine baseline IP set')

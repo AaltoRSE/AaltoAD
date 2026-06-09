@@ -474,24 +474,35 @@ def _generate_svg_prediction_errors(dataset, output_path, results_folder='result
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def generate_report(dataset, metric='f1', results_folder='results'):
-    """Generate HTML, PDF, CSV, and hyperparameter-markdown reports for a dataset."""
-    by_model = _load_results(dataset, results_folder)
-    if not by_model:
-        print(f'No results found for dataset "{dataset}" in {results_folder}/')
-        return
+def generate_report(dataset, metric='calibration_loss', results_folder='results'):
+	"""Generate HTML, PDF, CSV, and hyperparameter-markdown reports for a dataset.
+	
+	For TOL datasets (e.g., 'TOL_1_1', 'TOL_2_1_1'), files are saved in reports/TOL/{dataset}/.
+	For other datasets, files are saved in reports/{dataset}/.
+	"""
+	by_model = _load_results(dataset, results_folder)
+	if not by_model:
+		print(f'No results found for dataset "{dataset}" in {results_folder}/')
+		return
 
-    os.makedirs('reports', exist_ok=True)
-    html_path = os.path.join('reports', f'{dataset}_report.html')
-    pdf_path = os.path.join('reports', f'{dataset}_report.pdf')
-    csv_path = os.path.join('reports', f'{dataset}_summary.csv')
-    hp_path = os.path.join('reports', f'{dataset}_hyperparams.md')
-    tex_path = os.path.join('reports', f'{dataset}_summary.tex')
-    svg_path = os.path.join('reports', f'{dataset}_prediction_errors.svg')
+	# For TOL experiments, nest in reports/TOL/{experiment_id}/
+	if dataset.startswith('TOL_'):
+		dataset_dir = os.path.join('reports', 'TOL', dataset)
+	else:
+		dataset_dir = os.path.join('reports', dataset)
+	
+	os.makedirs(dataset_dir, exist_ok=True)
+	html_path = os.path.join(dataset_dir, f'report.html')
+	pdf_path = os.path.join(dataset_dir, f'report.pdf')
+	csv_path = os.path.join(dataset_dir, f'summary.csv')
+	hp_path = os.path.join(dataset_dir, f'hyperparams.md')
+	tex_path = os.path.join(dataset_dir, f'summary.tex')
+	svg_path = os.path.join(dataset_dir, f'prediction_errors.svg')
 
-    _generate_html(dataset, metric, by_model, html_path)
-    _generate_pdf(dataset, metric, by_model, pdf_path)
-    _generate_csv(dataset, metric, by_model, csv_path)
-    _generate_hp_markdown(dataset, metric, by_model, hp_path)
-    _generate_latex(dataset, metric, by_model, tex_path)
-    _generate_svg_prediction_errors(dataset, svg_path, results_folder=results_folder)
+	_generate_html(dataset, metric, by_model, html_path)
+	_generate_pdf(dataset, metric, by_model, pdf_path)
+	_generate_csv(dataset, metric, by_model, csv_path)
+	_generate_hp_markdown(dataset, metric, by_model, hp_path)
+	_generate_latex(dataset, metric, by_model, tex_path)
+	_generate_svg_prediction_errors(dataset, svg_path, results_folder=results_folder)
+
