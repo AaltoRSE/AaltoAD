@@ -277,11 +277,11 @@ def load_nettraffic(
          raise ValueError('Training partition is empty after split. Cannot normalize.')
     train, min_a, max_a = normalize(train)
     if calib.size > 0:
-        calib = normalize(calib, min_a, max_a)
+        calib, _, _ = normalize(calib, min_a, max_a)
     if test.size > 0:
-         test = normalize(test, min_a, max_a)
+         test, _, _ = normalize(test, min_a, max_a)
     if valid.size > 0:
-        valid = normalize(valid, min_a, max_a)
+        valid, _, _ = normalize(valid, min_a, max_a)
     
     def _build_labels(arr, name):
         out = np.zeros_like(arr)
