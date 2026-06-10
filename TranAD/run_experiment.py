@@ -407,9 +407,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 			# test metrics
 			lossFinal = np.mean(loss, axis=1)
-			labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
-			loss_test_normal = lossFinal[labelsFinal == 0]
-			loss_test_attack = lossFinal[labelsFinal == 1]
 			eval_time = float(time() - _eval_start)
 			print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
 			if plot:
@@ -426,35 +423,46 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			lossCfinal = np.mean(lossC, axis=1)
 
 		print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
+	
+	if labels is not None:
+		labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
 
 	if trainD is not None:
 		loss_stats('train loss (mean over feats)', lossTfinal)
 	if calibD is not None:
 		loss_stats('calib  loss (mean over feats)', lossCfinal)
 	if testD is not None:
-		loss_stats('test  loss | label=0 (normal)', loss_test_normal)
 		loss_stats('test  loss (mean over feats)', lossFinal)
-	if testD is not None and loss_test_attack.size:
-		loss_stats('test  loss | label=1 (attack)', loss_test_attack)
 
-	if lossFinal is not None and labelsFinal is not None:
+	if testD is not None and labels is not None:
 		oracle_expanded, oracle_expanded_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=True)
 		oracle, oracle_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=False)
 		result['oracle'] = oracle
 		result['oracle_expanded'] = oracle_expanded
 
 	q = applied_hyperparams.get('q', 1e-5)
-	if calibD is not None and testD is not None:
+	if calibD and testD and labels:
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 		result['pot'] = pot_result
 		result['pot_expanded'] = pot_expanded_result
-	elif trainD is not None and testD is not None:
+	elif trainD and testD and labels:
 		print(f"Warning: no calibration set found, using training data for POT thresholding.")
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 		result['pot'] = pot_result
 		result['pot_expanded'] = pot_expanded_result
+	elif calibD and testD:
+		# We have calibration data for thresholding but no test labels
+		# Calculate pot threshold from calibration data and apply it to test data, but can't compute metrics
+		labels = np.zeros_like(lossCfinal) 
+		pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q)
+		if testD is not None:
+			result['pot'] = {
+				'threshold': pot_result['threshold'],
+				'anomalies': pot_pred.sum(),
+			}
+
 
 	if calibD is not None:
 		result['calibration_loss'] = float(lossCfinal.mean())
