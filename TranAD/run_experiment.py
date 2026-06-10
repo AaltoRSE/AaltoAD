@@ -336,37 +336,40 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		model_name_full = f'{model_name}_{dataset_name}'
 
 	preds = []
-	train_loader, test_loader, labels, calib_loader = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+	trainD, testD, labels, calibD = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
 	## Prepare data
-	if train_loader:
-		trainD = next(iter(train_loader))
-	else:
-		trainD = None
-	
-	if calib_loader:
-		calibD = next(iter(calib_loader))
-	else:
-		calibD = None
+	n_features = 0
+	data_metadata = {'dataset': dataset_name}
+	if trainD is not None:
+		data_metadata['train_shape'] = list(trainD.shape)
+		n_features = trainD.shape[1]
+	if calibD is not None:
+		data_metadata['calib_shape'] = list(calibD.shape)
+		n_features = calibD.shape[1]
+	if testD is not None:
+		data_metadata['test_shape'] = list(testD.shape)
+		n_features = testD.shape[1]
+	if labels is not None:
+		data_metadata['labels_shape'] = list(labels.shape)
+		n_features = labels.shape[1]
+
+	data_metadata['num_features'] = int(n_features)
 
 
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
 		_merlin_start = time()
-		res = merlin.run_merlin(test_loader, labels, dataset_name)
+		res = merlin.run_merlin(testD, labels, dataset_name)
 		res['eval_time'] = float(time() - _merlin_start)
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
+
 	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams, hp_hash = load_model(
-		model_name, labels.shape[1], dataset_name,
+		model_name, n_features, dataset_name,
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
-	if test_loader:
-		testD = next(iter(test_loader))
-	else:
-		testD = None
-	
 	if hasattr(model, 'n_window'):
 		if trainD is not None:
 			trainD = utils.convert_to_windows(trainD, model)
@@ -375,6 +378,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		if calibD is not None:
 			calibD = utils.convert_to_windows(calibD, model)
 
+
 	### Training phase
 	if not test and trainD is not None:
 		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
@@ -382,17 +386,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		e = epoch + 1
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
-			feats = trainD.shape[1]
-			lossT, lr = model.train_step(e, trainD, optimizer, scheduler, feats)
+			lossT, lr = model.train_step(e, trainD, optimizer, scheduler, n_features)
 			accuracy_list.append((lossT, lr))
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
-		data_metadata = {
-			'dataset': dataset_name,
-			'train_shape': list(trainD.shape),
-			'test_shape': list(testD.shape),
-			'labels_shape': list(labels.shape),
-			'num_features': int(trainD.shape[1]),
-		}
 		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name, hyperparams=applied_hyperparams, metadata=data_metadata)
 		if plot:
 			utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
@@ -406,9 +402,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	with torch.no_grad():
 		start = time()
 		if testD is not None:
-			feats = testD.shape[1]
 			_eval_start = time()
-			loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
+			loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, n_features)
 
 			# test metrics
 			lossFinal = np.mean(loss, axis=1)
@@ -423,13 +418,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 				plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)
 
 		if trainD is not None:
-			feats = trainD.shape[1]
-			lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
+			lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, n_features)
 			lossTfinal = np.mean(lossT, axis=1)
 
 		if calibD is not None:
-			feats = calibD.shape[1]
-			lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
+			lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, n_features)
 			lossCfinal = np.mean(lossC, axis=1)
 
 		print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)

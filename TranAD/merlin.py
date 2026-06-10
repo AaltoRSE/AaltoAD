@@ -133,7 +133,7 @@ def get_result(pred, labels):
 	return result
 
 def run_merlin(test, labels, dset):
-	t = next(iter(test)).detach().numpy(); labelsAll = labels
+	t = test.detach().numpy(); labelsAll = labels
 	labels = (np.sum(labels, axis=1) >= 1) + 0
 	lsum = np.sum(labels)
 	start = time()
