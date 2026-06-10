@@ -339,13 +339,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	train_loader, test_loader, labels, calib_loader = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
 	## Prepare data
+	n_features = 0
 	if train_loader:
 		trainD = next(iter(train_loader))
+		n_features = trainD.shape[1]
 	else:
 		trainD = None
 	
 	if calib_loader:
 		calibD = next(iter(calib_loader))
+		n_features = calibD.shape[1]
 	else:
 		calibD = None
 
@@ -357,8 +360,9 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		res['eval_time'] = float(time() - _merlin_start)
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
+
 	model, optimizer, scheduler, epoch, accuracy_list, applied_hyperparams, hp_hash = load_model(
-		model_name, labels.shape[1], dataset_name,
+		model_name, n_features, dataset_name,
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
