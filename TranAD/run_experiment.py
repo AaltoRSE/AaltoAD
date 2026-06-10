@@ -349,8 +349,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	else:
 		calibD = None
 
-	trainO = trainD
-	calibO = calibD
 
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
@@ -368,7 +366,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		testD = next(iter(test_loader))
 	else:
 		testD = None
-	testO = testD
 	
 	if hasattr(model, 'n_window'):
 		if trainD is not None:
@@ -385,16 +382,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		e = epoch + 1
 		start = time()
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
-			feats = trainO.shape[1]
+			feats = trainD.shape[1]
 			lossT, lr = model.train_step(e, trainD, optimizer, scheduler, feats)
 			accuracy_list.append((lossT, lr))
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 		data_metadata = {
 			'dataset': dataset_name,
-			'train_shape': list(trainO.shape),
-			'test_shape': list(testO.shape),
+			'train_shape': list(trainD.shape),
+			'test_shape': list(testD.shape),
 			'labels_shape': list(labels.shape),
-			'num_features': int(trainO.shape[1]),
+			'num_features': int(trainD.shape[1]),
 		}
 		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name, hyperparams=applied_hyperparams, metadata=data_metadata)
 		if plot:
@@ -422,7 +419,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
 			if plot:
 				if 'TranAD' in model.name:
-					testO = torch.roll(testO, 1, 0)
+					testO = torch.roll(testD, 1, 0)
 				plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)
 
 		if trainD is not None:

@@ -154,17 +154,13 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 		if not os.path.exists(filepath):
 			loader.append(None)
 		else:
-			loader.append(np.load(filepath))
+			mat = np.load(filepath)
+			if file == 'labels':
+				loader.append(mat)
+			else:
+				loader.append(DataLoader(mat, batch_size=mat.shape[0]))
 
-	if less:
-		loader[0] = cut_array(0.2, loader[0])
-
-	train_loader = DataLoader(loader[0], batch_size=loader[0].shape[0]) if loader[0] is not None else None
-	test_loader = DataLoader(loader[1], batch_size=loader[1].shape[0]) if loader[1] is not None else None
-	labels = loader[2] 
-	calib_loader = DataLoader(loader[3], batch_size=loader[3].shape[0]) if loader[3] is not None else None
-
-	return train_loader, test_loader, labels, calib_loader
+	return loader[0], loader[1], loader[2], loader[3]
 
 def load_timestamps(dataset: str, output_folder: str = 'processed') -> np.ndarray:
 	"""Load timestamps for a given dataset.
