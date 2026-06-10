@@ -335,7 +335,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	if model_name_full is None:
 		model_name_full = f'{model_name}_{dataset_name}'
 
-	preds = []
 	trainD, testD, labels, calibD = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
 	## Prepare data
@@ -463,7 +462,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 				'anomalies': pot_pred.sum(),
 			}
 
-
 	if calibD is not None:
 		result['calibration_loss'] = float(lossCfinal.mean())
 
@@ -481,11 +479,12 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		labels_df['ground_truth'] = labelsFinal
 	if lossFinal is not None:
 		labels_df['prediction_error'] = lossFinal
-	if lossFinal is not None and labelsFinal is not None:
+	if lossFinal is not None:
 		labels_df['pot_label'] = pot_pred
-		labels_df['pot_expanded_label'] = pot_expanded_pred
-		labels_df['oracle_label'] = oracle_pred
-		labels_df['oracle_expanded_label'] = oracle_expanded_pred
+		if labelsFinal is not None:
+			labels_df['pot_expanded_label'] = pot_expanded_pred
+			labels_df['oracle_label'] = oracle_pred
+			labels_df['oracle_expanded_label'] = oracle_expanded_pred
 	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_exp{experiment_id}_labels.csv')
 	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)
 	labels_df.to_csv(labels_csv_path, index=False)
