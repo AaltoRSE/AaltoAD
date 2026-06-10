@@ -350,7 +350,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	if testD is not None:
 		data_metadata['test_shape'] = list(testD.shape)
 		n_features = testD.shape[1]
-	if labels is not None:
+	if labels is not None and labels.sum() > 0:
 		data_metadata['labels_shape'] = list(labels.shape)
 		n_features = labels.shape[1]
 
