@@ -440,18 +440,18 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		result['oracle_expanded'] = oracle_expanded
 
 	q = applied_hyperparams.get('q', 1e-5)
-	if calibD and testD and labels:
+	if calibD is not None and testD is not None and labels is not None:
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 		result['pot'] = pot_result
 		result['pot_expanded'] = pot_expanded_result
-	elif trainD and testD and labels:
+	elif trainD is not None and testD is not None and labels is not None:
 		print(f"Warning: no calibration set found, using training data for POT thresholding.")
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 		result['pot'] = pot_result
 		result['pot_expanded'] = pot_expanded_result
-	elif calibD and testD:
+	elif calibD is not None:
 		# We have calibration data for thresholding but no test labels
 		# Calculate pot threshold from calibration data and apply it to test data, but can't compute metrics
 		labels = np.zeros_like(lossCfinal) 
