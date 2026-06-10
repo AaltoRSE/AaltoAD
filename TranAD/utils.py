@@ -155,6 +155,9 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 			loader.append(None)
 		else:
 			mat = np.load(filepath)
+			if mat.shape[0] == 0:
+				loader.append(None)
+				continue
 			if file == 'labels':
 				loader.append(mat)
 			else:
