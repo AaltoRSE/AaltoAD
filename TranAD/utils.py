@@ -4,6 +4,7 @@ Utility functions for running experiments.
 
 import os
 import json
+from unittest import loader
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -138,7 +139,7 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 	if not os.path.exists(folder):
 		raise Exception('Processed Data not found.')
 
-	loader = []
+	arrays = []
 	for file in ['train', 'test', 'labels', 'calib']:
 		if dataset == 'SMD':
 			file = 'machine-1-1_' + file
@@ -152,18 +153,18 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 			file = 'ec2_request_latency_system_failure_' + file
 		filepath = os.path.join(folder, f'{file}.npy')
 		if not os.path.exists(filepath):
-			loader.append(None)
+			arrays.append(None)
 		else:
 			mat = np.load(filepath)
 			if mat.shape[0] == 0:
-				loader.append(None)
+				arrays.append(None)
 				continue
 			if file == 'labels':
-				loader.append(mat)
+				arrays.append(mat)
 			else:
-				loader.append(DataLoader(mat, batch_size=mat.shape[0]))
+				arrays.append(torch.from_numpy(mat))
 
-	return loader[0], loader[1], loader[2], loader[3]
+	return arrays[0], arrays[1], arrays[2], arrays[3]
 
 def load_timestamps(dataset: str, output_folder: str = 'processed') -> np.ndarray:
 	"""Load timestamps for a given dataset.

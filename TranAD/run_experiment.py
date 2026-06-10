@@ -336,27 +336,19 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		model_name_full = f'{model_name}_{dataset_name}'
 
 	preds = []
-	train_loader, test_loader, labels, calib_loader = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
+	trainD, testD, labels, calibD = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
 	## Prepare data
 	n_features = 0
-	if train_loader:
-		trainD = next(iter(train_loader))
+	if trainD is not None:
 		n_features = trainD.shape[1]
-	else:
-		trainD = None
-	
-	if calib_loader:
-		calibD = next(iter(calib_loader))
+	if calibD is not None:
 		n_features = calibD.shape[1]
-	else:
-		calibD = None
-
 
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
 		_merlin_start = time()
-		res = merlin.run_merlin(test_loader, labels, dataset_name)
+		res = merlin.run_merlin(testD, labels, dataset_name)
 		res['eval_time'] = float(time() - _merlin_start)
 		append_benchmark_row(model_name, dataset_name, res)
 		return res
@@ -366,11 +358,6 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
-	if test_loader:
-		testD = next(iter(test_loader))
-	else:
-		testD = None
-	
 	if hasattr(model, 'n_window'):
 		if trainD is not None:
 			trainD = utils.convert_to_windows(trainD, model)
