@@ -339,15 +339,18 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	train_loader, test_loader, labels, calib_loader = utils.load_dataset(dataset_name, less=less, output_folder=constants.output_folder)
 
 	## Prepare data
-	trainD = next(iter(train_loader))
-	trainO = trainD
-	if calib_loader is not None:
+	if train_loader:
+		trainD = next(iter(train_loader))
+	else:
+		trainD = None
+	
+	if calib_loader:
 		calibD = next(iter(calib_loader))
-		calibO = calibD
 	else:
 		calibD = None
-		calibO = calibD
-	
+
+	trainO = trainD
+	calibO = calibD
 
 	if model_name in ['MERLIN']:
 		# Call MERLIN's runner and append its result to benchmarks CSV
@@ -361,17 +364,22 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
-	testD = next(iter(test_loader))
+	if test_loader:
+		testD = next(iter(test_loader))
+	else:
+		testD = None
 	testO = testD
+	
 	if hasattr(model, 'n_window'):
-		trainD = utils.convert_to_windows(trainD, model)
-		testD = utils.convert_to_windows(testD, model)
+		if trainD is not None:
+			trainD = utils.convert_to_windows(trainD, model)
+		if testD is not None:
+			testD = utils.convert_to_windows(testD, model)
 		if calibD is not None:
 			calibD = utils.convert_to_windows(calibD, model)
 
-
 	### Training phase
-	if not test:
+	if not test and trainD is not None:
 		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
 		num_epochs = model.epochs
 		e = epoch + 1
@@ -392,104 +400,94 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		if plot:
 			utils.plot_accuracies(accuracy_list, f'{model_name}_{dataset_name}')
 
-	### Find calibration error
-	if calibD is not None:
-		print(f'Calculating prediction error on calibration set')
-		with torch.no_grad():
-			feats = calibO.shape[1]
-			lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
-			lossCfinal = np.mean(lossC, axis=1)
-	else:
-		lossC = None
-		lossCfinal = None
 
 	### Testing phase
 	model.eval()
 	print(f'{utils.color.HEADER}Testing {model_name} on {utils.color.ENDC}')
-	feats = testO.shape[1]
-	start = time()
+	result = {}
+	
 	with torch.no_grad():
-		_eval_start = time()
-		loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
-		eval_time = float(time() - _eval_start)
-		lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
-	print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
-	print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
+		start = time()
+		if testD is not None:
+			feats = testD.shape[1]
+			_eval_start = time()
+			loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, feats)
 
-	### Plot curves
-	if plot:
-		if 'TranAD' in model.name:
-			testO = torch.roll(testO, 1, 0)
-		plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)
+			# test metrics
+			lossFinal = np.mean(loss, axis=1)
+			labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
+			loss_test_normal = lossFinal[labelsFinal == 0]
+			loss_test_attack = lossFinal[labelsFinal == 1]
+			eval_time = float(time() - _eval_start)
+			print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
+			if plot:
+				if 'TranAD' in model.name:
+					testO = torch.roll(testO, 1, 0)
+				plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)
 
-	### Scores
-	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
-	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
+		if trainD is not None:
+			feats = trainD.shape[1]
+			lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, feats)
+			lossTfinal = np.mean(lossT, axis=1)
 
-	# Sanity checks: are inputs and predictions actually in the range we expect?
-	_trainD_arr = trainD.detach().cpu().numpy() if hasattr(trainD, 'detach') else np.asarray(trainD)
-	_testD_arr  = testD.detach().cpu().numpy()  if hasattr(testD,  'detach') else np.asarray(testD)
-	print(f'trainD range: min={_trainD_arr.min():.4g} max={_trainD_arr.max():.4g} '
-	      f'<0: {(_trainD_arr < 0).sum()}/{_trainD_arr.size} '
-	      f'>1: {(_trainD_arr > 1).sum()}/{_trainD_arr.size}')
-	if calibD is not None:
-		print(f'calibD range: min={float(lossC.min()):.4g} max={float(lossC.max()):.4g}'
-	   		  f'<0: {(lossC < 0).sum()}/{lossC.size} '
-			  f'>1: {(lossC > 1).sum()}/{lossC.size}')
-	print(f'testD  range: min={_testD_arr.min():.4g} max={_testD_arr.max():.4g} '
-	      f'<0: {(_testD_arr < 0).sum()}/{_testD_arr.size} '
-	      f'>1: {(_testD_arr > 1).sum()}/{_testD_arr.size}')
-	print(f'y_pred range: min={float(y_pred.min()):.4g} max={float(y_pred.max()):.4g}')
-	print(f'raw loss [N, F] shape={loss.shape} min={float(loss.min()):.4g} max={float(loss.max()):.4g}')
-	print(f'NaN/Inf in loss? nan={int(np.isnan(loss).sum())} inf={int(np.isinf(loss).sum())}')
+		if calibD is not None:
+			feats = calibD.shape[1]
+			lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, feats)
+			lossCfinal = np.mean(lossC, axis=1)
 
-	loss_test_normal = lossFinal[labelsFinal == 0]
-	loss_test_attack = lossFinal[labelsFinal == 1]
+		print(utils.color.BOLD+'Testing time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 
-	loss_stats('train loss (mean over feats)', lossTfinal)
+	if trainD is not None:
+		loss_stats('train loss (mean over feats)', lossTfinal)
 	if calibD is not None:
 		loss_stats('calib  loss (mean over feats)', lossCfinal)
-	loss_stats('test  loss | label=0 (normal)', loss_test_normal)
-	if loss_test_attack.size:
+	if testD is not None:
+		loss_stats('test  loss | label=0 (normal)', loss_test_normal)
+		loss_stats('test  loss (mean over feats)', lossFinal)
+	if testD is not None and loss_test_attack.size:
 		loss_stats('test  loss | label=1 (attack)', loss_test_attack)
-	loss_stats('test  loss (mean over feats)', lossFinal)
 
-	oracle_expanded, oracle_expanded_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=True)
-	oracle, oracle_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=False)
+	if lossFinal is not None and labelsFinal is not None:
+		oracle_expanded, oracle_expanded_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=True)
+		oracle, oracle_pred = oracle_f1(lossFinal, labelsFinal, expand_segments=False)
+		result['oracle'] = oracle
+		result['oracle_expanded'] = oracle_expanded
 
 	q = applied_hyperparams.get('q', 1e-5)
-	if calibD is not None:
+	if calibD is not None and testD is not None:
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
-	else:
-		print(f"{utils.color.YELLOW}Warning: no calibration set found, using training data for POT thresholding. POT performance may be worse than expected.{utils.color.ENDC}")
+		result['pot'] = pot_result
+		result['pot_expanded'] = pot_expanded_result
+	elif trainD is not None and testD is not None:
+		print(f"Warning: no calibration set found, using training data for POT thresholding.")
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
+		result['pot'] = pot_result
+		result['pot_expanded'] = pot_expanded_result
 
-	result = {
-		'pot': pot_result,
-		'pot_expanded': pot_expanded_result,
-		'oracle': oracle,
-		'oracle_expanded': oracle_expanded,
-	}
 	if calibD is not None:
 		result['calibration_loss'] = float(lossCfinal.mean())
 
-	result.update(diagnosis.hit_att(loss, labels))
-	result.update(diagnosis.ndcg(loss, labels))
-	result['eval_time'] = eval_time
+	if testD is not None:
+		result.update(diagnosis.hit_att(loss, labels))
+		result.update(diagnosis.ndcg(loss, labels))
+		result['eval_time'] = eval_time
 
 	# Write labels with timestamps to a csv
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
 	labels_df = pd.DataFrame({
-		'timestamp': timestamps,
-		'prediction_error': lossFinal,
-		'ground_truth': labelsFinal,
-		'pot_label': pot_pred,
-		'pot_expanded_label': pot_expanded_pred,
-		'oracle_label': oracle_pred,
-		'oracle_expanded_label': oracle_expanded_pred,
+		'timestamp': timestamps
 	})
+	if labelsFinal is not None:
+		labels_df['ground_truth'] = labelsFinal
+	if lossFinal is not None:
+		labels_df['prediction_error'] = lossFinal
+	if lossFinal is not None and labelsFinal is not None:
+		labels_df['pot_label'] = pot_pred
+		labels_df['pot_expanded_label'] = pot_expanded_pred
+		labels_df['oracle_label'] = oracle_pred
+		labels_df['oracle_expanded_label'] = oracle_expanded_pred
 	labels_csv_path = os.path.join('results', dataset_name, f'{model_name}_exp{experiment_id}_labels.csv')
 	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)
 	labels_df.to_csv(labels_csv_path, index=False)
