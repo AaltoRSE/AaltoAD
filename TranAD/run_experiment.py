@@ -462,7 +462,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 	else:
-		print(f"{utils.color.YELLOW}Warning: no calibration set found, using training data for POT thresholding. POT performance may be worse than expected.{utils.color.ENDC}")
+		print(f"Warning: no calibration set found, using training data for POT thresholding. POT performance may be worse than expected.")
 		pot_expanded_result, pot_expanded_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=True)
 		pot_result, pot_pred = pot.pot_eval(lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=False)
 
