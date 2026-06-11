@@ -20,9 +20,13 @@ for _m in METHOD_METRICS:
     DISPLAY_COLUMNS.append(_m)
     DISPLAY_COLUMNS.append(f'{_m} (PA)')
 DISPLAY_COLUMNS.append('eval_time')
+DISPLAY_COLUMNS.append('calibration_loss')
 
 # Used by --metric flag; default points at pot.f1 (raw, non-PA).
 DISPLAY_METRICS = [f'{method}.{m}' for method in METHODS for m in METHOD_METRICS]
+
+# Metrics where lower is better (affects _best_result and sort order).
+LOWER_IS_BETTER = {'calibration_loss'}
 
 
 def _get(d, dotted_key):
@@ -49,8 +53,10 @@ def _load_results(dataset, results_folder='results'):
 
 
 def _best_result(results, metric):
-    """Return the result dict with the highest non-NaN metric value.
+    """Return the result dict with the best non-NaN metric value.
 
+    For metrics in LOWER_IS_BETTER, returns the result with the minimum value;
+    otherwise returns the result with the maximum value.
     `metric` may be a dotted path like 'pot.f1' to reach into the nested schema.
     """
     def _val(r):
@@ -64,11 +70,13 @@ def _best_result(results, metric):
     valid = [r for r in results if not math.isnan(_val(r))]
     if not valid:
         return None
+    if metric in LOWER_IS_BETTER:
+        return min(valid, key=_val)
     return max(valid, key=_val)
 
 
 def _fmt(value):
-    """Format a numeric value for display."""
+    """Format a numeric value for display (scientific notation below 1e-3)."""
     if value is None:
         return 'N/A'
     try:
@@ -77,18 +85,90 @@ def _fmt(value):
             return 'NaN'
         if v == int(v) and abs(v) < 1e15:
             return str(int(v))
+        if abs(v) < 1e-3:
+            return f'{v:.3e}'
         return f'{v:.4f}'
     except (TypeError, ValueError):
         return str(value)
 
 
-def _build_summary(by_model, metric):
+def _is_unlabeled(result):
+    """Return True when a result has no positive labels (pot.TP + pot.FN == 0).
+
+    Returns False if the pot section or the required keys are absent.
+    """
+    pot = result.get('pot')
+    if not isinstance(pot, dict):
+        return False
+    tp = pot.get('TP')
+    fn = pot.get('FN')
+    if tp is None or fn is None:
+        return False
+    try:
+        return float(tp) + float(fn) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _detected(result):
+    """Return detected count (pot.TP + pot.FP), or None if keys absent."""
+    pot = result.get('pot')
+    if not isinstance(pot, dict):
+        return None
+    tp = pot.get('TP')
+    fp = pot.get('FP')
+    if tp is None or fp is None:
+        return None
+    try:
+        return float(tp) + float(fp)
+    except (TypeError, ValueError):
+        return None
+
+
+def _detection_rate(result):
+    """Return detected / total (TP+FP+TN+FN), or None if keys absent or denominator zero."""
+    pot = result.get('pot')
+    if not isinstance(pot, dict):
+        return None
+    tp = pot.get('TP')
+    fp = pot.get('FP')
+    tn = pot.get('TN')
+    fn = pot.get('FN')
+    if any(v is None for v in (tp, fp, tn, fn)):
+        return None
+    try:
+        total = float(tp) + float(fp) + float(tn) + float(fn)
+        if total == 0:
+            return None
+        return (float(tp) + float(fp)) / total
+    except (TypeError, ValueError):
+        return None
+
+
+def _col_value(result, path_or_fn):
+    """Return a column value from a result dict.
+
+    `path_or_fn` may be a dotted path string or a callable taking the result dict.
+    """
+    if callable(path_or_fn):
+        return path_or_fn(result)
+    return _get(result, path_or_fn)
+
+
+def _build_summary(by_model, metric, unlabeled=False):
     """Build metric rows and hyperparameter rows for best result per model.
 
-    Each model produces two metric rows — one for `pot`, one for `oracle` —
-    where each numeric column appears twice: raw (point-wise) and PA
-    (point-adjusted, i.e. segment-expanded). The row label is "<model> / <method>".
+    In labeled mode (unlabeled=False):
+        Each model produces two metric rows — one for `pot`, one for `oracle` —
+        where each numeric column appears twice: raw (point-wise) and PA
+        (point-adjusted, i.e. segment-expanded). The row label is "<model> / <method>".
+
+    In unlabeled mode (unlabeled=True):
+        Each model produces a single row with columns: detected, detection rate,
+        threshold, calibration_loss, eval_time.
+
     Sort order is by the row whose metric path matches the --metric argument.
+    Returns (metric_rows, hp_rows, all_hp_keys, display_columns).
     """
     metric_rows = []
     hp_rows = []
@@ -105,37 +185,89 @@ def _build_summary(by_model, metric):
                     all_hp_keys.append(k)
                     seen_hp.add(k)
 
-    sort_method, _, sort_metric = metric.partition('.')
+    # Determine lower-is-better for missing-value sentinel in sort.
+    lower_is_better = metric in LOWER_IS_BETTER
+    missing_sort_val = float('inf') if lower_is_better else float('-inf')
+
+    if unlabeled:
+        display_columns = ['detected', 'detection rate', 'threshold', 'calibration_loss', 'eval_time']
+        grouped = []
+        for model, results in by_model.items():
+            best = _best_result(results, metric)
+            row = {'row': model}
+            if best:
+                row['detected'] = _fmt(_detected(best))
+                row['detection rate'] = _fmt(_detection_rate(best))
+                row['threshold'] = _fmt(_get(best, 'pot.threshold'))
+                row['calibration_loss'] = _fmt(_get(best, 'calibration_loss'))
+                row['eval_time'] = _fmt(_get(best, 'eval_time'))
+            else:
+                for c in display_columns:
+                    row[c] = 'N/A'
+            try:
+                sort_val = float(_get(best, metric)) if best else missing_sort_val
+                if math.isnan(sort_val):
+                    sort_val = missing_sort_val
+            except (TypeError, ValueError):
+                sort_val = missing_sort_val
+            h_row = {'row': model}
+            hp = best.get('applied_hyperparameters', {}) if best else {}
+            for k in all_hp_keys:
+                h_row[k] = _fmt(hp[k]) if k in hp else ''
+            grouped.append((sort_val, [row], h_row))
+        grouped.sort(key=lambda t: t[0], reverse=not lower_is_better)
+        for _, rows, h_row in grouped:
+            metric_rows.extend(rows)
+            hp_rows.append(h_row)
+        return metric_rows, hp_rows, all_hp_keys, display_columns
+
+    # Labeled mode
+    display_columns = DISPLAY_COLUMNS
+
+    sort_method, sort_sep, sort_metric = metric.partition('.')
 
     grouped = []  # list of (sort_value, [method_rows], hp_row)
     for model, results in by_model.items():
         best = _best_result(results, metric)
         method_rows = []
-        sort_val = -1.0
+        sort_val = missing_sort_val
         for method in METHODS:
             row = {'row': f'{model} / {method}'}
             for m in METHOD_METRICS:
                 row[m] = _fmt(_get(best, f'{method}.{m}')) if best else 'N/A'
                 row[f'{m} (PA)'] = _fmt(_get(best, f'{method}_expanded.{m}')) if best else 'N/A'
             row['eval_time'] = _fmt(_get(best, 'eval_time')) if best else 'N/A'
-            if method == sort_method:
+            row['calibration_loss'] = _fmt(_get(best, 'calibration_loss')) if best else 'N/A'
+            if sort_sep and method == sort_method:
                 try:
-                    sort_val = float(row[sort_metric]) if row[sort_metric] not in ('N/A', 'NaN') else -1.0
-                except (TypeError, ValueError):
-                    sort_val = -1.0
+                    sv = float(row[sort_metric]) if row.get(sort_metric) not in ('N/A', 'NaN', None) else missing_sort_val
+                    if math.isnan(sv):
+                        sv = missing_sort_val
+                    sort_val = sv
+                except (TypeError, ValueError, KeyError):
+                    sort_val = missing_sort_val
             method_rows.append(row)
+        # Handle dotless metric (e.g. 'calibration_loss')
+        if not sort_sep and best:
+            try:
+                sv = float(_get(best, metric)) if _get(best, metric) is not None else missing_sort_val
+                if math.isnan(sv):
+                    sv = missing_sort_val
+                sort_val = sv
+            except (TypeError, ValueError):
+                sort_val = missing_sort_val
         h_row = {'row': model}
         hp = best.get('applied_hyperparameters', {}) if best else {}
         for k in all_hp_keys:
             h_row[k] = _fmt(hp[k]) if k in hp else ''
         grouped.append((sort_val, method_rows, h_row))
 
-    grouped.sort(key=lambda t: t[0], reverse=True)
+    grouped.sort(key=lambda t: t[0], reverse=not lower_is_better)
     for _, method_rows, h_row in grouped:
         metric_rows.extend(method_rows)
         hp_rows.append(h_row)
 
-    return metric_rows, hp_rows, all_hp_keys
+    return metric_rows, hp_rows, all_hp_keys, display_columns
 
 
 # ---------------------------------------------------------------------------
@@ -208,13 +340,13 @@ _HTML_TEMPLATE = """\
 """
 
 
-def _generate_html(dataset, metric, by_model, output_path):
-    metric_rows, hp_rows, hp_keys = _build_summary(by_model, metric)
+def _generate_html(dataset, metric, by_model, output_path, unlabeled=False):
+    metric_rows, hp_rows, hp_keys, display_columns = _build_summary(by_model, metric, unlabeled=unlabeled)
     template = Template(_HTML_TEMPLATE)
     html = template.render(
         dataset=dataset,
         metric=metric,
-        display_columns=DISPLAY_COLUMNS,
+        display_columns=display_columns,
         metric_rows=metric_rows,
         hp_rows=hp_rows,
         hp_keys=hp_keys,
@@ -260,8 +392,8 @@ def _draw_table_page(pdf, title, columns, rows):
     plt.close(fig)
 
 
-def _generate_pdf(dataset, metric, by_model, output_path):
-    metric_rows, hp_rows, hp_keys = _build_summary(by_model, metric)
+def _generate_pdf(dataset, metric, by_model, output_path, unlabeled=False):
+    metric_rows, hp_rows, hp_keys, display_columns = _build_summary(by_model, metric, unlabeled=unlabeled)
 
     # Rename internal 'row' key to a display label
     for row in metric_rows:
@@ -273,7 +405,7 @@ def _generate_pdf(dataset, metric, by_model, output_path):
         _draw_table_page(
             pdf,
             title=f'Metrics — Dataset: {dataset}  (best by {metric})',
-            columns=['Model / method'] + DISPLAY_COLUMNS,
+            columns=['Model / method'] + display_columns,
             rows=metric_rows,
         )
         _draw_table_page(
@@ -290,36 +422,53 @@ def _generate_pdf(dataset, metric, by_model, output_path):
 # Slide-ready summary (CSV metrics + per-model hyperparameter markdown)
 # ---------------------------------------------------------------------------
 
-# Slim metric set for presentation tables. Each entry is (column_label, dotted_path).
+# Slim metric set for presentation tables. Each entry is (column_label, dotted_path_or_callable).
 SLIDE_COLUMNS = [
-    ('POT F1',       'pot.f1'),
-    ('POT F1 (PA)',  'pot_expanded.f1'),
-    ('POT FPR',      'pot.fpr'),
-    ('POT latency',  'pot.p_latency'),
-    ('Oracle F1',    'oracle.f1'),
+    ('POT F1',        'pot.f1'),
+    ('POT F1 (PA)',   'pot_expanded.f1'),
+    ('POT FPR',       'pot.fpr'),
+    ('POT latency',   'pot.p_latency'),
+    ('Oracle F1',     'oracle.f1'),
+    ('Calib. loss',   'calibration_loss'),
     ('Eval time (s)', 'eval_time'),
 ]
 
+# Unlabeled mode: alternate slim column spec.
+UNLABELED_SLIDE_COLUMNS = [
+    ('Detected',        _detected),
+    ('Detection rate',  _detection_rate),
+    ('Threshold',       'pot.threshold'),
+    ('Calib. loss',     'calibration_loss'),
+    ('Eval time (s)',   'eval_time'),
+]
 
-def _generate_csv(dataset, metric, by_model, output_path):
-    """One row per model, slim metric set, sorted by `metric` desc."""
+
+def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
+    """One row per model, slim metric set, sorted by `metric`."""
+    lower_is_better = metric in LOWER_IS_BETTER
+    missing_sort_val = float('inf') if lower_is_better else float('-inf')
+
+    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
     rows = []
     for model, results in by_model.items():
         best = _best_result(results, metric)
         row = {'model': model}
-        for label, path in SLIDE_COLUMNS:
-            row[label] = _fmt(_get(best, path)) if best else 'N/A'
+        for label, path_or_fn in slide_cols:
+            if best:
+                row[label] = _fmt(_col_value(best, path_or_fn))
+            else:
+                row[label] = 'N/A'
         try:
-            sort_val = float(_get(best, metric)) if best else float('-inf')
+            sort_val = float(_get(best, metric)) if best else missing_sort_val
         except (TypeError, ValueError):
-            sort_val = float('-inf')
+            sort_val = missing_sort_val
         if sort_val != sort_val:  # NaN
-            sort_val = float('-inf')
+            sort_val = missing_sort_val
         rows.append((sort_val, row))
-    rows.sort(key=lambda t: t[0], reverse=True)
+    rows.sort(key=lambda t: t[0], reverse=not lower_is_better)
 
     with open(output_path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['model'] + [c for c, _ in SLIDE_COLUMNS])
+        writer = csv.DictWriter(f, fieldnames=['model'] + [c for c, _ in slide_cols])
         writer.writeheader()
         for _, row in rows:
             writer.writerow(row)
@@ -328,20 +477,23 @@ def _generate_csv(dataset, metric, by_model, output_path):
 
 def _generate_hp_markdown(dataset, metric, by_model, output_path):
     """One line per model listing its best-result hyperparameters."""
+    lower_is_better = metric in LOWER_IS_BETTER
+    missing_sort_val = float('inf') if lower_is_better else float('-inf')
+
     lines = [f'# Hyperparameters — {dataset}', f'_Best result per model by {metric}_', '']
     entries = []
     for model, results in by_model.items():
         best = _best_result(results, metric)
         hp = best.get('applied_hyperparameters', {}) if best else {}
         try:
-            sort_val = float(_get(best, metric)) if best else float('-inf')
+            sort_val = float(_get(best, metric)) if best else missing_sort_val
         except (TypeError, ValueError):
-            sort_val = float('-inf')
+            sort_val = missing_sort_val
         if sort_val != sort_val:
-            sort_val = float('-inf')
+            sort_val = missing_sort_val
         parts = ', '.join(f'{k}={_fmt(v)}' for k, v in sorted(hp.items()))
         entries.append((sort_val, f'- **{model}**: {parts if parts else "(defaults)"}'))
-    entries.sort(key=lambda t: t[0], reverse=True)
+    entries.sort(key=lambda t: t[0], reverse=not lower_is_better)
     lines.extend(line for _, line in entries)
 
     with open(output_path, 'w') as f:
@@ -387,29 +539,37 @@ def _latex_tabular(columns, rows, caption=None, label=None):
     return '\n'.join(lines)
 
 
-def _generate_latex(dataset, metric, by_model, output_path):
+def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
     """Write a LaTeX file with two tabular blocks (metrics + hyperparameters).
 
     Designed to be ``\\input``-ed inside a user-provided ``table`` float —
     no float wrapper is emitted.
     """
+    lower_is_better = metric in LOWER_IS_BETTER
+    missing_sort_val = float('inf') if lower_is_better else float('-inf')
+
+    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
+
     # Slim metrics table (same columns as CSV).
     metric_rows = []
     for model, results in by_model.items():
         best = _best_result(results, metric)
         row = {'model': model}
-        for label, path in SLIDE_COLUMNS:
-            row[label] = _fmt(_get(best, path)) if best else 'N/A'
+        for label, path_or_fn in slide_cols:
+            if best:
+                row[label] = _fmt(_col_value(best, path_or_fn))
+            else:
+                row[label] = 'N/A'
         try:
-            sort_val = float(_get(best, metric)) if best else float('-inf')
+            sort_val = float(_get(best, metric)) if best else missing_sort_val
         except (TypeError, ValueError):
-            sort_val = float('-inf')
+            sort_val = missing_sort_val
         if sort_val != sort_val:
-            sort_val = float('-inf')
+            sort_val = missing_sort_val
         metric_rows.append((sort_val, row))
-    metric_rows.sort(key=lambda t: t[0], reverse=True)
+    metric_rows.sort(key=lambda t: t[0], reverse=not lower_is_better)
     metric_rows = [r for _, r in metric_rows]
-    metric_cols = ['model'] + [c for c, _ in SLIDE_COLUMNS]
+    metric_cols = ['model'] + [c for c, _ in slide_cols]
 
     parts = [
         f'% Auto-generated by TranAD.report — dataset={dataset}, metric={metric}',
@@ -485,6 +645,14 @@ def generate_report(dataset, metric='calibration_loss', results_folder='results'
 		print(f'No results found for dataset "{dataset}" in {results_folder}/')
 		return
 
+	# Determine unlabeled flag: True when at least one result has a pot confusion
+	# matrix AND all results that have one satisfy _is_unlabeled.
+	results_with_pot = [
+		r for results in by_model.values() for r in results
+		if isinstance(r.get('pot'), dict) and r['pot'].get('TP') is not None
+	]
+	unlabeled = bool(results_with_pot) and all(_is_unlabeled(r) for r in results_with_pot)
+
 	# For TOL experiments, nest in reports/TOL/{experiment_id}/
 	if dataset.startswith('TOL_'):
 		dataset_dir = os.path.join('reports', 'TOL', dataset)
@@ -499,10 +667,10 @@ def generate_report(dataset, metric='calibration_loss', results_folder='results'
 	tex_path = os.path.join(dataset_dir, f'summary.tex')
 	svg_path = os.path.join(dataset_dir, f'prediction_errors.svg')
 
-	_generate_html(dataset, metric, by_model, html_path)
-	_generate_pdf(dataset, metric, by_model, pdf_path)
-	_generate_csv(dataset, metric, by_model, csv_path)
+	_generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled)
+	_generate_pdf(dataset, metric, by_model, pdf_path, unlabeled=unlabeled)
+	_generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled)
 	_generate_hp_markdown(dataset, metric, by_model, hp_path)
-	_generate_latex(dataset, metric, by_model, tex_path)
+	_generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
 	_generate_svg_prediction_errors(dataset, svg_path, results_folder=results_folder)
 
