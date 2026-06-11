@@ -475,7 +475,7 @@ def load_TOL(folder, csv_groups=None, csv_path=None, segments=None,
 	print(f'  Feature columns ({len(canonical_cols)}): {canonical_cols}')
 
 	for name, arr in [('train', train), ('test', test), ('calib', calib), ('valid', valid), ('labels', labels), ('valid_labels', valid_labels)]:
-		np.save(os.path.join(folder, f'{name}.npy'), arr.astype('float64'))
+		np.save(os.path.join(folder, f'{name}.npy'), np.ascontiguousarray(arr.astype('float64')))
 	all_paths = [p for paths, _ in csv_groups for p in paths]
 	print(f"Processed {len(all_paths)} CSV(s) as TOL -> {folder}/")
 	print(f"  train.npy: {train.shape}, test.npy: {test.shape}, calib.npy: {calib.shape}, valid.npy: {valid.shape}, labels.npy: {labels.shape}")
