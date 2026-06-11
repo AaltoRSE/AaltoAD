@@ -108,7 +108,7 @@ def convert_to_windows(data: torch.Tensor, model_obj) -> torch.Tensor:
 			w = data[i - w_size:i]
 		else:
 			w = torch.cat([data[0].repeat(w_size - i, 1), data[0:i]])
-		windows.append(w.view(-1) if flatten else w)
+		windows.append(w.reshape(-1) if flatten else w)
 	return torch.stack(windows)
 
 
