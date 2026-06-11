@@ -339,13 +339,16 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 	except Exception as e:
 		print(f"✗ ERROR  Exp {exp_id}: {e}")
 		traceback.print_exc()
+		tb_frames = traceback.extract_tb(e.__traceback__)
+		location = f" ({tb_frames[-1].filename}:{tb_frames[-1].lineno})" if tb_frames else ""
 		_write_failure_marker(dataset, model, exp_id, hyperparams,
-		                     f"{type(e).__name__}: {e}")
+		                     f"{type(e).__name__}: {e}{location}",
+		                     tb_text=traceback.format_exc())
 		return False
 
 
 def _write_failure_marker(dataset: str, model: str, exp_id: str,
-                          hyperparams: dict, error: str):
+                          hyperparams: dict, error: str, tb_text: str = None):
 	"""Persist a minimal result file recording the failure so the worker
 	loop's has_matching_result() check skips this sub-experiment on rescan
 	instead of re-running it forever. The report's metric lookup returns
@@ -361,6 +364,8 @@ def _write_failure_marker(dataset: str, model: str, exp_id: str,
 		'status': 'failed',
 		'error': error,
 	}
+	if tb_text:
+		marker['traceback'] = tb_text
 	try:
 		with open(result_path, 'w') as f:
 			json.dump(marker, f, indent=2, default=str)
