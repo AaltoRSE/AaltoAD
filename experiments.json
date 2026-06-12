@@ -565,6 +565,47 @@
         3,
         5
       ]
+    },
+    {
+      "index": 18,
+      "dataset": "TOL",
+      "model": "STAGNN",
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        10,20
+      ],
+      "batch_size": [
+        128,
+        256
+      ],
+      "embed_dim": [
+        32,
+        64
+      ],
+      "notes": "TranAD higher LR",
+      "q": [
+        0.001,
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        3,
+        5
+      ],
+      "topk": [
+        5,
+        10
+      ],
+      "graph_num_heads": [
+        2, 4
+      ]
     }
   ]
 }
