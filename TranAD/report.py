@@ -636,7 +636,7 @@ def _generate_svg_prediction_errors(dataset, output_path, results_folder='result
 
 def generate_report(dataset, metric='calibration_loss', results_folder='results'):
 	"""Generate HTML, PDF, CSV, and hyperparameter-markdown reports for a dataset.
-	
+
 	For TOL datasets (e.g., 'TOL_1_1', 'TOL_2_1_1'), files are saved in reports/TOL/{dataset}/.
 	For other datasets, files are saved in reports/{dataset}/.
 	"""
@@ -658,7 +658,7 @@ def generate_report(dataset, metric='calibration_loss', results_folder='results'
 		dataset_dir = os.path.join('reports', 'TOL', dataset)
 	else:
 		dataset_dir = os.path.join('reports', dataset)
-	
+
 	os.makedirs(dataset_dir, exist_ok=True)
 	html_path = os.path.join(dataset_dir, f'report.html')
 	pdf_path = os.path.join(dataset_dir, f'report.pdf')
@@ -673,4 +673,3 @@ def generate_report(dataset, metric='calibration_loss', results_folder='results'
 	_generate_hp_markdown(dataset, metric, by_model, hp_path)
 	_generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
 	_generate_svg_prediction_errors(dataset, svg_path, results_folder=results_folder)
-

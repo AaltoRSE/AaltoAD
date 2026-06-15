@@ -18,8 +18,8 @@
         2
       ],
       "batch_size": [
-        256,
-        512
+        240,
+        120
       ],
       "notes": "LSTM_Univariate",
       "q": [
@@ -78,9 +78,8 @@
         32
       ],
       "batch_size": [
-        128,
-        256,
-        512
+        120,
+        240
       ],
       "sequence_length": [
         8,
@@ -326,8 +325,8 @@
         10
       ],
       "batch_size": [
-        128,
-        256
+        120,
+        240
       ],
       "dim_feedforward": [
         16,
@@ -363,8 +362,8 @@
         10
       ],
       "batch_size": [
-        64,
-        128
+        60,
+        120
       ],
       "n_hidden": [
         16,
@@ -398,8 +397,8 @@
         10
       ],
       "batch_size": [
-        128,
-        256
+        120,
+        240
       ],
       "dim_feedforward": [
         16,
@@ -436,8 +435,8 @@
         10
       ],
       "batch_size": [
-        128,
-        256
+        120,
+        240
       ],
       "dim_feedforward": [
         16,
@@ -474,8 +473,8 @@
         10
       ],
       "batch_size": [
-        128,
-        256
+        120,
+        240
       ],
       "dim_feedforward": [
         16,
@@ -519,8 +518,8 @@
         16
       ],
       "batch_size": [
-        64,
-        128
+        60,
+        120
       ],
       "sequence_length": [
         16,
