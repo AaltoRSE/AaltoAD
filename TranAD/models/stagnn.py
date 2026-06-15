@@ -1,7 +1,10 @@
-import math
 import torch
 import torch.nn as nn
+import numpy as np
 import torch.nn.functional as F
+from tqdm import tqdm
+from torch.utils.data import DataLoader, TensorDataset
+from .base import BaseModel
 
 
 class STAGNN_Core(nn.Module):
@@ -173,3 +176,59 @@ class STAGNN_Core(nn.Module):
 
 	def forward_with_ctx(self, X: torch.Tensor, A_static: torch.Tensor | None = None):
 		return self._forward_internal(X, A_static=A_static)
+
+
+class STAGNN(BaseModel):
+	def __init__(self, feats, n_window=10, batch_size=128, embed_dim=64, topk=5, dropout=0.1, graph_num_heads=4, learning_rate=0.001, epochs=5, weight_decay=1e-5):
+		super().__init__(feats, learning_rate=learning_rate, epochs=epochs, weight_decay=weight_decay)
+		self.name = 'STAGNN'
+		self.n_window = n_window
+		self.flat_window = False
+		self.batch = batch_size
+		self.model = STAGNN_Core(
+			num_sensors=feats,
+			embed_dim=embed_dim,
+			window_size=n_window,
+			topk=topk,
+			dropout=dropout,
+			feature_dim=1,
+			graph_num_heads=graph_num_heads,
+		)
+		self.model = self.model.double()
+
+	def forward(self, x):
+		out, alpha = self.model(x)
+		out = out.squeeze(-1)
+		return out, alpha
+
+	def train_step(self, epoch, data, optimizer, scheduler, feats):
+		l = nn.MSELoss(reduction='none')
+		data_x = torch.DoubleTensor(data)
+		dataset = TensorDataset(data_x, data_x)
+		bs = self.batch
+		dataloader = DataLoader(dataset, batch_size=bs)
+		l1s = []
+		for d, _ in dataloader:
+			target = d[:, -1, :]
+			out, alpha = self(d)
+			loss = torch.mean(l(out, target))
+			l1s.append(loss.item())
+			optimizer.zero_grad()
+			loss.backward()
+			torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+			optimizer.step()
+		scheduler.step()
+		tqdm.write(f'Epoch {epoch},\tL1 = {np.mean(l1s)}')
+		return np.mean(l1s), optimizer.param_groups[0]['lr']
+
+	def eval_step(self, epoch, data, optimizer, scheduler, feats):
+		l = nn.MSELoss(reduction='none')
+		data_x = torch.DoubleTensor(data)
+		dataset = TensorDataset(data_x, data_x)
+		bs = len(data)
+		dataloader = DataLoader(dataset, batch_size=bs)
+		for d, _ in dataloader:
+			target = d[:, -1, :]
+			out, alpha = self(d)
+		loss = l(out, target)
+		return loss.detach().numpy(), out.detach().numpy()

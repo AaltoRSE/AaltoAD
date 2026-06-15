@@ -409,6 +409,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			eval_time = float(time() - _eval_start)
 			print(utils.color.BOLD+'Eval time (test split): '+"{:10.4f}".format(eval_time)+ utils.color.ENDC)
 			if plot:
+				testO = testD
 				if 'TranAD' in model.name:
 					testO = torch.roll(testD, 1, 0)
 				plotting.plotter(f'{model_name}_{dataset_name}', testO, y_pred, loss, labels)

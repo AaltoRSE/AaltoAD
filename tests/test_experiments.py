@@ -174,14 +174,12 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 
     mock_load_model.return_value = (mock_model, mock_optimizer, mock_scheduler, -1, [], {}, 'default')
 
-    # Create mock data
+    # Create mock data (load_dataset returns arrays/tensors, not loaders)
     train_data = torch.randn(100, 5).numpy()
     test_data = torch.randn(50, 5).numpy()
     labels = np.random.randint(0, 2, (50, 5))
 
-    train_loader = [train_data]
-    test_loader = [test_data]
-    mock_load_dataset.return_value = (train_loader, test_loader, labels, None)
+    mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
@@ -255,9 +253,7 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     test_data = torch.randn(50, 5).numpy()
     labels = np.random.randint(0, 2, (50, 5))
 
-    train_loader = [train_data]
-    test_loader = [test_data]
-    mock_load_dataset.return_value = (train_loader, test_loader, labels, None)
+    mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
@@ -303,10 +299,8 @@ def test_run_experiment_merlin(mock_append, mock_load_dataset, mock_run_merlin, 
     test_data = torch.randn(50, 5).numpy()
     labels = np.random.randint(0, 2, (50, 5))
     
-    train_loader = [train_data]
-    test_loader = [test_data]
-    mock_load_dataset.return_value = (train_loader, test_loader, labels, None)
-    
+    mock_load_dataset.return_value = (train_data, test_data, labels, None)
+
     merlin_result = {'precision': 0.82, 'recall': 0.88, 'ROC/AUC': 0.91, 'f1': 0.85}
     mock_run_merlin.return_value = merlin_result
     
@@ -345,7 +339,7 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
     train_data = torch.randn(100, 5).numpy()
     test_data = torch.randn(50, 5).numpy()
     labels = np.random.randint(0, 2, (50, 5))
-    mock_load_dataset.return_value = ([train_data], [test_data], labels, None)
+    mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
     # Mock convert_to_windows to return data as-is (simplified)
     mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
