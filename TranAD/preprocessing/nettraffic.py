@@ -31,6 +31,8 @@ def _load_and_prepare(csv_path, interval = 1):
     timestamp_col = find_timestamp_column(df)
     src_col, dst_col = _detect_ip_columns(df)
     bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
+    if bytes_col:
+        df[bytes_col] = pd.to_numeric(df[bytes_col], errors='coerce').fillna(0)
     src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
     df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
     df['interval'] = (df['ts_sec'] // interval)
@@ -135,7 +137,7 @@ def _aggregate_to_features(
     in_grp = df.groupby(['interval', dst_col])
     in_agg = pd.DataFrame({'num_srcs': in_grp[src_col].nunique()})
     in_agg['in_count'] = in_grp.size()
-    if bytes_col:
+    if bytes and bytes_col:
         in_agg['bytes_in'] = in_grp[bytes_col].sum()
 
     out_wide = out_agg.unstack(fill_value=0)
