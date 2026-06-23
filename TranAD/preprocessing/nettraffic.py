@@ -28,6 +28,14 @@ DEFAULT_SEGMENTS = [
 def _load_and_prepare(csv_path, interval = 1):
     """Read CSV, detect needed columns, parse timestamps. Returns a     parsed-CSV record."""
     df = pd.read_csv(csv_path, on_bad_lines='warn')
+    # Drop embedded header rows. These appear when several CSVs are concatenated
+    # (e.g. `cat a.csv b.csv > combined.csv`), repeating the header line as data.
+    # Left in, they force numeric columns to object dtype and skew the time range.
+    header_row = df.columns.to_numpy().astype(str)
+    header_mask = df.astype(str).eq(header_row).all(axis=1)
+    if header_mask.any():
+        print(f"  Dropping {int(header_mask.sum())} embedded header row(s) in {csv_path}")
+        df = df[~header_mask].reset_index(drop=True)
     timestamp_col = find_timestamp_column(df)
     src_col, dst_col = _detect_ip_columns(df)
     bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
@@ -41,9 +49,11 @@ def _load_and_prepare(csv_path, interval = 1):
     df.drop(columns=['ts_sec'], inplace=True)
     df.drop(columns=[timestamp_col], inplace=True)
     temperature_col = _detect_column(df, ['temperature', 'temp'])
+    if temperature_col:
+        df[temperature_col] = pd.to_numeric(df[temperature_col], errors='coerce')
     print(f"  Detected columns in {csv_path}: timestamp='{timestamp_col}', src_ip='{src_col}', dst_ip='{dst_col}', bytes='{bytes_col}', src_port='{src_port_col}', temp='{temperature_col}'")
     if 'has_temp' in df.columns:
-        has_temp_mask = df['has_temp'].astype(bool)
+        has_temp_mask = pd.to_numeric(df['has_temp'], errors='coerce').fillna(0).astype(bool)
         df.loc[~has_temp_mask, temperature_col] = np.nan
     return {
 		'path': csv_path, 'df': df,
