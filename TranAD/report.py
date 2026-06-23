@@ -47,6 +47,9 @@ def _load_results(dataset, results_folder='results'):
     for path in files:
         with open(path) as f:
             data = json.load(f)
+        # Remember where this result came from so per-model plots can locate the
+        # matching *_labels.csv (same path with _results.json -> _labels.csv).
+        data['_source_path'] = path
         model = data.get('model', 'unknown')
         by_model.setdefault(model, []).append(data)
     return by_model
@@ -631,6 +634,62 @@ def _generate_svg_prediction_errors(dataset, output_path, results_folder='result
 
 
 # ---------------------------------------------------------------------------
+# Per-model SVG plots (best result per model)
+# ---------------------------------------------------------------------------
+
+def _generate_model_plots(dataset, metric, by_model, output_dir):
+    """Plot the best result per model as prediction error vs. threshold.
+
+    For each model, take its best result (by `metric`), read the matching
+    ``*_labels.csv``, and plot the ``prediction_error`` series against the POT
+    threshold with ground-truth anomaly regions shaded. One SVG per model is
+    written to ``output_dir`` (typically ``reports/<dataset>/plots/``).
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    for model, results in by_model.items():
+        best = _best_result(results, metric)
+        if not best:
+            continue
+        src = best.get('_source_path')
+        if not src:
+            continue
+        csv_path = src.replace('_results.json', '_labels.csv')
+        if not os.path.exists(csv_path):
+            print(f'No labels CSV for {model} best result; skipping plot.')
+            continue
+        try:
+            df = pd.read_csv(csv_path)
+        except (ValueError, OSError):
+            continue
+        if 'prediction_error' not in df.columns:
+            continue
+
+        cols = ['prediction_error']
+        threshold = _get(best, 'pot.threshold')
+        if threshold is not None:
+            df['threshold'] = threshold
+            cols.append('threshold')
+
+        ax = df[cols].plot(figsize=(10, 4), linewidth=0.8)
+        if 'ground_truth' in df.columns:
+            mask = df['ground_truth'].astype(bool)
+            ax.fill_between(
+                df.index, 0, 1, where=mask,
+                color='tomato', alpha=0.15,
+                transform=ax.get_xaxis_transform(), label='ground_truth',
+            )
+        ax.set_xlabel('test step')
+        ax.set_ylabel('prediction error')
+        ax.set_title(f'{model} — {dataset}')
+        ax.legend(loc='best', fontsize=8)
+        plt.tight_layout()
+        out_path = os.path.join(output_dir, f'{model}.svg')
+        ax.figure.savefig(out_path, format='svg', bbox_inches='tight')
+        plt.close(ax.figure)
+        print(f'Model plot written to {out_path}')
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -666,6 +725,7 @@ def generate_report(dataset, metric='calibration_loss', results_folder='results'
 	hp_path = os.path.join(dataset_dir, f'hyperparams.md')
 	tex_path = os.path.join(dataset_dir, f'summary.tex')
 	svg_path = os.path.join(dataset_dir, f'prediction_errors.svg')
+	plots_dir = os.path.join(dataset_dir, 'plots')
 
 	_generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled)
 	_generate_pdf(dataset, metric, by_model, pdf_path, unlabeled=unlabeled)
@@ -673,3 +733,4 @@ def generate_report(dataset, metric='calibration_loss', results_folder='results'
 	_generate_hp_markdown(dataset, metric, by_model, hp_path)
 	_generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
 	_generate_svg_prediction_errors(dataset, svg_path, results_folder=results_folder)
+	_generate_model_plots(dataset, metric, by_model, plots_dir)
