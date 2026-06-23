@@ -17,21 +17,21 @@
       ],
       "model": "Attention",
       "learning_rate": [
-        5e-05
+        0.0002
       ],
       "n_window": [
-        10
+        5
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         1e-05
       ],
       "epochs": [
-        30
+        50
       ],
-      "notes": "Attention: best combined-sweep params"
+      "notes": "Attention: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 2,
@@ -63,7 +63,7 @@
       "epochs": [
         50
       ],
-      "notes": "CAE_M: best combined-sweep params"
+      "notes": "CAE_M: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 3,
@@ -90,18 +90,18 @@
         5
       ],
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        1e-05
+        0.001
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "DAGMM: best combined-sweep params"
+      "notes": "DAGMM: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 4,
@@ -125,18 +125,18 @@
         5
       ],
       "n_hidden": [
-        16
+        32
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        1e-05
+        0.001
       ],
       "epochs": [
         50
       ],
-      "notes": "GDN: best combined-sweep params"
+      "notes": "GDN: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 5,
@@ -166,18 +166,18 @@
         128
       ],
       "sequence_length": [
-        8
+        16
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "LSTM_AD: best combined-sweep params"
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_AD: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 6,
@@ -198,19 +198,19 @@
         0.001
       ],
       "n_layers": [
-        2
+        1
       ],
       "n_hidden": [
-        8
-      ],
-      "batch_size": [
-        128
-      ],
-      "sequence_length": [
         16
       ],
+      "batch_size": [
+        64
+      ],
+      "sequence_length": [
+        32
+      ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         1e-05
@@ -218,7 +218,7 @@
       "epochs": [
         50
       ],
-      "notes": "LSTM_AE: best combined-sweep params"
+      "notes": "LSTM_AE: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 7,
@@ -236,7 +236,7 @@
       ],
       "model": "LSTM_Univariate",
       "learning_rate": [
-        0.003
+        0.004
       ],
       "n_hidden": [
         4
@@ -245,18 +245,18 @@
         1
       ],
       "batch_size": [
-        512
+        256
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         0.001
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "LSTM_Univariate: best combined-sweep params"
+      "notes": "LSTM_Univariate: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 8,
@@ -274,16 +274,16 @@
       ],
       "model": "MAD_GAN",
       "n_window": [
-        10
+        5
       ],
       "n_hidden": [
         32
       ],
       "learning_rate": [
-        0.0002
+        0.0001
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         1e-05
@@ -291,7 +291,7 @@
       "epochs": [
         50
       ],
-      "notes": "MAD_GAN: best combined-sweep params"
+      "notes": "MAD_GAN: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 9,
@@ -309,13 +309,13 @@
       ],
       "model": "MSCRED",
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "n_window": [
         5
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         1e-05
@@ -323,7 +323,7 @@
       "epochs": [
         50
       ],
-      "notes": "MSCRED: best combined-sweep params"
+      "notes": "MSCRED: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 10,
@@ -341,27 +341,27 @@
       ],
       "model": "OmniAnomaly",
       "learning_rate": [
-        0.001
+        0.0005
       ],
       "beta": [
         0.0002
       ],
       "n_hidden": [
-        16
+        32
       ],
       "n_latent": [
         16
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        1e-05
+        0.001
       ],
       "epochs": [
         50
       ],
-      "notes": "OmniAnomaly: best combined-sweep params"
+      "notes": "OmniAnomaly: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 11,
@@ -382,10 +382,10 @@
         5
       ],
       "batch_size": [
-        256
+        128
       ],
       "dim_feedforward": [
-        16
+        32
       ],
       "dropout": [
         0.1
@@ -394,15 +394,15 @@
         0.0002
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "TranAD: best combined-sweep params"
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 12,
@@ -426,24 +426,24 @@
         128
       ],
       "dim_feedforward": [
-        16
+        32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
-        5e-05
+        0.0002
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "TranAD_Adversarial: best combined-sweep params"
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Adversarial: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 13,
@@ -473,7 +473,7 @@
         0.1
       ],
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "q": [
         1e-05
@@ -484,7 +484,7 @@
       "epochs": [
         50
       ],
-      "notes": "TranAD_Basic: best combined-sweep params"
+      "notes": "TranAD_Basic: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 14,
@@ -505,7 +505,7 @@
         10
       ],
       "batch_size": [
-        256
+        128
       ],
       "dim_feedforward": [
         16
@@ -523,9 +523,9 @@
         1e-05
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "TranAD_SelfConditioning: best combined-sweep params"
+      "notes": "TranAD_SelfConditioning: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 15,
@@ -543,27 +543,27 @@
       ],
       "model": "TranAD_Transformer",
       "n_window": [
-        5
+        10
       ],
       "batch_size": [
         64
       ],
       "n_hidden": [
-        16
+        32
       ],
       "learning_rate": [
-        5e-05
+        0.0002
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         1e-05
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "TranAD_Transformer: best combined-sweep params"
+      "notes": "TranAD_Transformer: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 16,
@@ -593,7 +593,7 @@
         5
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         0.001
@@ -601,7 +601,7 @@
       "epochs": [
         50
       ],
-      "notes": "USAD: best combined-sweep params"
+      "notes": "USAD: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 17,
@@ -619,21 +619,21 @@
       ],
       "model": "Attention",
       "learning_rate": [
-        5e-05
+        0.0002
       ],
       "n_window": [
         5
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        0.001
+        1e-05
       ],
       "epochs": [
         50
       ],
-      "notes": "Attention: PA-tuned params"
+      "notes": "Attention: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 18,
@@ -654,27 +654,27 @@
         0.001
       ],
       "n_layers": [
-        2
+        1
       ],
       "n_hidden": [
-        16
+        32
       ],
       "batch_size": [
-        512
+        128
       ],
       "sequence_length": [
         16
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        0.001
+        1e-05
       ],
       "epochs": [
         50
       ],
-      "notes": "LSTM_AD: PA-tuned params"
+      "notes": "LSTM_AD: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 19,
@@ -695,27 +695,27 @@
         0.001
       ],
       "n_layers": [
-        2
+        1
       ],
       "n_hidden": [
-        8
+        16
       ],
       "batch_size": [
-        128
+        64
       ],
       "sequence_length": [
         32
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "LSTM_AE: PA-tuned params"
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_AE: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 20,
@@ -739,21 +739,21 @@
         4
       ],
       "n_layers": [
-        2
+        1
       ],
       "batch_size": [
-        512
+        256
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        1e-05
+        0.001
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "LSTM_Univariate: PA-tuned params"
+      "notes": "LSTM_Univariate: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 21,
@@ -771,24 +771,24 @@
       ],
       "model": "MAD_GAN",
       "n_window": [
-        10
+        5
       ],
       "n_hidden": [
         32
       ],
       "learning_rate": [
-        0.0002
+        0.0001
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         1e-05
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "MAD_GAN: PA-tuned params"
+      "notes": "MAD_GAN: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 22,
@@ -812,15 +812,15 @@
         5
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
-        0.001
+        1e-05
       ],
       "epochs": [
         50
       ],
-      "notes": "MSCRED: PA-tuned params"
+      "notes": "MSCRED: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 23,
@@ -850,7 +850,7 @@
         16
       ],
       "q": [
-        1e-05
+        0.001
       ],
       "weight_decay": [
         0.001
@@ -858,7 +858,7 @@
       "epochs": [
         50
       ],
-      "notes": "OmniAnomaly: PA-tuned params"
+      "notes": "OmniAnomaly: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 24,
@@ -876,13 +876,13 @@
       ],
       "model": "TranAD",
       "n_window": [
-        10
+        5
       ],
       "batch_size": [
         128
       ],
       "dim_feedforward": [
-        16
+        32
       ],
       "dropout": [
         0.1
@@ -891,15 +891,15 @@
         0.0002
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "TranAD: PA-tuned params"
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 25,
@@ -920,27 +920,27 @@
         5
       ],
       "batch_size": [
-        256
+        128
       ],
       "dim_feedforward": [
-        16
+        32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "TranAD_Adversarial: PA-tuned params"
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Adversarial: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 26,
@@ -961,16 +961,16 @@
         10
       ],
       "batch_size": [
-        256
+        128
       ],
       "dim_feedforward": [
-        16
+        32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "q": [
         1e-05
@@ -979,9 +979,9 @@
         1e-05
       ],
       "epochs": [
-        30
+        50
       ],
-      "notes": "TranAD_Basic: PA-tuned params"
+      "notes": "TranAD_Basic: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 27,
@@ -1020,9 +1020,9 @@
         1e-05
       ],
       "epochs": [
-        10
+        50
       ],
-      "notes": "TranAD_SelfConditioning: PA-tuned params"
+      "notes": "TranAD_SelfConditioning: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 28,
@@ -1043,24 +1043,24 @@
         10
       ],
       "batch_size": [
-        128
+        64
       ],
       "n_hidden": [
-        16
+        32
       ],
       "learning_rate": [
-        0.0001
+        0.0002
       ],
       "q": [
-        1e-05
-      ],
-      "weight_decay": [
         0.001
       ],
-      "epochs": [
-        10
+      "weight_decay": [
+        1e-05
       ],
-      "notes": "TranAD_Transformer: PA-tuned params"
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Transformer: best calibration_loss params, epochs scaled x10"
     }
   ]
 }
