@@ -30,6 +30,12 @@ DISPLAY_METRICS = [f"{method}.{m}" for method in METHODS for m in METHOD_METRICS
 # Metrics where lower is better (affects _best_result and sort order).
 LOWER_IS_BETTER = {"calibration_loss"}
 
+# Models are *selected* (best hyperparameters) by the `metric` argument
+# (default calibration_loss), but the summary tables are *ordered* by F1.
+# Calibration loss is not comparable across models, so it makes a poor ranking;
+# F1 reflects detection quality and is comparable.
+SUMMARY_SORT_METRIC = "pot.f1"
+
 
 def _get(d, dotted_key):
     """Look up a possibly-dotted key like 'pot.f1' in a nested dict, returning None if absent."""
@@ -76,7 +82,11 @@ def _best_result(results, metric):
 
     valid = [r for r in results if not math.isnan(_val(r))]
     if not valid:
-        return None
+        # No result has this metric (e.g. calibration_loss missing on
+        # old-style results that used the training threshold). Fall back to
+        # the first result so its available metrics still render instead of
+        # blanking the whole row to N/A.
+        return results[0] if results else None
     if metric in LOWER_IS_BETTER:
         return min(valid, key=_val)
     return max(valid, key=_val)
@@ -237,7 +247,10 @@ def _build_summary(by_model, metric, unlabeled=False):
     # Labeled mode
     display_columns = DISPLAY_COLUMNS
 
-    sort_method, sort_sep, sort_metric = metric.partition(".")
+    # Order by F1 (detection quality), independent of the selection metric.
+    lower_is_better = SUMMARY_SORT_METRIC in LOWER_IS_BETTER
+    missing_sort_val = float("inf") if lower_is_better else float("-inf")
+    sort_method, sort_sep, sort_metric = SUMMARY_SORT_METRIC.partition(".")
 
     grouped = []  # list of (sort_value, [method_rows], hp_row)
     for model, results in by_model.items():
@@ -474,8 +487,9 @@ UNLABELED_SLIDE_COLUMNS = [
 
 
 def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
-    """One row per model, slim metric set, sorted by `metric`."""
-    lower_is_better = metric in LOWER_IS_BETTER
+    """One row per model, slim metric set; selected by `metric`, ordered by F1."""
+    sort_metric = metric if unlabeled else SUMMARY_SORT_METRIC
+    lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
     slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
@@ -489,7 +503,7 @@ def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
             else:
                 row[label] = "N/A"
         try:
-            sort_val = float(_get(best, metric)) if best else missing_sort_val
+            sort_val = float(_get(best, sort_metric)) if best else missing_sort_val
         except (TypeError, ValueError):
             sort_val = missing_sort_val
         if sort_val != sort_val:  # NaN
@@ -588,7 +602,8 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
     Designed to be ``\\input``-ed inside a user-provided ``table`` float —
     no float wrapper is emitted.
     """
-    lower_is_better = metric in LOWER_IS_BETTER
+    sort_metric = metric if unlabeled else SUMMARY_SORT_METRIC
+    lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
     slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
@@ -604,7 +619,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
             else:
                 row[label] = "N/A"
         try:
-            sort_val = float(_get(best, metric)) if best else missing_sort_val
+            sort_val = float(_get(best, sort_metric)) if best else missing_sort_val
         except (TypeError, ValueError):
             sort_val = missing_sort_val
         if sort_val != sort_val:
@@ -629,26 +644,48 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
 # ---------------------------------------------------------------------------
 
 
-def _generate_svg_prediction_errors(dataset, output_path, results_folder="results"):
-    """Overlay per-model prediction_error series for a dataset and save as SVG.
+def _generate_svg_prediction_errors(
+    dataset, metric, by_model, output_path
+):
+    """Overlay each model's best-result prediction_error for a dataset as SVG.
 
-    Mirrors the style of test.ipynb: read every ``*_labels.csv`` in the
-    dataset's results folder, take the ``prediction_error`` column, and plot
-    all models on one axis with y-limit clipped to ``min(1.0, max)``.
+    For each model, take its best result (by `metric`), read the matching
+    ``*_labels.csv``, and plot the ``prediction_error`` column scaled by that
+    model's POT threshold so the threshold is 1 — any peak above 1 is flagged
+    anomalous. All models are drawn on one axis with a dashed line at y=1 and
+    ground-truth anomaly regions shaded once.
     """
-    pattern = os.path.join(results_folder, dataset, "*_labels.csv")
-    files = sorted(glob(pattern))
     series = {}
-    for path in files:
+    ground_truth = None
+    for model, results in by_model.items():
+        best = _best_result(results, metric)
+        if not best:
+            continue
+        src = best.get("_source_path")
+        if not src:
+            continue
+        csv_path = src.replace("_results.json", "_labels.csv")
+        if not os.path.exists(csv_path):
+            continue
         try:
-            df = pd.read_csv(path, usecols=["prediction_error"])
-        except (ValueError, KeyError):
+            df = pd.read_csv(csv_path)
+        except (ValueError, OSError):
             continue
         if "prediction_error" not in df.columns:
             continue
-        model_name = os.path.basename(path).split("_exp")[0]
-        # If multiple experiments per model exist, keep the first encountered.
-        series.setdefault(model_name, df["prediction_error"].reset_index(drop=True))
+        # Scale by the POT threshold so the threshold maps to 1.
+        threshold = _get(best, "pot.threshold")
+        try:
+            threshold = float(threshold)
+        except (TypeError, ValueError):
+            threshold = None
+        if not threshold or threshold <= 0:
+            print(f"No usable POT threshold for {model}; skipping in SVG plot.")
+            continue
+        series[model] = df["prediction_error"].reset_index(drop=True) / threshold
+        # Ground truth is shared across models for a dataset; capture it once.
+        if ground_truth is None and "ground_truth" in df.columns:
+            ground_truth = df["ground_truth"].reset_index(drop=True)
 
     if not series:
         print(f"No prediction_error data found for {dataset}; skipping SVG plot.")
@@ -656,16 +693,31 @@ def _generate_svg_prediction_errors(dataset, output_path, results_folder="result
 
     combined = pd.concat(series, axis=1)
     try:
-        y_max = float(min(1.0, combined.max().max()))
+        y_max = float(combined.max().max())
     except (TypeError, ValueError):
-        y_max = 1.0
-    if not (y_max > 0):
-        y_max = 1.0
+        y_max = 2.0
+    if not (y_max > 0) or math.isnan(y_max):
+        y_max = 2.0
+    # Cap extreme outliers but always keep the threshold line in view.
+    y_max = max(1.2, min(y_max, 10.0))
 
     fig, ax = plt.subplots(figsize=(10, 4))
     combined.plot(ax=ax, ylim=(0, y_max), linewidth=0.8)
+    ax.axhline(1.0, color="black", linestyle="--", linewidth=0.8, label="threshold")
+    if ground_truth is not None:
+        mask = ground_truth.astype(bool)
+        ax.fill_between(
+            ground_truth.index,
+            0,
+            1,
+            where=mask,
+            color="tomato",
+            alpha=0.15,
+            transform=ax.get_xaxis_transform(),
+            label="ground_truth",
+        )
     ax.set_xlabel("test step")
-    ax.set_ylabel("prediction error")
+    ax.set_ylabel("prediction error / threshold")
     ax.set_title(f"Prediction error — {dataset}")
     ax.legend(loc="best", fontsize=8, ncol=2)
     plt.tight_layout()
@@ -744,8 +796,7 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
 def generate_report(dataset, metric="calibration_loss", results_folder="results"):
     """Generate HTML, PDF, CSV, and hyperparameter-markdown reports for a dataset.
 
-    For TOL datasets (e.g., 'TOL_1_1', 'TOL_2_1_1'), files are saved in reports/TOL/{dataset}/.
-    For other datasets, files are saved in reports/{dataset}/.
+    Files are saved in reports/{dataset}/ (e.g., reports/TOL_1_1/).
     """
     by_model = _load_results(dataset, results_folder)
     if not by_model:
@@ -764,11 +815,7 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
         _is_unlabeled(r) for r in results_with_pot
     )
 
-    # For TOL experiments, nest in reports/TOL/{experiment_id}/
-    if dataset.startswith("TOL_"):
-        dataset_dir = os.path.join("reports", "TOL", dataset)
-    else:
-        dataset_dir = os.path.join("reports", dataset)
+    dataset_dir = os.path.join("reports", dataset)
 
     os.makedirs(dataset_dir, exist_ok=True)
     html_path = os.path.join(dataset_dir, f"report.html")
@@ -784,5 +831,5 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
     _generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled)
     _generate_hp_markdown(dataset, metric, by_model, hp_path)
     _generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
-    _generate_svg_prediction_errors(dataset, svg_path, results_folder=results_folder)
+    _generate_svg_prediction_errors(dataset, metric, by_model, svg_path)
     _generate_model_plots(dataset, metric, by_model, plots_dir)

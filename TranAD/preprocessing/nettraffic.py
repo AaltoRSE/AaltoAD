@@ -379,6 +379,19 @@ def load_nettraffic(
 
     if train.size == 0:
         raise ValueError("Training partition is empty after split. Cannot normalize.")
+
+    # Zero out columns that are constant in the training (baseline) data across
+    # every partition. Without this, the eps-regularised divisor in normalize()
+    # amplifies any calib/test variation in such columns by 1/eps (~10000x),
+    # drowning out signal from the well-behaved features.
+    keep = train.max(axis=0) != train.min(axis=0)
+    if not keep.all():
+        constant_cols = [c for c, k in zip(canonical_cols, keep) if not k]
+        print(f"  zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}")
+        for part in (train, calib, test, valid):
+            if part.size:
+                part[:, ~keep] = 0.0
+
     train, min_a, max_a = normalize(train)
     if calib.size > 0:
         calib, _, _ = normalize(calib, min_a, max_a)
