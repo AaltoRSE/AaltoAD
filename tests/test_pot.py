@@ -39,10 +39,8 @@ def test_pot_eval_with_dummy_spot(monkeypatch):
 
         def initialize(self, level=None, min_extrema=False, verbose=False):
             self.level = level
-
-        def run(self, dynamic=False):
-            # return a thresholds array so pot_eval computes a threshold
-            return {"thresholds": np.array([0.6]), "alarms": []}
+            # pot_eval reads the calibration threshold from this attribute
+            self.extreme_quantile = 0.6
 
     # monkeypatch SPOT used inside pot module
     monkeypatch.setattr(pot, "SPOT", DummySPOT)

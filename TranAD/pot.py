@@ -186,8 +186,9 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False
                 }, pred
             lms = lms * 0.95
         else: break
-    ret = s.run(dynamic=False)  # run
-    pot_th = np.mean(ret['thresholds']) * constants.lm[1]
+    # Threshold comes from the calibration data only: initialize() fits the
+    # GPD to the peaks of init_score and extrapolates the quantile at risk q.
+    pot_th = s.extreme_quantile * constants.lm[1]
     raw_pred = score > pot_th
     p_latency = segment_latency(raw_pred, label)
     if expand_segments:

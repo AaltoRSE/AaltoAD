@@ -644,9 +644,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
 # ---------------------------------------------------------------------------
 
 
-def _generate_svg_prediction_errors(
-    dataset, metric, by_model, output_path
-):
+def _generate_svg_prediction_errors(dataset, metric, by_model, output_path):
     """Overlay each model's best-result prediction_error for a dataset as SVG.
 
     For each model, take its best result (by `metric`), read the matching
