@@ -640,18 +640,20 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
 
 
 # ---------------------------------------------------------------------------
-# SVG prediction-error plot
+# PDF prediction-error plot
 # ---------------------------------------------------------------------------
 
 
-def _generate_svg_prediction_errors(dataset, metric, by_model, output_path):
-    """Overlay each model's best-result prediction_error for a dataset as SVG.
+def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
+    """Overlay each model's best-result prediction_error for a dataset.
 
     For each model, take its best result (by `metric`), read the matching
     ``*_labels.csv``, and plot the ``prediction_error`` column scaled by that
     model's POT threshold so the threshold is 1 — any peak above 1 is flagged
     anomalous. All models are drawn on one axis with a dashed line at y=1 and
-    ground-truth anomaly regions shaded once.
+    ground-truth anomaly regions shaded once. The figure is saved as both a
+    vector PDF (for ``\\includegraphics`` in a LaTeX/Overleaf document) and an
+    SVG, sharing the basename of ``output_path``.
     """
     series = {}
     ground_truth = None
@@ -678,7 +680,7 @@ def _generate_svg_prediction_errors(dataset, metric, by_model, output_path):
         except (TypeError, ValueError):
             threshold = None
         if not threshold or threshold <= 0:
-            print(f"No usable POT threshold for {model}; skipping in SVG plot.")
+            print(f"No usable POT threshold for {model}; skipping in PDF plot.")
             continue
         series[model] = df["prediction_error"].reset_index(drop=True) / threshold
         # Ground truth is shared across models for a dataset; capture it once.
@@ -686,7 +688,7 @@ def _generate_svg_prediction_errors(dataset, metric, by_model, output_path):
             ground_truth = df["ground_truth"].reset_index(drop=True)
 
     if not series:
-        print(f"No prediction_error data found for {dataset}; skipping SVG plot.")
+        print(f"No prediction_error data found for {dataset}; skipping PDF plot.")
         return
 
     combined = pd.concat(series, axis=1)
@@ -719,9 +721,12 @@ def _generate_svg_prediction_errors(dataset, metric, by_model, output_path):
     ax.set_title(f"Prediction error — {dataset}")
     ax.legend(loc="best", fontsize=8, ncol=2)
     plt.tight_layout()
-    fig.savefig(output_path, format="svg", bbox_inches="tight")
+    base = os.path.splitext(output_path)[0]
+    for fmt in ("pdf", "svg"):
+        out = f"{base}.{fmt}"
+        fig.savefig(out, format=fmt, bbox_inches="tight")
+        print(f"Prediction-error plot written to {out}")
     plt.close(fig)
-    print(f"SVG prediction-error plot written to {output_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -734,8 +739,9 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
 
     For each model, take its best result (by `metric`), read the matching
     ``*_labels.csv``, and plot the ``prediction_error`` series against the POT
-    threshold with ground-truth anomaly regions shaded. One SVG per model is
-    written to ``output_dir`` (typically ``reports/<dataset>/plots/``).
+    threshold with ground-truth anomaly regions shaded. Each model is written to
+    ``output_dir`` (typically ``reports/<dataset>/plots/``) as both a PDF (for
+    ``\\includegraphics`` in a LaTeX/Overleaf document) and an SVG.
     """
     os.makedirs(output_dir, exist_ok=True)
     for model, results in by_model.items():
@@ -780,10 +786,11 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
         ax.set_title(f"{model} — {dataset}")
         ax.legend(loc="best", fontsize=8)
         plt.tight_layout()
-        out_path = os.path.join(output_dir, f"{model}.svg")
-        ax.figure.savefig(out_path, format="svg", bbox_inches="tight")
+        for fmt in ("pdf", "svg"):
+            out_path = os.path.join(output_dir, f"{model}.{fmt}")
+            ax.figure.savefig(out_path, format=fmt, bbox_inches="tight")
+            print(f"Model plot written to {out_path}")
         plt.close(ax.figure)
-        print(f"Model plot written to {out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -821,7 +828,7 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
     csv_path = os.path.join(dataset_dir, f"summary.csv")
     hp_path = os.path.join(dataset_dir, f"hyperparams.md")
     tex_path = os.path.join(dataset_dir, f"summary.tex")
-    svg_path = os.path.join(dataset_dir, f"prediction_errors.svg")
+    plot_path = os.path.join(dataset_dir, f"prediction_errors.pdf")
     plots_dir = os.path.join(dataset_dir, "plots")
 
     _generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled)
@@ -829,5 +836,5 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
     _generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled)
     _generate_hp_markdown(dataset, metric, by_model, hp_path)
     _generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
-    _generate_svg_prediction_errors(dataset, metric, by_model, svg_path)
+    _generate_prediction_error_plot(dataset, metric, by_model, plot_path)
     _generate_model_plots(dataset, metric, by_model, plots_dir)
