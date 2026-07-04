@@ -692,17 +692,10 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
         return
 
     combined = pd.concat(series, axis=1)
-    try:
-        y_max = float(combined.max().max())
-    except (TypeError, ValueError):
-        y_max = 2.0
-    if not (y_max > 0) or math.isnan(y_max):
-        y_max = 2.0
-    # Cap extreme outliers but always keep the threshold line in view.
-    y_max = max(1.2, min(y_max, 10.0))
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    combined.plot(ax=ax, ylim=(0, y_max), linewidth=0.8)
+    combined.plot(ax=ax, ylim=(-0.2, 3.0), linewidth=0.8)
+    ax.axhline(0.0, color="black", linewidth=0.8)
     ax.axhline(1.0, color="black", linestyle="--", linewidth=0.8, label="threshold")
     if ground_truth is not None:
         mask = ground_truth.astype(bool)
