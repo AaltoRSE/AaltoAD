@@ -690,17 +690,11 @@ def _generate_svg_prediction_errors(dataset, metric, by_model, output_path):
         return
 
     combined = pd.concat(series, axis=1)
-    try:
-        y_max = float(combined.max().max())
-    except (TypeError, ValueError):
-        y_max = 2.0
-    if not (y_max > 0) or math.isnan(y_max):
-        y_max = 2.0
-    # Cap extreme outliers but always keep the threshold line in view.
-    y_max = max(1.2, min(y_max, 10.0))
-
+    # Fixed axis so the threshold (scaled to 1) and variation around/below it
+    # are clearly visible; extreme peaks above 3 are clipped by the ylim.
     fig, ax = plt.subplots(figsize=(10, 4))
-    combined.plot(ax=ax, ylim=(0, y_max), linewidth=0.8)
+    combined.plot(ax=ax, ylim=(-0.2, 2), linewidth=0.8)
+    ax.axhline(0.0, color="black", linewidth=0.8)
     ax.axhline(1.0, color="black", linestyle="--", linewidth=0.8, label="threshold")
     if ground_truth is not None:
         mask = ground_truth.astype(bool)
@@ -756,13 +750,22 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
         if "prediction_error" not in df.columns:
             continue
 
-        cols = ["prediction_error"]
         threshold = _get(best, "pot.threshold")
-        if threshold is not None:
-            df["threshold"] = threshold
-            cols.append("threshold")
+        try:
+            threshold = float(threshold)
+        except (TypeError, ValueError):
+            threshold = None
+        if not threshold or threshold <= 0:
+            print(f"No usable POT threshold for {model}; skipping plot.")
+            continue
 
-        ax = df[cols].plot(figsize=(10, 4), linewidth=0.8)
+        # Scale by the POT threshold so the threshold maps to 1 and variation
+        # around/below it is clearly visible on a fixed 0-3 axis.
+        df["prediction_error"] = df["prediction_error"] / threshold
+
+        ax = df[["prediction_error"]].plot(figsize=(10, 4), linewidth=0.8, ylim=(-0.2, 2))
+        ax.axhline(0.0, color="black", linewidth=0.8)
+        ax.axhline(1.0, color="black", linestyle="--", linewidth=0.8, label="threshold")
         if "ground_truth" in df.columns:
             mask = df["ground_truth"].astype(bool)
             ax.fill_between(
@@ -776,7 +779,7 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
                 label="ground_truth",
             )
         ax.set_xlabel("test step")
-        ax.set_ylabel("prediction error")
+        ax.set_ylabel("prediction error / threshold")
         ax.set_title(f"{model} — {dataset}")
         ax.legend(loc="best", fontsize=8)
         plt.tight_layout()
