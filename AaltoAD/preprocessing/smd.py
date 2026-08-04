@@ -1,6 +1,6 @@
 import os
-from TranAD.constants import DEFAULT_DATA_FOLDER
-from TranAD.preprocessing.utils import load_and_save, load_and_save2
+from AaltoAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing.utils import load_and_save, load_and_save2
 
 
 def load_SMD(folder):

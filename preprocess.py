@@ -1,10 +1,10 @@
 import os
-import TranAD
+import AaltoAD
 import argparse
 
-from TranAD.constants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
+from AaltoAD.constants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
 
-# dataset-specific implementations live under TranAD.preprocessing
+# dataset-specific implementations live under AaltoAD.preprocessing
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL', 'SWaT_physical', 'SWaT_netflow', 'SWaT_payload_netflow', 'nettraffic']
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
@@ -77,14 +77,14 @@ def load_data(
 	if dataset.startswith('TOL'):
 		# Convert mutable inner lists to tuples for clarity, but load_TOL accepts either.
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
-		TranAD.preprocessing.load_TOL(
+		AaltoAD.preprocessing.load_TOL(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
 			top_k=top_k,
 			extended_features=extended_features,
 		)
 	elif dataset.startswith('nettraffic'):
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
-		TranAD.preprocessing.load_nettraffic(
+		AaltoAD.preprocessing.load_nettraffic(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
 			top_k=top_k, interval=interval, port_entropy=args.port_entropy,
 			bytes=args.bytes, temperature=args.temperature,
@@ -92,29 +92,29 @@ def load_data(
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
 	elif dataset == 'UCR':
-		TranAD.preprocessing.load_UCR(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_UCR(folder, data_folder=data_folder)
 	elif dataset == 'synthetic':
-		TranAD.preprocessing.load_synthetic(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_synthetic(folder, data_folder=data_folder)
 	elif dataset == 'SMD':
-		TranAD.preprocessing.load_SMD(folder)
+		AaltoAD.preprocessing.load_SMD(folder)
 	elif dataset == 'NAB':
-		TranAD.preprocessing.load_NAB(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_NAB(folder, data_folder=data_folder)
 	elif dataset == 'MSDS':
-		TranAD.preprocessing.load_MSDS(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_MSDS(folder, data_folder=data_folder)
 	elif dataset == 'SWaT':
-		TranAD.preprocessing.load_SWaT(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_SWaT(folder, data_folder=data_folder)
 	elif dataset in ['SMAP', 'MSL']:
-		TranAD.preprocessing.load_SMAP_MSL(folder, dataset, data_folder=data_folder)
+		AaltoAD.preprocessing.load_SMAP_MSL(folder, dataset, data_folder=data_folder)
 	elif dataset == 'WADI':
-		TranAD.preprocessing.load_WADI(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_WADI(folder, data_folder=data_folder)
 	elif dataset == 'MBA':
-		TranAD.preprocessing.load_MBA(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_MBA(folder, data_folder=data_folder)
 	elif dataset == 'SWaT_physical':
-		TranAD.preprocessing.load_SWaT_physical(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_SWaT_physical(folder, data_folder=data_folder)
 	elif dataset == 'SWaT_netflow':
-		TranAD.preprocessing.load_SWaT_netflow(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_SWaT_netflow(folder, data_folder=data_folder)
 	elif dataset == 'SWaT_payload_netflow':
-		TranAD.preprocessing.load_SWaT_payload_netflow(folder, data_folder=data_folder)
+		AaltoAD.preprocessing.load_SWaT_payload_netflow(folder, data_folder=data_folder)
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 

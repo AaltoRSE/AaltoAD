@@ -133,7 +133,7 @@ def load_dataset(dataset: str, less: bool = False, output_folder: str = 'process
 	Raises:
 		Exception: If processed data folder does not exist for the given dataset.
 	"""
-	from TranAD.utils import cut_array
+	from AaltoAD.utils import cut_array
 
 	folder = os.path.join(output_folder, dataset)
 	if not os.path.exists(folder):

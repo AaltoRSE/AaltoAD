@@ -1,8 +1,8 @@
 import os
 import numpy as np
 import pandas as pd
-from TranAD.preprocessing.utils import normalize
-from TranAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing.utils import normalize
+from AaltoAD.constants import DEFAULT_DATA_FOLDER
 
 
 def load_SWaT(folder, data_folder=DEFAULT_DATA_FOLDER):

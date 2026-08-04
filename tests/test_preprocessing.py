@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from TranAD.preprocessing.utils import normalize
+from AaltoAD.preprocessing.utils import normalize
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -143,7 +143,7 @@ def _assert_clean_finite(path):
 
 
 def test_load_NAB(tmp_path):
-    from TranAD.preprocessing.nab import load_NAB
+    from AaltoAD.preprocessing.nab import load_NAB
     out = tmp_path / "NAB"
     out.mkdir()
     load_NAB(str(out), data_folder=DATA_DIR)
@@ -157,7 +157,7 @@ def test_load_NAB(tmp_path):
 
 
 def test_load_synthetic(tmp_path):
-    from TranAD.preprocessing.synthetic import load_synthetic
+    from AaltoAD.preprocessing.synthetic import load_synthetic
     out = tmp_path / "synthetic"
     out.mkdir()
     np.random.seed(0)  # the loader uses np.random
@@ -172,7 +172,7 @@ def test_load_synthetic(tmp_path):
 
 
 def test_load_UCR(tmp_path):
-    from TranAD.preprocessing.ucr import load_UCR
+    from AaltoAD.preprocessing.ucr import load_UCR
     out = tmp_path / "UCR"
     out.mkdir()
     load_UCR(str(out), data_folder=DATA_DIR)
@@ -188,7 +188,7 @@ def test_load_UCR(tmp_path):
 
 def test_load_MBA(tmp_path):
     pytest.importorskip("openpyxl")
-    from TranAD.preprocessing.mba import load_MBA
+    from AaltoAD.preprocessing.mba import load_MBA
     out = tmp_path / "MBA"
     out.mkdir()
     load_MBA(str(out), data_folder=DATA_DIR)
@@ -200,7 +200,7 @@ def test_load_MBA(tmp_path):
 
 
 def test_load_SMAP(tmp_path):
-    from TranAD.preprocessing.smap_msl import load_SMAP_MSL
+    from AaltoAD.preprocessing.smap_msl import load_SMAP_MSL
     out = tmp_path / "SMAP"
     out.mkdir()
     load_SMAP_MSL(str(out), "SMAP", data_folder=DATA_DIR)
@@ -213,7 +213,7 @@ def test_load_SMAP(tmp_path):
 
 
 def test_load_MSL(tmp_path):
-    from TranAD.preprocessing.smap_msl import load_SMAP_MSL
+    from AaltoAD.preprocessing.smap_msl import load_SMAP_MSL
     out = tmp_path / "MSL"
     out.mkdir()
     load_SMAP_MSL(str(out), "MSL", data_folder=DATA_DIR)
@@ -228,7 +228,7 @@ def test_load_SMD(tmp_path, monkeypatch):
     load_and_save's default-arg DEFAULT_OUTPUT_FOLDER. Run from tmp_path with
     a symlink to the repo's data folder so output lands in the temp dir.
     """
-    from TranAD.preprocessing.smd import load_SMD
+    from AaltoAD.preprocessing.smd import load_SMD
 
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data").symlink_to(REPO_ROOT / "data")

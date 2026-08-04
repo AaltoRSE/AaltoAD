@@ -1,6 +1,6 @@
 import numpy as np
-import TranAD.merlin as merlin_mod
-import TranAD.constants as const
+import AaltoAD.merlin as merlin_mod
+import AaltoAD.constants as const
 
 
 def test_dist_and_getsub():

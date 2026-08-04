@@ -19,14 +19,14 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.metrics import precision_recall_curve, confusion_matrix
 
-import TranAD
-from TranAD import models
-from TranAD import constants
-from TranAD import plotting
-from TranAD import pot
-from TranAD import merlin
-from TranAD import diagnosis
-from TranAD import utils
+import AaltoAD
+from AaltoAD import models
+from AaltoAD import constants
+from AaltoAD import plotting
+from AaltoAD import pot
+from AaltoAD import merlin
+from AaltoAD import diagnosis
+from AaltoAD import utils
 
 import tempfile
 import shutil
@@ -530,21 +530,21 @@ def run_all(models_list=None, datasets_list=None, args_obj=None):
 	"""Run all models on all datasets and print a summary report.
 
 	Args:
-		models_list (list): List of model names to run. If None, discovers from TranAD.models.
+		models_list (list): List of model names to run. If None, discovers from AaltoAD.models.
 		datasets_list (list): List of dataset names to run. If None, discovers from processed folder.
 		args_obj: Optional args object with retrain attribute.
 	"""
 	# discover datasets from processed output folder if not provided
 	if datasets_list is None:
-		folder = os.path.join(TranAD.constants.output_folder)
+		folder = os.path.join(AaltoAD.constants.output_folder)
 		if not os.path.exists(folder):
 			raise Exception(f'Processed data folder not found: {folder}')
 		datasets_list = sorted([d for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))])
 
 	# discover model class names if not provided
 	if models_list is None:
-		importlib.reload(TranAD.models)
-		models_list = [name for name in dir(TranAD.models) if name[0].isupper() and callable(getattr(TranAD.models, name))] + ["MERLIN"]
+		importlib.reload(AaltoAD.models)
+		models_list = [name for name in dir(AaltoAD.models) if name[0].isupper() and callable(getattr(AaltoAD.models, name))] + ["MERLIN"]
 
 	# Load existing benchmark entries to optionally skip already-run experiments
 	bench_file = os.path.join('results', 'benchmarks.csv')
@@ -567,7 +567,7 @@ def run_all(models_list=None, datasets_list=None, args_obj=None):
 		for modelname in models_list:
 			constants.initialize(dataset, modelname)
 			# reload models so they pick up new dataset
-			importlib.reload(TranAD.models)
+			importlib.reload(AaltoAD.models)
 			
 			# Skip if this run is already present in the benchmarks CSV and retrain not requested
 			should_retrain = getattr(args_obj, 'retrain', False) if args_obj else False

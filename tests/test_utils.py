@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-import TranAD.utils as utils
+import AaltoAD.utils as utils
 
 
 def test_cut_array_center_slice():

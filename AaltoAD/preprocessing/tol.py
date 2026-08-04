@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import re
 
-from TranAD.constants import DEFAULT_DATA_FOLDER
-from TranAD.preprocessing.utils import normalize
+from AaltoAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing.utils import normalize
 
 
 def parse_timestamp_column(series):

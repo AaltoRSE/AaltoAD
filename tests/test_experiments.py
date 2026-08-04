@@ -1,4 +1,4 @@
-from TranAD import run_experiment
+from AaltoAD import run_experiment
 import torch
 import csv
 import json
@@ -24,11 +24,11 @@ def test_save_and_load_model(tmp_path):
     loaded_model, loaded_optimizer, loaded_scheduler, loaded_epoch, loaded_accuracy_list, _, _ = run_experiment.load_model(
         model_name, 1, dataset_name, retrain=False, test=True, root_path=str(tmp_path)+'/'
     )
-    
+
     # Check that the loaded model has the same state_dict as the original
     for param_tensor in model.state_dict():
         assert torch.equal(model.state_dict()[param_tensor], loaded_model.state_dict()[param_tensor])
-    
+
     # Check that other components are also correctly loaded
     assert epoch == loaded_epoch
     assert accuracy_list == loaded_accuracy_list
@@ -38,7 +38,7 @@ def test_load_model_retrain_flag(tmp_path):
     """Test that retrain flag prevents loading existing checkpoint."""
     dataset_name = 'synthetic'
     model_name = 'LSTM_Univariate'
-    
+
     # Create and save a model
     model, optimizer, scheduler, epoch, accuracy_list, _, _ = run_experiment.load_model(
         model_name, 1, dataset_name, retrain=True, test=False, root_path=str(tmp_path)+'/'
@@ -57,7 +57,7 @@ def test_load_model_with_hyperparameters():
     """Test that hyperparameters are applied when loading model."""
     dataset_name = 'synthetic'
     model_name = 'TranAD'
-    
+
     # Create hyperparams JSON string
     hyperparams = json.dumps({
         'learning_rate': 0.005,
@@ -78,7 +78,7 @@ def test_load_model_with_hyperparameters():
 def test_append_benchmark_row_creates_file(tmp_path):
     """Test that append_benchmark_row creates CSV file with header."""
     bench_path = tmp_path / 'benchmarks.csv'
-    
+
     result_dict = {
         'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
         'oracle': {'precision': 0.88, 'recall': 0.93, 'f1': 0.90, 'threshold': 0.42},
@@ -104,7 +104,7 @@ def test_append_benchmark_row_creates_file(tmp_path):
 def test_append_benchmark_row_appends_to_existing(tmp_path):
     """Test that append_benchmark_row appends to existing file without duplicating header."""
     bench_path = tmp_path / 'benchmarks.csv'
-    
+
     # Create first entry
     result1 = {'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
                'oracle': {'precision': 0.86, 'recall': 0.91, 'f1': 0.88, 'threshold': 0.5}}
@@ -128,7 +128,7 @@ def test_append_benchmark_row_appends_to_existing(tmp_path):
 def test_append_benchmark_row_handles_missing_values(tmp_path):
     """Test that append_benchmark_row handles missing values gracefully."""
     bench_path = tmp_path / 'benchmarks.csv'
-    
+
     result_dict = {
         'pot': {'precision': 0.85},  # missing recall, ROC/AUC, f1; oracle absent entirely
     }
@@ -145,15 +145,15 @@ def test_append_benchmark_row_handles_missing_values(tmp_path):
         assert rows[1][3] == ''      # pot_recall missing
 
 
-@patch('TranAD.run_experiment.load_model')
-@patch('TranAD.utils.load_dataset')
-@patch('TranAD.utils.convert_to_windows')
-@patch('TranAD.utils.load_timestamps')
-@patch('TranAD.plotting.plotter')
-@patch('TranAD.pot.pot_eval')
-@patch('TranAD.diagnosis.hit_att')
-@patch('TranAD.diagnosis.ndcg')
-@patch('TranAD.utils.get_git_hash')
+@patch('AaltoAD.run_experiment.load_model')
+@patch('AaltoAD.utils.load_dataset')
+@patch('AaltoAD.utils.convert_to_windows')
+@patch('AaltoAD.utils.load_timestamps')
+@patch('AaltoAD.plotting.plotter')
+@patch('AaltoAD.pot.pot_eval')
+@patch('AaltoAD.diagnosis.hit_att')
+@patch('AaltoAD.diagnosis.ndcg')
+@patch('AaltoAD.utils.get_git_hash')
 def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
                                mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment function with mocked models."""
@@ -165,7 +165,7 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 
     # Create mock model
     mock_model = Mock(spec=['name', 'lr', 'batch', 'n_window', 'eval', 'eval_step', 'epochs', 'weight_decay'])
-    mock_model.name = 'TranAD'
+    mock_model.name = 'AaltoAD'
     mock_model.lr = 0.001
     mock_model.batch = 128
     mock_model.n_window = 10
@@ -211,23 +211,23 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
     assert result['model'] == 'TranAD'
     assert result['dataset'] == 'TOL'
     assert 'oracle' in result
-    
+
     # Verify results file was created
     results_file = tmp_path / 'results' / 'TOL' / 'TranAD_results.json'
     assert results_file.exists()
 
 
-@patch('TranAD.run_experiment.load_model')
-@patch('TranAD.utils.load_dataset')
-@patch('TranAD.utils.convert_to_windows')
-@patch('TranAD.utils.load_timestamps')
-@patch('TranAD.run_experiment.save_model')
-@patch('TranAD.utils.plot_accuracies')
-@patch('TranAD.plotting.plotter')
-@patch('TranAD.pot.pot_eval')
-@patch('TranAD.diagnosis.hit_att')
-@patch('TranAD.diagnosis.ndcg')
-@patch('TranAD.utils.get_git_hash')
+@patch('AaltoAD.run_experiment.load_model')
+@patch('AaltoAD.utils.load_dataset')
+@patch('AaltoAD.utils.convert_to_windows')
+@patch('AaltoAD.utils.load_timestamps')
+@patch('AaltoAD.run_experiment.save_model')
+@patch('AaltoAD.utils.plot_accuracies')
+@patch('AaltoAD.plotting.plotter')
+@patch('AaltoAD.pot.pot_eval')
+@patch('AaltoAD.diagnosis.hit_att')
+@patch('AaltoAD.diagnosis.ndcg')
+@patch('AaltoAD.utils.get_git_hash')
 def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
                                       mock_plotter, mock_plot_accuracies, mock_save_model, mock_load_timestamps,
                                       mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
@@ -287,41 +287,41 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     assert result['applied_hyperparameters'] == {'lr': 0.001}
 
 
-@patch('TranAD.merlin.run_merlin')
-@patch('TranAD.utils.load_dataset')
-@patch('TranAD.run_experiment.append_benchmark_row')
+@patch('AaltoAD.merlin.run_merlin')
+@patch('AaltoAD.utils.load_dataset')
+@patch('AaltoAD.run_experiment.append_benchmark_row')
 def test_run_experiment_merlin(mock_append, mock_load_dataset, mock_run_merlin, tmp_path, monkeypatch):
     """Test run_experiment with MERLIN model (special case)."""
     monkeypatch.chdir(tmp_path)
-    
+
     # Setup mocks
     train_data = torch.randn(100, 5).numpy()
     test_data = torch.randn(50, 5).numpy()
     labels = np.random.randint(0, 2, (50, 5))
-    
+
     mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
     merlin_result = {'precision': 0.82, 'recall': 0.88, 'ROC/AUC': 0.91, 'f1': 0.85}
     mock_run_merlin.return_value = merlin_result
-    
+
     # Run experiment with MERLIN
     result = run_experiment.run_experiment('MERLIN', 'TOL')
-    
+
     # Verify MERLIN was called
     assert mock_run_merlin.called
     assert result == merlin_result
     assert mock_append.called
 
 
-@patch('TranAD.run_experiment.load_model')
-@patch('TranAD.utils.load_dataset')
-@patch('TranAD.utils.convert_to_windows')
-@patch('TranAD.utils.load_timestamps')
-@patch('TranAD.plotting.plotter')
-@patch('TranAD.pot.pot_eval')
-@patch('TranAD.diagnosis.hit_att')
-@patch('TranAD.diagnosis.ndcg')
-@patch('TranAD.utils.get_git_hash')
+@patch('AaltoAD.run_experiment.load_model')
+@patch('AaltoAD.utils.load_dataset')
+@patch('AaltoAD.utils.convert_to_windows')
+@patch('AaltoAD.utils.load_timestamps')
+@patch('AaltoAD.plotting.plotter')
+@patch('AaltoAD.pot.pot_eval')
+@patch('AaltoAD.diagnosis.hit_att')
+@patch('AaltoAD.diagnosis.ndcg')
+@patch('AaltoAD.utils.get_git_hash')
 def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
                                               mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model,
                                               tmp_path, monkeypatch):
@@ -331,7 +331,7 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
     # Setup mocks (simplified)
     mock_git_hash.return_value = 'xyz789'
     mock_model = Mock(spec=['name', 'n_window', 'eval', 'eval_step', 'epochs', 'weight_decay'])
-    mock_model.name = 'TranAD'
+    mock_model.name = 'AaltoAD'
     mock_model.n_window = 10
     mock_load_model.return_value = (mock_model, Mock(), Mock(), -1, [], {}, 'default')
     mock_load_timestamps.return_value = np.arange(50)
@@ -349,52 +349,52 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
         (np.random.rand(100, 5), np.random.rand(100, 5)),
         (np.random.rand(100, 5), np.random.rand(100, 5)),
     ])
-    
+
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
     mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
-    
+
     # Run with experiment_id
     result = run_experiment.run_experiment('TranAD', 'TOL', experiment_id=42, test=True)
-    
+
     # Verify experiment_id is in result
     assert result['experiment_id'] == 42
-    
+
     # Verify results file includes experiment index in filename
     results_file = tmp_path / 'results' / 'TOL' / 'TranAD_exp42_results.json'
     assert results_file.exists()
 
 
-@patch('TranAD.run_experiment.run_experiment')
-@patch('TranAD.constants.initialize')
+@patch('AaltoAD.run_experiment.run_experiment')
+@patch('AaltoAD.constants.initialize')
 @patch('importlib.reload')
 def test_run_all_basic(mock_reload, mock_init, mock_run_experiment, tmp_path, monkeypatch):
     """Test run_all function with basic setup."""
     monkeypatch.chdir(tmp_path)
-    
+
     # Create processed data directory structure
     processed_dir = tmp_path / 'processed'
     (processed_dir / 'TOL').mkdir(parents=True)
     (processed_dir / 'MSL').mkdir(parents=True)
-    
+
     # Mock run_experiment to return results
     mock_run_experiment.side_effect = [
         {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
         {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90},
     ]
-    
+
     # Run all with specific models and datasets
     summary, report = run_experiment.run_all(
         models_list=['TranAD'],
         datasets_list=['TOL', 'MSL']
     )
-    
+
     # Verify experiments were run
     assert len(summary) == 2
     assert ('TranAD', 'TOL') in summary
     assert ('TranAD', 'MSL') in summary
-    
+
     # Verify report DataFrame
     assert len(report) == 2
     assert 'model' in report.columns
@@ -402,17 +402,17 @@ def test_run_all_basic(mock_reload, mock_init, mock_run_experiment, tmp_path, mo
     assert 'precision' in report.columns
 
 
-@patch('TranAD.run_experiment.run_experiment')
-@patch('TranAD.constants.initialize')
+@patch('AaltoAD.run_experiment.run_experiment')
+@patch('AaltoAD.constants.initialize')
 @patch('importlib.reload')
 def test_run_all_skip_existing(mock_reload, mock_init, mock_run_experiment, tmp_path, monkeypatch):
     """Test run_all skips experiments already in benchmarks.csv."""
     monkeypatch.chdir(tmp_path)
-    
+
     # Create processed data directory
     processed_dir = tmp_path / 'processed'
     (processed_dir / 'TOL').mkdir(parents=True)
-    
+
     # Create existing benchmarks.csv with one entry
     results_dir = tmp_path / 'results'
     results_dir.mkdir()
@@ -421,29 +421,29 @@ def test_run_all_skip_existing(mock_reload, mock_init, mock_run_experiment, tmp_
         writer = csv.writer(f)
         writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
         writer.writerow(['TranAD', 'TOL', '0.85', '0.90', '0.95', '0.87'])
-    
+
     # Run all - should skip TranAD on TOL
     summary, report = run_experiment.run_all(
         models_list=['TranAD'],
         datasets_list=['TOL']
     )
-    
+
     # Verify experiment was skipped (run_experiment not called)
     assert not mock_run_experiment.called
     assert len(summary) == 0
 
 
-@patch('TranAD.run_experiment.run_experiment')
-@patch('TranAD.constants.initialize')
+@patch('AaltoAD.run_experiment.run_experiment')
+@patch('AaltoAD.constants.initialize')
 @patch('importlib.reload')
 def test_run_all_with_retrain(mock_reload, mock_init, mock_run_experiment, tmp_path, monkeypatch):
     """Test run_all with retrain flag ignores existing benchmarks."""
     monkeypatch.chdir(tmp_path)
-    
+
     # Create processed data directory
     processed_dir = tmp_path / 'processed'
     (processed_dir / 'TOL').mkdir(parents=True)
-    
+
     # Create existing benchmarks.csv
     results_dir = tmp_path / 'results'
     results_dir.mkdir()
@@ -452,50 +452,45 @@ def test_run_all_with_retrain(mock_reload, mock_init, mock_run_experiment, tmp_p
         writer = csv.writer(f)
         writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
         writer.writerow(['TranAD', 'TOL', '0.85', '0.90', '0.95', '0.87'])
-    
+
     mock_run_experiment.return_value = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
-    
+
     # Create mock args object with retrain=True
     args_obj = SimpleNamespace(retrain=True)
-    
+
     # Run all with retrain flag
     summary, report = run_experiment.run_all(
         models_list=['TranAD'],
         datasets_list=['TOL'],
         args_obj=args_obj
     )
-    
+
     # Verify experiment was NOT skipped
     assert mock_run_experiment.called
     assert len(summary) == 1
 
 
-@patch('TranAD.run_experiment.run_experiment')
-@patch('TranAD.constants.initialize')
+@patch('AaltoAD.run_experiment.run_experiment')
+@patch('AaltoAD.constants.initialize')
 @patch('importlib.reload')
 def test_run_all_handles_errors(mock_reload, mock_init, mock_run_experiment, tmp_path, monkeypatch):
     """Test run_all handles exceptions in run_experiment."""
     monkeypatch.chdir(tmp_path)
-    
+
     # Create processed data directory
     processed_dir = tmp_path / 'processed'
     (processed_dir / 'TOL').mkdir(parents=True)
-    
+
     # Mock run_experiment to raise exception
     mock_run_experiment.side_effect = ValueError("Test error")
-    
+
     # Run all - should not crash
     summary, report = run_experiment.run_all(
         models_list=['TranAD'],
         datasets_list=['TOL']
     )
-    
+
     # Verify error was captured
     assert ('TranAD', 'TOL') in summary
     assert 'error' in summary[('TranAD', 'TOL')]
     assert 'Test error' in str(summary[('TranAD', 'TOL')])
-
-
-
-
-

@@ -1,13 +1,11 @@
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-red.svg)](https://github.com/imperial-qore/TranAD/blob/master/LICENSE)
-![Python 3.7, 3.8](https://img.shields.io/badge/python-3.7%20%7C%203.8-blue.svg)
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fimperial-qore%2FTranAD&count_bg=%23FFC401&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-red.svg)](https://github.com/AaltoRSE/AaltoAD/blob/master/LICENSE)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 
 
-# TranAD
+# AaltoAD
 
-This repository updates the original [TranAD repository](https://github.com/AaltoRSE/TranAD) for current Python and libraries in 2026.
-
-The original results were published in ["TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data"](https://doi.org/10.48550/arXiv.2201.07284) accepted in VLDB 2022.
+Based on [TranAD repository](https://github.com/imperial-qore/TranAD).
+Original results were published in ["TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data"](https://doi.org/10.48550/arXiv.2201.07284) accepted in VLDB 2022.
 
 ## Results
 ![Alt text](results/main.PNG?raw=true "results")
@@ -79,18 +77,6 @@ All outputs can be run multiple times to ensure statistical significance.
 ## Cite this work
 
 Our paper is available in the Proceedings of VLDB: http://vldb.org/pvldb/vol15/p1201-tuli.pdf.
-If you use this work, please cite using the following bibtex entry.
-```bibtex
-@article{tuli2022tranad,
-  title={{TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data}},
-  author={Tuli, Shreshth and Casale, Giuliano and Jennings, Nicholas R},
-  journal={Proceedings of VLDB},
-  volume={15},
-  number={6},
-  pages={1201-1214},
-  year={2022}
-}
-```
 
 ## License
 

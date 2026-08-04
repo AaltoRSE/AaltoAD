@@ -8,10 +8,10 @@ from itertools import product
 import re
 import time
 
-from TranAD.parser import parser
-from TranAD import constants
-from TranAD.run_experiment import run_experiment, run_all
-from TranAD.report import generate_report
+from AaltoAD.parser import parser
+from AaltoAD import constants
+from AaltoAD.run_experiment import run_experiment, run_all
+from AaltoAD.report import generate_report
 
 # Suppress matplotlib font warnings
 import warnings
@@ -26,13 +26,13 @@ def load_experiments(config_path: str) -> Dict:
 
 def generate_parameter_grid(params: Dict) -> List[Dict]:
 	"""Generate cross-product of parameter lists.
-	
+
 	Args:
 		params: Dictionary where values can be lists or scalars
-		
+
 	Returns:
 		List of dictionaries, each representing one parameter combination
-		
+
 	Example:
 		>>> generate_parameter_grid({'lr': [0.1, 0.01], 'batch': [32, 64]})
 		[
@@ -45,36 +45,36 @@ def generate_parameter_grid(params: Dict) -> List[Dict]:
 	# Separate list and non-list parameters
 	list_params = {}
 	fixed_params = {}
-	
+
 	for key, value in params.items():
 		if isinstance(value, list):
 			list_params[key] = value
 		else:
 			fixed_params[key] = value
-	
+
 	# If no list parameters, return single config
 	if not list_params:
 		return [params.copy()]
-	
+
 	# Generate cross product
 	keys = list(list_params.keys())
 	values = [list_params[k] for k in keys]
-	
+
 	result = []
 	for combination in product(*values):
 		config = fixed_params.copy()
 		config.update(dict(zip(keys, combination)))
 		result.append(config)
-	
+
 	return result
 
 
 def expand_experiment_to_subexperiments(exp: Dict) -> List[Tuple[str, Dict]]:
 	"""Expand experiment with parameter lists into sub-experiments.
-	
+
 	Args:
 		exp: Experiment dictionary from experiments.json
-		
+
 	Returns:
 		List of (sub_id, hyperparams) tuples where:
 			- sub_id is "index.subindex" (e.g., "5.0", "5.1", "5.2")
@@ -83,30 +83,30 @@ def expand_experiment_to_subexperiments(exp: Dict) -> List[Tuple[str, Dict]]:
 	exp_index = exp.get('index')
 	dataset = exp.get('dataset')
 	model = exp.get('model')
-	
+
 	# Extract hyperparameters (exclude metadata fields)
-	hyperparams = {k: v for k, v in exp.items() 
+	hyperparams = {k: v for k, v in exp.items()
 				  if k not in ['index', 'model', 'notes', 'dataset']}
-	
+
 	# Generate all parameter combinations
 	param_grids = generate_parameter_grid(hyperparams)
-	
+
 	# Create sub-experiment IDs and combine with metadata
 	sub_experiments = []
 	for sub_idx, params in enumerate(param_grids):
 		sub_id = f"{exp_index}.{sub_idx}"
 		sub_exp_params = params.copy()
 		sub_experiments.append((sub_id, sub_exp_params))
-	
+
 	return sub_experiments
 
 
 def collect_all_subexperiments(experiments: List[Dict]) -> List[Tuple[str, str, str, Dict]]:
 	"""Collect all sub-experiments from experiment list.
-	
+
 	Args:
 		experiments: List of experiment configurations from JSON file
-		
+
 	Returns:
 		List of (exp_id, dataset, model, hyperparams) tuples for all sub-experiments
 	"""
@@ -133,19 +133,19 @@ def collect_all_subexperiments(experiments: List[Dict]) -> List[Tuple[str, str, 
 
 def get_incomplete_subexperiments(all_subexps: List[Tuple[str, str, str, Dict]]) -> List[Tuple[str, str, str, Dict]]:
 	"""Filter to only incomplete sub-experiments.
-	
+
 	Args:
 		all_subexps: List of (exp_id, dataset, model, hyperparams) tuples
-		
+
 	Returns:
 		List of incomplete sub-experiments (those without matching results)
 	"""
 	incomplete = []
-	
+
 	for exp_id, dataset, model, hyperparams in all_subexps:
 		if not has_matching_result(dataset, model, exp_id):
 			incomplete.append((exp_id, dataset, model, hyperparams))
-	
+
 	return incomplete
 
 
@@ -198,7 +198,7 @@ def map_array_index_to_subexperiment(
 
 def get_result_path(dataset: str, model: str, exp_id: str) -> str:
 	"""Get result file path for experiment or sub-experiment.
-	
+
 	Args:
 		dataset: Dataset name
 		model: Model name
@@ -211,12 +211,12 @@ def get_result_path(dataset: str, model: str, exp_id: str) -> str:
 
 def has_matching_result(dataset: str, model: str, exp_id: str) -> Optional[str]:
 	"""Check if experiment result exists with matching ID.
-	
+
 	Args:
 		dataset: Dataset name
 		model: Model name
 		exp_id: Experiment ID (e.g., "5" or "5.2" for sub-experiments)
-		
+
 	Returns:
 		Path to result file if it exists and matches, None otherwise
 	"""
@@ -292,13 +292,13 @@ def is_stale_claim(dataset: str, model: str, exp_id: str, max_age_hours: float =
 
 def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Dict) -> bool:
 	"""Run one experiment or sub-experiment from experiment file.
-	
+
 	Args:
 		dataset: Dataset name
 		model: Model name
 		exp_id: Experiment ID (e.g., "5" or "5.2")
 		hyperparams: Dictionary of hyperparameters
-	
+
 	Returns:
 		True if run successfully, False if skipped or failed
 	"""
@@ -307,16 +307,16 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 	if existing_result:
 		print(f"✓ SKIP   Exp {exp_id}: {model} (already cached)")
 		return False
-	
+
 	hp_str = ", ".join([f"{k}={v}" for k, v in hyperparams.items() if k not in ['notes']])
 	# flush=True so this line lands in the SLURM log before any
 	# long-running / memory-hungry load, even when stdout is block-buffered.
 	print(f"→ RUN    Exp {exp_id}: {model} on {dataset} ({hp_str})", flush=True)
-	
+
 	try:
 		# Initialize config for this dataset/model combination
 		constants.initialize(dataset, model)
-		
+
 		result = run_experiment(
 			model_name=model,
 			dataset_name=dataset,
@@ -326,7 +326,7 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 			test=False,
 			retrain=True
 		)
-		
+
 		result_path = get_result_path(dataset, model, exp_id)
 		if result and os.path.exists(result_path):
 			print(f"✓ DONE   Exp {exp_id}: {model}")
@@ -447,37 +447,37 @@ def handle_experiment_file(args):
 	"""Handle experiment file operations with sub-experiment support."""
 	# Use default experiment file if not specified
 	experiment_file = args.experiment_file if args.experiment_file else 'experiments.json'
-	
+
 	if not os.path.exists(experiment_file):
 		print(f"Error: Experiment file '{experiment_file}' not found")
 		return 1
-	
+
 	config = load_experiments(experiment_file)
 	experiments = config.get('experiments', [])
-	
+
 	if not experiments:
 		print("Error: No experiments defined in file")
 		return 1
-	
+
 	# Filter by experiment index if specified
 	if args.experiment:
 		experiments = [e for e in experiments if e.get('index') == args.experiment]
 		if not experiments:
 			print(f"Error: No experiment with index {args.experiment}")
 			return 1
-	
+
 	# List mode - show all sub-experiments
 	if args.list:
 		print(f"\nExperiments in {experiment_file}:")
 		print(f"{'Exp ID':<12} {'Dataset':<12} {'Model':<20} {'Params'}")
 		print("-" * 100)
-		
+
 		for exp in experiments:
 			exp_idx = exp.get('index')
 			dataset = exp.get('dataset', '?')
 			model = exp.get('model', '?')
 			sub_exps = expand_experiment_to_subexperiments(exp)
-			
+
 			if len(sub_exps) == 1:
 				# Single configuration
 				exp_id, params = sub_exps[0]
@@ -491,13 +491,13 @@ def handle_experiment_file(args):
 					print(f"  {exp_id:<10} {'':<12} {'':<20} {param_str}")
 				if len(sub_exps) > 3:
 					print(f"  ... ({len(sub_exps) - 3} more)")
-		
+
 		# Show summary with task counts
 		all_subexps = collect_all_subexperiments(experiments)
 		incomplete_subexps = get_incomplete_subexperiments(all_subexps)
 		total_tasks = len(all_subexps)
 		incomplete_tasks = len(incomplete_subexps)
-		
+
 		print("\n" + "=" * 100)
 		print(f"Summary:")
 		print(f"  Total sub-experiments:      {total_tasks}")
@@ -506,40 +506,40 @@ def handle_experiment_file(args):
 		print(f"\nFor SLURM array jobs, use: --array=0-{max(0, incomplete_tasks - 1)}")
 		if incomplete_tasks > 20:
 			print(f"  Or limit concurrency:    --array=0-{max(0, incomplete_tasks - 1)}%20")
-		
+
 		return 0
-	
+
 	# Status mode - show completion status of sub-experiments
 	if args.status:
 		print(f"\nExperiment Status in {experiment_file}:")
 		print(f"{'Exp ID':<12} {'Dataset':<12} {'Model':<20} {'Status':<12} {'Complete/Total'}")
 		print("-" * 80)
-		
+
 		for exp in experiments:
 			exp_idx = exp.get('index')
 			dataset = exp.get('dataset', '?')
 			model = exp.get('model', '?')
 			sub_exps = expand_experiment_to_subexperiments(exp)
-			
+
 			# Count completed sub-experiments
 			completed_count = 0
 			for exp_id, _ in sub_exps:
 				if has_matching_result(dataset, model, exp_id):
 					completed_count += 1
-			
+
 			total_count = len(sub_exps)
-			
+
 			if completed_count == total_count:
 				status = "✓ COMPLETE"
 			elif completed_count == 0:
 				status = "○ TODO"
 			else:
 				status = "◐ PARTIAL"
-			
+
 			print(f"{exp_idx}.*      {dataset:<12} {model:<20} {status:<12} {completed_count}/{total_count}")
-		
+
 		return 0
-	
+
 	# Worker loop mode
 	if args.worker:
 		run_worker_loop(experiments, retrain=args.retrain)
@@ -548,40 +548,40 @@ def handle_experiment_file(args):
 	# Array job mode
 	if args.array_index is not None:
 		result = map_array_index_to_subexperiment(experiments, args.array_index, retrain=args.retrain)
-		
+
 		if result is None:
 			print(f"Array index {args.array_index} out of range (no incomplete sub-experiments at this index)")
 			return 0  # Not an error - just no work to do
-		
+
 		exp_id, dataset, model, hyperparams = result
 		print(f"Array job {args.array_index} → Exp {exp_id}: {model} on {dataset}")
-		
+
 		success = run_single_experiment(dataset, model, exp_id, hyperparams)
 		return 0 if success else 1
-	
+
 	# Run mode - expand to sub-experiments and run all
 	all_subexps = collect_all_subexperiments(experiments)
-	
+
 	print(f"\nRunning experiments...")
 	print(f"Config: {experiment_file}")
 	print(f"Total: {len(all_subexps)} sub-experiment(s) from {len(experiments)} experiment(s)\n")
-	
+
 	completed = 0
 	skipped = 0
 	failed = 0
-	
+
 	for exp_id, dataset, model, hyperparams in all_subexps:
 		# Run sub-experiment
 		if has_matching_result(dataset, model, exp_id):
 			skipped += 1
 			continue
-			
+
 		success = run_single_experiment(dataset, model, exp_id, hyperparams)
 		if success:
 			completed += 1
 		else:
 			failed += 1
-	
+
 	print(f"\n{'='*50}")
 	print(f"Summary:")
 	print(f"  Completed: {completed}")
@@ -589,7 +589,7 @@ def handle_experiment_file(args):
 	print(f"  Failed:    {failed}")
 	print(f"  Total:     {len(all_subexps)}")
 	print(f"\nResults organized by dataset in results/{{dataset}}/")
-	
+
 	return 0 if failed == 0 else 1
 
 
@@ -600,15 +600,15 @@ def main():
 	if args.report:
 		generate_report(args.dataset, metric=args.metric)
 		return 0
-	
+
 	# Determine which mode to run
 	# Use experiment file mode if:
 	# 1. experiment_file is explicitly provided, OR
 	# 2. any experiment-related flag is set (--experiment, --list, --status, --array-index)
-	if (args.experiment_file is not None or 
-	    args.experiment is not None or 
-	    args.list or 
-	    args.status or 
+	if (args.experiment_file is not None or
+	    args.experiment is not None or
+	    args.list or
+	    args.status or
 	    args.array_index is not None):
 		# Experiment file mode (handles --experiment, --list, --status, --array-index, or running all)
 		return handle_experiment_file(args)

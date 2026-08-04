@@ -1,8 +1,8 @@
 import os
 import numpy as np
 import pandas as pd
-from TranAD.preprocessing.utils import convertNumpy
-from TranAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing.utils import convertNumpy
+from AaltoAD.constants import DEFAULT_DATA_FOLDER
 
 
 def load_WADI(folder, data_folder=DEFAULT_DATA_FOLDER):

@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 from torch.nn import TransformerEncoder, TransformerDecoder
 from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
-from TranAD import dlutils
+from AaltoAD import dlutils
 from .base import BaseModel
 from .tranad_base import TranADBase
 

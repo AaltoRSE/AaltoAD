@@ -1,13 +1,13 @@
 import pytest
 import numpy as np
-import TranAD.pot as pot
-import TranAD.constants
+import AaltoAD.pot as pot
+import AaltoAD.constants
 
 
 @pytest.fixture(autouse=True)
 def initialize_constants():
     # Initialize constants for testing
-    TranAD.constants.initialize(dataset='synthetic', model='TranAD')
+    AaltoAD.constants.initialize(dataset='synthetic', model='TranAD')
     yield
 
 

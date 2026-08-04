@@ -1,9 +1,8 @@
 [project]
-name = "TranAD"
+name = "AaltoAD"
 version = "0.1.0"
 description = "Anomaly detection models and training code"
 authors = [
-    { name = "TranAD Contributors" }
 ]
 dependencies = [
     "pandas",
@@ -20,4 +19,4 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["TranAD"]
+packages = ["AaltoAD"]

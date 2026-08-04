@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
-from TranAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.constants import DEFAULT_DATA_FOLDER
 
 
 def load_synthetic(folder, data_folder=DEFAULT_DATA_FOLDER):

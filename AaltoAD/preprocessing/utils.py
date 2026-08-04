@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from TranAD.constants import  DEFAULT_OUTPUT_FOLDER
+from AaltoAD.constants import  DEFAULT_OUTPUT_FOLDER
 
 
 def load_and_save(category, filename, dataset, dataset_folder, output_folder=DEFAULT_OUTPUT_FOLDER):
