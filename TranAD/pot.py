@@ -144,7 +144,7 @@ def bf_search(score, label, start, end=None, step_num=1, display_freq=1, verbose
     return m, m_t
 
 
-def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False):
+def pot_eval(init_score, score, label, q=1e-5, expand_segments=False):
     """
     Run POT method on given score.
     Args:
@@ -154,10 +154,12 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False
             it should be the anomaly score of test set.
         label:
         q (float): Detection level (risk)
-        level (float): Probability associated with the initial threshold t
         expanded_segments (bool): Whether to expand the detected anomaly segments to include adjacent points.
     Returns:
         dict: pot result dict
+
+    The tail used to fit the GPD is selected via constants.level: calibration
+    points above that quantile are the excesses the GPD is fitted to.
     """
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
         pred = np.zeros_like(label)
@@ -167,28 +169,32 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02, expand_segments=False
             'ROC/AUC': np.nan, 'threshold': np.nan, 'p_latency': None,
         }, pred
 
-    lms = constants.lm[0]
+    level = constants.level
+
+    # If the level leaves too few peaks for the GPD fit (e.g. a small
+    # calibration set), lower it and retry.
     retries = 0
     while True:
         try:
             s = SPOT(q)  # SPOT object
             s.fit(init_score, score)  # data import
-            s.initialize(level=lms, min_extrema=False, verbose=False)  # initialization step
-        except:
+            s.initialize(level=level, min_extrema=False, verbose=False)  # initialization step
+        except Exception as e:
             retries += 1
             if retries > 100:
-                print(f'SPOT: giving up after {retries} retries')
+                print(f'SPOT: giving up after {retries} retries: {e}')
                 pred = np.zeros_like(label)
                 return {
-                    'f1': np.nan, 'precision': np.nan, 'recall': np.nan,
+                    'f1': np.nan, 'precision': np.nan, 'recall': np.nan, 'fpr': np.nan,
                     'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
-                    'ROC/AUC': np.nan, 'threshold': np.nan,
+                    'ROC/AUC': np.nan, 'threshold': np.nan, 'p_latency': None,
                 }, pred
-            lms = lms * 0.95
-        else: break
+            level = level * 0.95
+        else:
+            break
     # Threshold comes from the calibration data only: initialize() fits the
     # GPD to the peaks of init_score and extrapolates the quantile at risk q.
-    pot_th = s.extreme_quantile * constants.lm[1]
+    pot_th = s.extreme_quantile
     raw_pred = score > pot_th
     p_latency = segment_latency(raw_pred, label)
     if expand_segments:
