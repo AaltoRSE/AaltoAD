@@ -134,6 +134,37 @@ def _shannon_entropy(series):
 	return -(p * np.log2(p + 1e-10)).sum()
 
 
+# Per-IP features expand to one column per IP key (sorted top_ips + 'Other').
+PER_IP_FEATURES = {
+	'sent_row_count', 'sent_bytes', 'sent_port_entropy', 'num_dsts',
+	'received_row_count', 'received_frameln', 'received_port_entropy', 'num_srcs',
+	'rw_ratio',
+}
+
+# Global (single-column) features.
+GLOBAL_FEATURES = {'rows_per_window', 'empty_rows'}
+
+# Full ordered registry of valid TOL feature names, used for argparse choices
+# and validation.
+TOL_FEATURES = [
+	'sent_row_count', 'sent_bytes', 'sent_port_entropy', 'num_dsts',
+	'received_row_count', 'received_frameln', 'received_port_entropy', 'num_srcs',
+	'rw_ratio',
+	'rows_per_window', 'empty_rows',
+]
+
+DEFAULT_FEATURES = [
+	'sent_row_count', 'sent_bytes', 'sent_port_entropy',
+	'received_row_count', 'received_frameln', 'received_port_entropy',
+]
+
+
+def _validate_features(features):
+	"""Raise ValueError if any requested feature name is not in TOL_FEATURES."""
+	unknown = [f for f in features if f not in TOL_FEATURES]
+	if unknown:
+		raise ValueError(f'Unknown TOL feature(s) {unknown}; must be one of {TOL_FEATURES}')
+
 
 DEFAULT_SEGMENTS = [
 	('train', False, 300),
@@ -204,13 +235,14 @@ def _load_and_prepare(csv_path):
 	src_col, dst_col = _detect_ip_columns(df)
 	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
 	src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
+	dst_port_col = _detect_column(df, ['dst_port', 'dport', 'destination_port', 'dstport'])
 	df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
 	df = df.dropna(subset=['ts_sec'])
 	df['ts_sec'] = df['ts_sec'].astype(int)
 	return {
 		'path': csv_path, 'df': df,
 		'src_col': src_col, 'dst_col': dst_col,
-		'bytes_col': bytes_col, 'port_col': src_port_col,
+		'bytes_col': bytes_col, 'port_col': src_port_col, 'dst_port_col': dst_port_col,
 	}
 
 
@@ -233,138 +265,161 @@ def _baseline_mask(df, segments, interval_col = 'ts_sec'):
 	return mask
 
 
-def _aggregate_csv(parsed, top_ips, internal_prefix, extended_features):
-	"""Aggregate one parsed CSV into a per-second features dataframe.
+def _aggregate_csv(parsed, top_ips, features, window):
+	"""Aggregate one parsed CSV into a per-window features dataframe.
 
-	Uses the supplied `top_ips` and `internal_prefix` so the column space is
-	consistent across CSVs that share a baseline. Non-top-k IPs collapse into
-	'other_internal' or 'other_external'.
+	Uses the supplied `top_ips` so the column space is consistent across CSVs
+	that share a baseline. Non-top-k IPs collapse into a single 'Other' bucket.
+	The aggregation window is `window` seconds, indexed relative to this CSV's
+	own data start (`ts_win = (ts_sec - ts_min) // window`).
 	"""
 	df = parsed['df'].copy()
 	src_col, dst_col = parsed['src_col'], parsed['dst_col']
-	bytes_col, src_port_col = parsed['bytes_col'], parsed['port_col']
+	bytes_col = parsed['bytes_col']
+	src_port_col = parsed['port_col']
+	dst_port_col = parsed.get('dst_port_col')
+	received_port_col = dst_port_col or src_port_col
+
+	# Compute the empty-rows mask on the ORIGINAL IP columns, before mapping
+	# them through the top-k classifier.
+	empty_mask = (
+		(df[src_col].isna() | (df[src_col].astype(str).str.strip() == '')) &
+		(df[dst_col].isna() | (df[dst_col].astype(str).str.strip() == ''))
+	)
+
+	ts_min = df['ts_sec'].min()
+	df['ts_win'] = (df['ts_sec'] - ts_min) // window
 
 	def _classify(ip_str):
 		ip_str = str(ip_str).strip()
-		if ip_str in top_ips:
-			return ip_str
-		return 'other_internal' if ip_str.startswith(internal_prefix + '.') else 'other_external'
+		return ip_str if ip_str in top_ips else 'Other'
 
 	df[src_col] = df[src_col].astype(str).str.strip().map(_classify)
 	df[dst_col] = df[dst_col].astype(str).str.strip().map(_classify)
 
-	rows_per_second = None
-	empty_rows = None
-	if extended_features:
-		rows_per_second = df.groupby('ts_sec').size().rename('rows_per_second')
-		empty_mask = (
-			(df[src_col].isna() | (df[src_col].astype(str).str.strip() == '')) &
-			(df[dst_col].isna() | (df[dst_col].astype(str).str.strip() == ''))
-		)
-		empty_rows = df[empty_mask].groupby('ts_sec').size().rename('empty_rows')
+	# rw_ratio needs the underlying sent_bytes/received_frameln aggregations
+	# even if they are not themselves requested.
+	need_sent_bytes = 'sent_bytes' in features or 'rw_ratio' in features
+	need_received_frameln = 'received_frameln' in features or 'rw_ratio' in features
 
-	out_grp = df.groupby(['ts_sec', src_col])
-	out_agg = pd.DataFrame({'num_dsts': out_grp[dst_col].nunique()})
-	if extended_features:
-		out_agg['out_count'] = out_grp.size()
-		if bytes_col:
-			out_agg['bytes_out'] = out_grp[bytes_col].sum()
-		if src_port_col:
-			out_agg['port_entropy'] = out_grp[src_port_col].apply(_shannon_entropy)
+	out_grp = df.groupby(['ts_win', src_col])
+	out_cols = {}
+	if 'sent_row_count' in features:
+		out_cols['sent_row_count'] = out_grp.size()
+	if need_sent_bytes and bytes_col:
+		out_cols['sent_bytes'] = out_grp[bytes_col].sum()
+	if 'sent_port_entropy' in features and src_port_col:
+		out_cols['sent_port_entropy'] = out_grp[src_port_col].apply(_shannon_entropy)
+	if 'num_dsts' in features:
+		out_cols['num_dsts'] = out_grp[dst_col].nunique()
 
-	in_grp = df.groupby(['ts_sec', dst_col])
-	in_agg = pd.DataFrame({'num_srcs': in_grp[src_col].nunique()})
-	if extended_features:
-		in_agg['in_count'] = in_grp.size()
-		if bytes_col:
-			in_agg['bytes_in'] = in_grp[bytes_col].sum()
+	in_grp = df.groupby(['ts_win', dst_col])
+	in_cols = {}
+	if 'received_row_count' in features:
+		in_cols['received_row_count'] = in_grp.size()
+	if need_received_frameln and bytes_col:
+		in_cols['received_frameln'] = in_grp[bytes_col].sum()
+	if 'received_port_entropy' in features and received_port_col:
+		in_cols['received_port_entropy'] = in_grp[received_port_col].apply(_shannon_entropy)
+	if 'num_srcs' in features:
+		in_cols['num_srcs'] = in_grp[src_col].nunique()
 
-	out_wide = out_agg.unstack(level=src_col, fill_value=0)
-	out_wide.columns = [f'{ip}_{metric}' for metric, ip in out_wide.columns]
-	in_wide = in_agg.unstack(level=dst_col, fill_value=0)
-	in_wide.columns = [f'{ip}_{metric}' for metric, ip in in_wide.columns]
+	max_win = df['ts_win'].max()
+	full_idx = np.arange(0, max_win + 1)
+	features_df = pd.DataFrame(index=pd.Index(full_idx, name='ts_win'))
 
-	ts_min, ts_max = df['ts_sec'].min(), df['ts_sec'].max()
-	full_idx = np.arange(ts_min, ts_max + 1)
-	features_df = (
-		out_wide.reindex(full_idx, fill_value=0)
-		.join(in_wide.reindex(full_idx, fill_value=0), how='outer')
-		.fillna(0)
-	)
-	if extended_features:
-		features_df = (
-			features_df
-			.join(rows_per_second.reindex(full_idx, fill_value=0), how='outer')
-			.join(empty_rows.reindex(full_idx, fill_value=0), how='outer')
-			.fillna(0)
-		)
-	features_df.index.name = 'ts_sec'
+	if out_cols:
+		out_agg = pd.DataFrame(out_cols)
+		out_wide = out_agg.unstack(level=src_col, fill_value=0)
+		out_wide.columns = [f'{ip}_{metric}' for metric, ip in out_wide.columns]
+		features_df = features_df.join(out_wide.reindex(full_idx, fill_value=0), how='left')
 
-	if extended_features and bytes_col:
-		for ip in list(top_ips) + ['other_internal', 'other_external']:
-			b_in_col  = f'{ip}_bytes_in'
-			b_out_col = f'{ip}_bytes_out'
-			if b_in_col in features_df.columns and b_out_col in features_df.columns:
-				features_df[f'{ip}_rw_ratio'] = features_df[b_in_col] / (features_df[b_in_col] + features_df[b_out_col] + 1e-10)
+	if in_cols:
+		in_agg = pd.DataFrame(in_cols)
+		in_wide = in_agg.unstack(level=dst_col, fill_value=0)
+		in_wide.columns = [f'{ip}_{metric}' for metric, ip in in_wide.columns]
+		features_df = features_df.join(in_wide.reindex(full_idx, fill_value=0), how='left')
 
+	features_df = features_df.fillna(0)
+
+	if 'rows_per_window' in features:
+		rows_per_window = df.groupby('ts_win').size().reindex(full_idx, fill_value=0)
+		features_df['rows_per_window'] = rows_per_window
+
+	if 'empty_rows' in features:
+		empty_rows = df[empty_mask].groupby('ts_win').size().reindex(full_idx, fill_value=0)
+		features_df['empty_rows'] = empty_rows
+
+	if 'rw_ratio' in features and bytes_col:
+		for ip in list(top_ips) + ['Other']:
+			recv_col = f'{ip}_received_frameln'
+			sent_col = f'{ip}_sent_bytes'
+			if recv_col in features_df.columns and sent_col in features_df.columns:
+				features_df[f'{ip}_rw_ratio'] = features_df[recv_col] / (features_df[recv_col] + features_df[sent_col] + 1e-10)
+
+	features_df.index.name = 'ts_win'
 	return features_df
 
 
-def _canonical_columns(top_ips, extended_features, has_bytes, has_ports):
+def _filter_available_features(features, has_bytes, has_src_ports, has_recv_ports):
+	"""Drop requested features whose required column is absent from every CSV, warning."""
+	requires = {
+		'sent_bytes': has_bytes,
+		'received_frameln': has_bytes,
+		'rw_ratio': has_bytes,
+		'sent_port_entropy': has_src_ports,
+		'received_port_entropy': has_recv_ports,
+	}
+	selected = []
+	for f in features:
+		if f in requires and not requires[f]:
+			print(f"TOL: warning: feature '{f}' requires a column not present in any CSV; dropping it.")
+			continue
+		selected.append(f)
+	return selected
+
+
+def _canonical_columns(top_ips, features):
 	"""Build the canonical column list shared across all CSVs in a combined dataset."""
-	ip_keys = sorted(top_ips) + ['other_internal', 'other_external']
+	ip_keys = sorted(top_ips) + ['Other']
 	cols = []
-	# Outgoing block (per-IP num_dsts + extended)
-	for ip in ip_keys:
-		cols.append(f'{ip}_num_dsts')
-	if extended_features:
-		for ip in ip_keys:
-			cols.append(f'{ip}_out_count')
-		if has_bytes:
+	for f in features:
+		if f in PER_IP_FEATURES:
 			for ip in ip_keys:
-				cols.append(f'{ip}_bytes_out')
-		if has_ports:
-			for ip in ip_keys:
-				cols.append(f'{ip}_port_entropy')
-	# Incoming block (per-IP num_srcs + extended)
-	for ip in ip_keys:
-		cols.append(f'{ip}_num_srcs')
-	if extended_features:
-		for ip in ip_keys:
-			cols.append(f'{ip}_in_count')
-		if has_bytes:
-			for ip in ip_keys:
-				cols.append(f'{ip}_bytes_in')
-	# Derived
-	if extended_features and has_bytes:
-		for ip in ip_keys:
-			cols.append(f'{ip}_rw_ratio')
-	# Global
-	if extended_features:
-		cols.append('rows_per_second')
-		cols.append('empty_rows')
+				cols.append(f'{ip}_{f}')
+		else:
+			cols.append(f)
 	return cols
 
 
 def load_TOL(folder, csv_groups=None, csv_path=None, segments=None,
-             data_folder=DEFAULT_DATA_FOLDER, top_k=10, extended_features=False):
+             data_folder=DEFAULT_DATA_FOLDER, top_k=10, features=None, window=1):
 	"""Load and preprocess TOL dataset (network traffic aggregated by timestamp).
 
 	Two calling modes:
 
-	- Single-CSV (legacy): pass `csv_path` and (optionally) `segments`. One CSV is
-	  aggregated, sliced into partitions, and saved.
+	- Single-CSV (the common case): pass `csv_path` and (optionally) `segments`.
+	  One CSV is aggregated, sliced into partitions, and saved.
 	- Combined / multi-CSV: pass `csv_groups`, an ordered list of
 	  `(csv_paths, segments)` tuples. Each CSV in each group is aggregated
 	  independently, sliced by its group's segments, and per-partition outputs
-	  are concatenated across all CSVs of all groups. Top-k IPs and the
-	  internal/external prefix are computed once from baseline (train) rows
-	  across ALL CSVs in ALL groups so the feature column space is consistent.
+	  are concatenated across all CSVs of all groups. Top-k IPs are computed
+	  once from baseline (train) rows across ALL CSVs in ALL groups so the
+	  feature column space is consistent.
 
 	Partitions are 'train', 'calib', 'test', 'valid'. Within each group's
 	segment list, each partition must be contiguous. Labels are produced for
 	'test' and 'valid' partitions from the anomalous flags.
+
+	`features` selects which feature columns to compute (see `TOL_FEATURES`
+	for the full registry); defaults to `DEFAULT_FEATURES` when None.
+	`window` is the aggregation window in seconds (default 1); every
+	segment's seconds must be evenly divisible by `window`.
 	"""
+	if features is None:
+		features = list(DEFAULT_FEATURES)
+	_validate_features(features)
+
 	# Normalize input modes into a uniform csv_groups list.
 	if csv_groups is None:
 		if csv_path is None:
@@ -382,6 +437,11 @@ def load_TOL(folder, csv_groups=None, csv_path=None, segments=None,
 		if not segs:
 			raise ValueError('Every group must contain at least one segment spec')
 		_validate_segments(segs)
+		for partition, anomalous, seconds in segs:
+			if seconds % window != 0:
+				raise ValueError(
+					f"Segment ({partition}, {seconds}s) is not divisible by window ({window}s)"
+				)
 
 	# Pass 1: load each CSV, parse columns + timestamps. Also collect baseline IPs.
 	parsed_records = []  # list of (parsed_csv_dict, group_segments)
@@ -402,42 +462,43 @@ def load_TOL(folder, csv_groups=None, csv_path=None, segments=None,
 	counts = all_ips_concat.value_counts()
 	if counts.empty:
 		raise ValueError('No IP addresses found in baseline source/destination columns')
-	most_common_ip = counts.idxmax()
-	internal_prefix = most_common_ip.split('.')[0]
 	top_ips = set(counts.head(top_k).index)
 	total_baseline_rows = sum(len(s) for s in all_baseline_ips) // 2  # we appended src + dst
 	print(f'TOL: unique IPs across all baselines: {len(counts)} '
 	      f'(total baseline rows aggregated: {total_baseline_rows})')
-	print(f'TOL: most common IP {most_common_ip} => internal prefix {internal_prefix}')
 	print(f'TOL: selecting top_{top_k} IPs from combined baseline (keeps {len(top_ips)})')
 
-	# Determine canonical column set. has_bytes / has_ports are True if ANY CSV has them.
+	# Determine canonical column set. has_bytes / has_*_ports are True if ANY CSV has them.
 	has_bytes = any(rec['bytes_col'] for rec, _ in parsed_records)
-	has_ports = any(rec['port_col'] for rec, _ in parsed_records)
-	canonical_cols = _canonical_columns(top_ips, extended_features, has_bytes, has_ports)
+	has_src_ports = any(rec['port_col'] for rec, _ in parsed_records)
+	has_recv_ports = any(rec.get('dst_port_col') or rec['port_col'] for rec, _ in parsed_records)
+	features = _filter_available_features(features, has_bytes, has_src_ports, has_recv_ports)
+	canonical_cols = _canonical_columns(top_ips, features)
+	print(f'TOL: features={features}, window={window}s')
 
 	# Pass 2: aggregate each CSV, reindex to canonical columns, slice, accumulate.
 	partitions = {'train': [], 'calib': [], 'test': [], 'valid': []}
 	label_segs = {'train': [], 'calib': [], 'test': [], 'valid': []}
 	for parsed, segs in parsed_records:
-		features_df = _aggregate_csv(parsed, top_ips, internal_prefix, extended_features)
+		features_df = _aggregate_csv(parsed, top_ips, features, window)
 		features_df = features_df.reindex(columns=canonical_cols, fill_value=0)
-		features = features_df.values.astype(float)
-		total_needed = sum(s[2] for s in segs)
-		if features.shape[0] < total_needed:
+		feat_arr = features_df.values.astype(float)
+		total_needed = sum(seconds // window for _, _, seconds in segs)
+		if feat_arr.shape[0] < total_needed:
 			raise ValueError(
-				f"CSV {parsed['path']}: segments require {total_needed} rows but only "
-				f"{features.shape[0]} available after aggregation"
+				f"CSV {parsed['path']}: segments require {total_needed} rows (window={window}s) but only "
+				f"{feat_arr.shape[0]} available after aggregation"
 			)
 		offset = 0
 		for partition, anomalous, seconds in segs:
+			rows = seconds // window
 			if partition == 'skip':
-				# Consume seconds without writing them to any partition.
-				offset += seconds
+				# Consume rows without writing them to any partition.
+				offset += rows
 				continue
-			partitions[partition].append(features[offset:offset + seconds])
-			label_segs[partition].append((seconds, anomalous))
-			offset += seconds
+			partitions[partition].append(feat_arr[offset:offset + rows])
+			label_segs[partition].append((rows, anomalous))
+			offset += rows
 
 	# Concatenate per-partition. Missing partitions become zero-row arrays.
 	n_feat = len(canonical_cols)
@@ -474,10 +535,10 @@ def load_TOL(folder, csv_groups=None, csv_path=None, segments=None,
 	def _build_labels(arr, name):
 		out = np.zeros_like(arr)
 		row = 0
-		for seconds, anomalous in label_segs.get(name, []):
+		for rows, anomalous in label_segs.get(name, []):
 			if anomalous:
-				out[row:row + seconds] = 1
-			row += seconds
+				out[row:row + rows] = 1
+			row += rows
 		return out
 
 	labels = _build_labels(test, 'test')

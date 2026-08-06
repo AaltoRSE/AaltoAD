@@ -3,6 +3,7 @@ import AaltoAD
 import argparse
 
 from AaltoAD.constants import  DEFAULT_OUTPUT_FOLDER, DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing.tol import TOL_FEATURES
 
 # dataset-specific implementations live under AaltoAD.preprocessing
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'TOL', 'SWaT_physical', 'SWaT_netflow', 'SWaT_payload_netflow', 'nettraffic']
@@ -61,7 +62,7 @@ def load_data(
 		dataset, csv_groups=None,
 		output_folder=DEFAULT_OUTPUT_FOLDER,
 		data_folder=DEFAULT_DATA_FOLDER,
-        top_k=100, extended_features=False,
+        top_k=100, features=None, window=1,
 		interval=10,
 	):
 	folder = os.path.join(output_folder, dataset)
@@ -80,7 +81,7 @@ def load_data(
 		AaltoAD.preprocessing.load_TOL(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
 			top_k=top_k,
-			extended_features=extended_features,
+			features=features, window=window,
 		)
 	elif dataset.startswith('nettraffic'):
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
@@ -142,9 +143,19 @@ if __name__ == '__main__':
 		'--segment', nargs='+', type=parse_segment, action=_GroupBuilder, role='segment', dest='_segment',
 		help='[TOL] Segment spec(s) TYPE[-]:SECONDS for the current group. TYPE is train|calib|test|valid|skip; trailing "-" marks the segment as anomalous (e.g. test-:240). Use skip:N to discard N seconds (e.g. lead-in before an attack).',
 	)
-	parser.add_argument('--top-k', type=int, default=100, help='[TOL] Keep the top-k most frequent IPs from baseline; the rest collapse into other_internal/other_external (default: 100)')
+	parser.add_argument('--top-k', type=int, default=100, help='[TOL] Keep the top-k most frequent IPs from baseline; the rest collapse into a single Other bucket (default: 100)')
 	parser.add_argument('--interval', type=int, default=10, help='Number of seconds to aggregate to one row of data in nettraffic data.')
-	parser.add_argument('--extended-features', action='store_true', help='[TOL] Include bytes/ports/entropy features in addition to src/dst counts')
+	parser.add_argument(
+		'--features', nargs='+', choices=TOL_FEATURES, default=None,
+		help=(
+			"[TOL] Feature names to compute (default: sent_row_count sent_bytes "
+			"sent_port_entropy received_row_count received_frameln received_port_entropy)"
+		),
+	)
+	parser.add_argument(
+		'--window', type=int, default=1,
+		help='[TOL] Aggregation window in seconds; each output row aggregates this many seconds (segment lengths must be divisible by it)',
+	)
 	parser.add_argument('--port-entropy', action='store_true', help='[nettraffic] Include port entropy features', default=False)
 	parser.add_argument('--bytes', action='store_true', help='[nettraffic] Include byte count features', default=False)
 	parser.add_argument('--temperature', action='store_true', help='[nettraffic] Include temperature features', default=False)
@@ -160,6 +171,7 @@ if __name__ == '__main__':
 			ds,
 			csv_groups=csv_groups,
 			top_k=args.top_k,
-			extended_features=args.extended_features,
+			features=args.features,
+			window=args.window,
 			interval=args.interval,
 		)
