@@ -1,8 +1,8 @@
 {
-  "description": "Per-sub-dataset experiments using best combined-sweep hyperparameters. Two sets per applicable model: best-by-pot.f1 (raw) and best-by-pot_expanded.f1 (PA). Epochs scaled x10 to match combined total training steps on each ~1/10-size sub-dataset.",
+  "description": "Per-sub-dataset hyperparameter sweeps using the original combined-TOL grids (commit a923728). q fixed at 1e-05; weight_decay and model params swept; epochs fixed at 1. Indices start at 29 to avoid colliding with the finished index 1-28 results.",
   "experiments": [
     {
-      "index": 1,
+      "index": 29,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -17,24 +17,28 @@
       ],
       "model": "Attention",
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "n_window": [
-        5
+        5,
+        10
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "Attention: best calibration_loss params, epochs scaled x10"
+      "notes": "Attention: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 2,
+      "index": 30,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -49,24 +53,28 @@
       ],
       "model": "CAE_M",
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "n_window": [
+        10,
         null
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
+        1e-05,
         0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "CAE_M: best calibration_loss params, epochs scaled x10"
+      "notes": "CAE_M: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 3,
+      "index": 31,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -81,30 +89,35 @@
       ],
       "model": "DAGMM",
       "n_latent": [
+        16,
         32
       ],
       "n_hidden": [
+        16,
         32
       ],
       "n_window": [
-        5
+        5,
+        10
       ],
       "learning_rate": [
+        0.0001,
         0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
+        1e-05,
         0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "DAGMM: best calibration_loss params, epochs scaled x10"
+      "notes": "DAGMM: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 4,
+      "index": 32,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -119,27 +132,32 @@
       ],
       "model": "GDN",
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "n_window": [
-        5
+        5,
+        10
       ],
       "n_hidden": [
+        16,
         32
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
+        1e-05,
         0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "GDN: best calibration_loss params, epochs scaled x10"
+      "notes": "GDN: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 5,
+      "index": 33,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -157,30 +175,36 @@
         0.001
       ],
       "n_layers": [
-        1
+        1,
+        2
       ],
       "n_hidden": [
+        16,
         32
       ],
       "batch_size": [
-        128
+        128,
+        256,
+        512
       ],
       "sequence_length": [
+        8,
         16
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "LSTM_AD: best calibration_loss params, epochs scaled x10"
+      "notes": "LSTM_AD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 6,
+      "index": 34,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -198,30 +222,35 @@
         0.001
       ],
       "n_layers": [
-        1
+        1,
+        2
       ],
       "n_hidden": [
+        8,
         16
       ],
       "batch_size": [
-        64
+        64,
+        128
       ],
       "sequence_length": [
+        16,
         32
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "LSTM_AE: best calibration_loss params, epochs scaled x10"
+      "notes": "LSTM_AE: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 7,
+      "index": 35,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -236,30 +265,35 @@
       ],
       "model": "LSTM_Univariate",
       "learning_rate": [
+        0.003,
         0.004
       ],
       "n_hidden": [
+        1,
         4
       ],
       "n_layers": [
-        1
+        1,
+        2
       ],
       "batch_size": [
-        256
+        256,
+        512
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
+        1e-05,
         0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "LSTM_Univariate: best calibration_loss params, epochs scaled x10"
+      "notes": "LSTM_Univariate: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 8,
+      "index": 36,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -274,27 +308,31 @@
       ],
       "model": "MAD_GAN",
       "n_window": [
-        5
+        5,
+        10
       ],
       "n_hidden": [
+        16,
         32
       ],
       "learning_rate": [
-        0.0001
+        0.0001,
+        0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "MAD_GAN: best calibration_loss params, epochs scaled x10"
+      "notes": "MAD_GAN: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 9,
+      "index": 37,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -309,24 +347,27 @@
       ],
       "model": "MSCRED",
       "learning_rate": [
+        0.0001,
         0.0002
       ],
       "n_window": [
-        5
+        5,
+        10
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "MSCRED: best calibration_loss params, epochs scaled x10"
+      "notes": "MSCRED: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 10,
+      "index": 38,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -341,30 +382,35 @@
       ],
       "model": "OmniAnomaly",
       "learning_rate": [
-        0.0005
+        0.0005,
+        0.001
       ],
       "beta": [
-        0.0002
+        0.0002,
+        0.01
       ],
       "n_hidden": [
+        16,
         32
       ],
       "n_latent": [
-        16
+        16,
+        32
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
+        1e-05,
         0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "OmniAnomaly: best calibration_loss params, epochs scaled x10"
+      "notes": "OmniAnomaly: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 11,
+      "index": 39,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -379,33 +425,39 @@
       ],
       "model": "TranAD",
       "n_window": [
-        5
+        5,
+        10
       ],
       "batch_size": [
-        128
+        128,
+        256
       ],
       "dim_feedforward": [
+        16,
         32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "TranAD: best calibration_loss params, epochs scaled x10"
+      "notes": "TranAD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 12,
+      "index": 40,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -420,33 +472,39 @@
       ],
       "model": "TranAD_Adversarial",
       "n_window": [
-        5
+        5,
+        10
       ],
       "batch_size": [
-        128
+        128,
+        256
       ],
       "dim_feedforward": [
+        16,
         32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "TranAD_Adversarial: best calibration_loss params, epochs scaled x10"
+      "notes": "TranAD_Adversarial: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 13,
+      "index": 41,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -461,33 +519,38 @@
       ],
       "model": "TranAD_Basic",
       "n_window": [
+        5,
         10
       ],
       "batch_size": [
-        128
+        128,
+        256
       ],
       "dim_feedforward": [
+        16,
         32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
+        0.0001,
         0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "TranAD_Basic: best calibration_loss params, epochs scaled x10"
+      "notes": "TranAD_Basic: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 14,
+      "index": 42,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -502,33 +565,39 @@
       ],
       "model": "TranAD_SelfConditioning",
       "n_window": [
+        5,
         10
       ],
       "batch_size": [
-        128
+        128,
+        256
       ],
       "dim_feedforward": [
-        16
+        16,
+        32
       ],
       "dropout": [
         0.1
       ],
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "TranAD_SelfConditioning: best calibration_loss params, epochs scaled x10"
+      "notes": "TranAD_SelfConditioning: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 15,
+      "index": 43,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -543,30 +612,36 @@
       ],
       "model": "TranAD_Transformer",
       "n_window": [
+        5,
         10
       ],
       "batch_size": [
-        64
+        64,
+        128
       ],
       "n_hidden": [
+        16,
         32
       ],
       "learning_rate": [
+        5e-05,
+        0.0001,
         0.0002
       ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "TranAD_Transformer: best calibration_loss params, epochs scaled x10"
+      "notes": "TranAD_Transformer: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     },
     {
-      "index": 16,
+      "index": 44,
       "dataset": [
         "TOL_1_1",
         "TOL_2_1_1",
@@ -581,486 +656,33 @@
       ],
       "model": "USAD",
       "learning_rate": [
-        0.0001
+        5e-05,
+        0.0001,
+        0.0002
       ],
       "n_hidden": [
+        8,
         16
       ],
       "n_latent": [
+        5,
         8
       ],
       "n_window": [
-        5
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        0.001
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "USAD: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 17,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "Attention",
-      "learning_rate": [
-        0.0002
-      ],
-      "n_window": [
-        5
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "Attention: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 18,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "LSTM_AD",
-      "learning_rate": [
-        0.001
-      ],
-      "n_layers": [
-        1
-      ],
-      "n_hidden": [
-        32
-      ],
-      "batch_size": [
-        128
-      ],
-      "sequence_length": [
-        16
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "LSTM_AD: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 19,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "LSTM_AE",
-      "learning_rate": [
-        0.001
-      ],
-      "n_layers": [
-        1
-      ],
-      "n_hidden": [
-        16
-      ],
-      "batch_size": [
-        64
-      ],
-      "sequence_length": [
-        32
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "LSTM_AE: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 20,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "LSTM_Univariate",
-      "learning_rate": [
-        0.004
-      ],
-      "n_hidden": [
-        4
-      ],
-      "n_layers": [
-        1
-      ],
-      "batch_size": [
-        256
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        0.001
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "LSTM_Univariate: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 21,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "MAD_GAN",
-      "n_window": [
-        5
-      ],
-      "n_hidden": [
-        32
-      ],
-      "learning_rate": [
-        0.0001
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "MAD_GAN: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 22,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "MSCRED",
-      "learning_rate": [
-        0.0002
-      ],
-      "n_window": [
-        5
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "MSCRED: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 23,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "OmniAnomaly",
-      "learning_rate": [
-        0.0005
-      ],
-      "beta": [
-        0.0002
-      ],
-      "n_hidden": [
-        32
-      ],
-      "n_latent": [
-        16
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        0.001
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "OmniAnomaly: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 24,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD",
-      "n_window": [
-        5
-      ],
-      "batch_size": [
-        128
-      ],
-      "dim_feedforward": [
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        0.0002
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "TranAD: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 25,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_Adversarial",
-      "n_window": [
-        5
-      ],
-      "batch_size": [
-        128
-      ],
-      "dim_feedforward": [
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        0.0002
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "TranAD_Adversarial: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 26,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_Basic",
-      "n_window": [
+        5,
         10
       ],
-      "batch_size": [
-        128
-      ],
-      "dim_feedforward": [
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        0.0002
-      ],
       "q": [
         1e-05
       ],
       "weight_decay": [
-        1e-05
+        1e-05,
+        0.001
       ],
       "epochs": [
-        50
+        1
       ],
-      "notes": "TranAD_Basic: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 27,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_SelfConditioning",
-      "n_window": [
-        10
-      ],
-      "batch_size": [
-        128
-      ],
-      "dim_feedforward": [
-        16
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        0.0002
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "TranAD_SelfConditioning: best calibration_loss params, epochs scaled x10"
-    },
-    {
-      "index": 28,
-      "dataset": [
-        "TOL_1_1",
-        "TOL_2_1_1",
-        "TOL_2_2_1",
-        "TOL_3_2_1",
-        "TOL_3_3_1",
-        "TOL_1_2",
-        "TOL_2_1_2",
-        "TOL_2_2_2",
-        "TOL_3_2_2",
-        "TOL_3_3_2"
-      ],
-      "model": "TranAD_Transformer",
-      "n_window": [
-        10
-      ],
-      "batch_size": [
-        64
-      ],
-      "n_hidden": [
-        32
-      ],
-      "learning_rate": [
-        0.0002
-      ],
-      "q": [
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05
-      ],
-      "epochs": [
-        50
-      ],
-      "notes": "TranAD_Transformer: best calibration_loss params, epochs scaled x10"
+      "notes": "USAD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-05"
     }
   ]
 }
