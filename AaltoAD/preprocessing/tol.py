@@ -214,13 +214,18 @@ def _validate_segments(segments):
 
 
 def _detect_ip_columns(df):
-	"""Find src/dst IP columns in a TOL CSV using the same fallback order as before."""
-	src_col = 'src_ip' if 'src_ip' in df.columns else None
-	dst_col = 'dst_ip' if 'dst_ip' in df.columns else None
+	"""Find src/dst IP columns in a TOL CSV, preferring IP columns over MAC columns."""
+	ip_src_names = ('src_ip', 'ip.src', 'ip_src')
+	ip_dst_names = ('dst_ip', 'ip.dst', 'ip_dst')
+	src_col = next((c for c in df.columns if c.lower() in ip_src_names), None)
+	dst_col = next((c for c in df.columns if c.lower() in ip_dst_names), None)
 	if src_col is None or dst_col is None:
 		for c in df.columns:
-			if src_col is None and 'src' in c.lower(): src_col = c
-			if dst_col is None and 'dst' in c.lower(): dst_col = c
+			cl = c.lower()
+			if 'eth' in cl or 'mac' in cl:
+				continue
+			if src_col is None and 'src' in cl: src_col = c
+			if dst_col is None and 'dst' in cl: dst_col = c
 		if src_col is None or dst_col is None:
 			for c in df.columns:
 				if src_col is None and 'ip' in c.lower(): src_col = c
@@ -233,9 +238,9 @@ def _load_and_prepare(csv_path):
 	df = pd.read_csv(csv_path, on_bad_lines='warn')
 	timestamp_col = find_timestamp_column(df)
 	src_col, dst_col = _detect_ip_columns(df)
-	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen'])
-	src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port'])
-	dst_port_col = _detect_column(df, ['dst_port', 'dport', 'destination_port', 'dstport'])
+	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen', 'frame.len'])
+	src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port', 'srcport', 'tcp.srcport', 'udp.srcport'])
+	dst_port_col = _detect_column(df, ['dst_port', 'dport', 'destination_port', 'dstport', 'tcp.dstport', 'udp.dstport'])
 	df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
 	df = df.dropna(subset=['ts_sec'])
 	df['ts_sec'] = df['ts_sec'].astype(int)
