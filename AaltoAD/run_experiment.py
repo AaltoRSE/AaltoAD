@@ -179,6 +179,28 @@ def _hyperparams_hash(hyperparams: dict) -> str:
 	return hashlib.sha256(serialized.encode()).hexdigest()[:8]
 
 
+def _data_hash(dataset_name: str) -> str:
+	"""Return a short hash (first 8 chars of SHA256) of the dataset's training data file.
+
+	Hashes the raw bytes of `train.npy` in the processed dataset folder so that
+	regenerating the data invalidates cached model checkpoints.
+
+	Args:
+		dataset_name (str): Name of the dataset (processed folder name).
+
+	Returns:
+		str: 8-character hex string, or "nodata" if train.npy does not exist.
+	"""
+	path = os.path.join(constants.output_folder, dataset_name, 'train.npy')
+	if not os.path.exists(path):
+		return 'nodata'
+	h = hashlib.sha256()
+	with open(path, 'rb') as f:
+		for chunk in iter(lambda: f.read(1 << 20), b''):
+			h.update(chunk)
+	return h.hexdigest()[:8]
+
+
 def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: str, dataset_name: str, root_path: str = '', hyperparams: dict = None, metadata: dict = None):
 	"""Save model checkpoint including state dicts and training metadata.
 
@@ -195,11 +217,12 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list, model_name: st
 		metadata (dict): Additional metadata to save (e.g., data shapes, dataset info).
 
 	Returns:
-		None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/{hash}/model.ckpt
+		None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/{hp_hash}_{data_hash}/model.ckpt
 		with hyperparams.json and metadata.json alongside it.
 	"""
 	hp_hash = _hyperparams_hash(hyperparams)
-	folder = f'{root_path}checkpoints/{model_name}_{dataset_name}/{hp_hash}/'
+	data_hash = _data_hash(dataset_name)
+	folder = f'{root_path}checkpoints/{model_name}_{dataset_name}/{hp_hash}_{data_hash}/'
 	os.makedirs(folder, exist_ok=True)
 	file_path = f'{folder}/model.ckpt'
 	torch.save({
@@ -254,10 +277,11 @@ def load_model(
 	model = model_class(dims, **model_kwargs).double()
 	applied_hyperparams = hyperparams
 	hp_hash = _hyperparams_hash(applied_hyperparams)
+	data_hash = _data_hash(dataset_name)
 
 	optimizer = torch.optim.AdamW(model.parameters(), lr=model.lr, weight_decay=model.weight_decay)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
-	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/{hp_hash}/model.ckpt'
+	fname = f'{root_path}checkpoints/{modelname}_{dataset_name}/{hp_hash}_{data_hash}/model.ckpt'
 	if os.path.exists(fname) and (not retrain or test):
 		print(f"{utils.color.GREEN}Loading pre-trained model: {model.name}{utils.color.ENDC}")
 		try:
