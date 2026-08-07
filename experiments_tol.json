@@ -1,611 +1,1066 @@
 {
-  "description": "Experiment configurations. Each experiment is numbered and fully self-contained. Change the index to force rerun. Results are saved with the index.",
+  "description": "Per-sub-dataset experiments using best combined-sweep hyperparameters. Two sets per applicable model: best-by-pot.f1 (raw) and best-by-pot_expanded.f1 (PA). Epochs scaled x10 to match combined total training steps on each ~1/10-size sub-dataset.",
   "experiments": [
     {
       "index": 1,
-      "dataset": "TOL",
-      "model": "LSTM_Univariate",
-      "learning_rate": [
-        0.003,
-        0.004
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
       ],
-      "n_hidden": [
-        1,
-        4
-      ],
-      "n_layers": [
-        1,
-        2
-      ],
-      "batch_size": [
-        256,
-        512
-      ],
-      "notes": "LSTM_Univariate",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 2,
-      "dataset": "TOL",
       "model": "Attention",
       "learning_rate": [
-        5e-05,
-        0.0001,
         0.0002
       ],
       "n_window": [
-        5,
-        10
+        5
       ],
-      "notes": "TranAD higher LR",
       "q": [
-        0.001,
         1e-05
       ],
       "weight_decay": [
-        1e-05,
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "Attention: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 2,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "CAE_M",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        null
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
         0.001
       ],
       "epochs": [
-        3,
-        5
-      ]
+        50
+      ],
+      "notes": "CAE_M: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 3,
-      "dataset": "TOL",
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "DAGMM",
+      "n_latent": [
+        32
+      ],
+      "n_hidden": [
+        32
+      ],
+      "n_window": [
+        5
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "DAGMM: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 4,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "GDN",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        5
+      ],
+      "n_hidden": [
+        32
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "GDN: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 5,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
       "model": "LSTM_AD",
       "learning_rate": [
         0.001
       ],
       "n_layers": [
-        1,
-        2
+        1
       ],
       "n_hidden": [
-        16,
         32
       ],
       "batch_size": [
-        128,
-        256,
-        512
+        128
       ],
       "sequence_length": [
-        8,
         16
       ],
-      "notes": "LSTM_AD",
       "q": [
-        0.001,
         1e-05
       ],
       "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 4,
-      "dataset": "TOL",
-      "model": "DAGMM",
-      "n_latent": [
-        16,
-        32
-      ],
-      "n_hidden": [
-        16,
-        32
-      ],
-      "n_window": [
-        5,
-        10
-      ],
-      "learning_rate": [
-        0.0001,
-        0.0002
-      ],
-      "notes": "DAGMM",
-      "q": [
-        0.001,
         1e-05
       ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
       "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 5,
-      "dataset": "TOL",
-      "model": "OmniAnomaly",
-      "learning_rate": [
-        0.0005,
-        0.001
+        50
       ],
-      "beta": [
-        0.0002,
-        0.01
-      ],
-      "n_hidden": [
-        16,
-        32
-      ],
-      "n_latent": [
-        16,
-        32
-      ],
-      "notes": "OmniAnomaly",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
+      "notes": "LSTM_AD: best calibration_loss params, epochs scaled x10"
     },
     {
       "index": 6,
-      "dataset": "TOL",
-      "model": "USAD",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
       ],
-      "n_hidden": [
-        8,
-        16
-      ],
-      "n_latent": [
-        5,
-        8
-      ],
-      "n_window": [
-        5,
-        10
-      ],
-      "notes": "USAD",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 7,
-      "dataset": "TOL",
-      "model": "MSCRED",
-      "learning_rate": [
-        0.0001,
-        0.0002
-      ],
-      "n_window": [
-        5,
-        10
-      ],
-      "notes": "MSCRED",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 8,
-      "dataset": "TOL",
-      "model": "CAE_M",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "n_window": [
-        10,
-        null
-      ],
-      "notes": "CAE_M",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 10,
-      "dataset": "TOL",
-      "model": "GDN",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "n_window": [
-        5,
-        10
-      ],
-      "n_hidden": [
-        16,
-        32
-      ],
-      "notes": "GDN",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 11,
-      "dataset": "TOL",
-      "model": "MAD_GAN",
-      "n_window": [
-        5,
-        10
-      ],
-      "n_hidden": [
-        16,
-        32
-      ],
-      "learning_rate": [
-        0.0001,
-        0.0002
-      ],
-      "notes": "MAD_GAN",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 12,
-      "dataset": "TOL",
-      "model": "TranAD_Basic",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        128,
-        256
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_Basic",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 13,
-      "dataset": "TOL",
-      "model": "TranAD_Transformer",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        64,
-        128
-      ],
-      "n_hidden": [
-        16,
-        32
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_Transformer",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 14,
-      "dataset": "TOL",
-      "model": "TranAD_Adversarial",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        128,
-        256
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_Adversarial",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 15,
-      "dataset": "TOL",
-      "model": "TranAD_SelfConditioning",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        128,
-        256
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD_SelfConditioning",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 16,
-      "dataset": "TOL",
-      "model": "TranAD",
-      "n_window": [
-        5,
-        10
-      ],
-      "batch_size": [
-        128,
-        256
-      ],
-      "dim_feedforward": [
-        16,
-        32
-      ],
-      "dropout": [
-        0.1
-      ],
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "notes": "TranAD",
-      "q": [
-        0.001,
-        1e-05
-      ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 17,
-      "dataset": "TOL",
       "model": "LSTM_AE",
       "learning_rate": [
         0.001
       ],
       "n_layers": [
-        1,
-        2
+        1
       ],
       "n_hidden": [
-        8,
         16
       ],
       "batch_size": [
-        64,
+        64
+      ],
+      "sequence_length": [
+        32
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_AE: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 7,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_Univariate",
+      "learning_rate": [
+        0.004
+      ],
+      "n_hidden": [
+        4
+      ],
+      "n_layers": [
+        1
+      ],
+      "batch_size": [
+        256
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_Univariate: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 8,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MAD_GAN",
+      "n_window": [
+        5
+      ],
+      "n_hidden": [
+        32
+      ],
+      "learning_rate": [
+        0.0001
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MAD_GAN: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 9,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MSCRED",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        5
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MSCRED: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 10,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "OmniAnomaly",
+      "learning_rate": [
+        0.0005
+      ],
+      "beta": [
+        0.0002
+      ],
+      "n_hidden": [
+        32
+      ],
+      "n_latent": [
+        16
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "OmniAnomaly: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 11,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 12,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Adversarial: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 13,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Basic",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Basic: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 14,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_SelfConditioning: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 15,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Transformer",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        64
+      ],
+      "n_hidden": [
+        32
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Transformer: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 16,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "USAD",
+      "learning_rate": [
+        0.0001
+      ],
+      "n_hidden": [
+        16
+      ],
+      "n_latent": [
+        8
+      ],
+      "n_window": [
+        5
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "USAD: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 17,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "Attention",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        5
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "Attention: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 18,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_AD",
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        1
+      ],
+      "n_hidden": [
+        32
+      ],
+      "batch_size": [
         128
       ],
       "sequence_length": [
-        16,
-        32
+        16
       ],
-      "notes": "LSTM_AE",
       "q": [
-        0.001,
         1e-05
       ],
       "weight_decay": [
-        1e-05,
-        0.001
-      ],
-      "epochs": [
-        3,
-        5
-      ]
-    },
-    {
-      "index": 18,
-      "dataset": "TOL",
-      "model": "Attention",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
-      ],
-      "n_window": [
-        2
-      ],
-      "notes": "TranAD higher LR",
-      "q": [
-        0.001,
         1e-05
       ],
-      "weight_decay": [
-        1e-05,
-        0.001
-      ],
       "epochs": [
-        3,
-        5
-      ]
+        50
+      ],
+      "notes": "LSTM_AD: best calibration_loss params, epochs scaled x10"
     },
     {
-      "index": 18,
-      "dataset": "TOL",
-      "model": "STAGNN",
-      "learning_rate": [
-        5e-05,
-        0.0001,
-        0.0002
+      "index": 19,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
       ],
-      "n_window": [
-        10,20
+      "model": "LSTM_AE",
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        1
+      ],
+      "n_hidden": [
+        16
       ],
       "batch_size": [
-        128,
-        256
-      ],
-      "embed_dim": [
-        32,
         64
       ],
-      "notes": "TranAD higher LR",
+      "sequence_length": [
+        32
+      ],
       "q": [
-        0.001,
         1e-05
       ],
       "weight_decay": [
-        1e-05,
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "LSTM_AE: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 20,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_Univariate",
+      "learning_rate": [
+        0.004
+      ],
+      "n_hidden": [
+        4
+      ],
+      "n_layers": [
+        1
+      ],
+      "batch_size": [
+        256
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
         0.001
       ],
       "epochs": [
-        3,
+        50
+      ],
+      "notes": "LSTM_Univariate: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 21,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MAD_GAN",
+      "n_window": [
         5
       ],
-      "topk": [
-        5,
+      "n_hidden": [
+        32
+      ],
+      "learning_rate": [
+        0.0001
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MAD_GAN: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 22,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MSCRED",
+      "learning_rate": [
+        0.0002
+      ],
+      "n_window": [
+        5
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "MSCRED: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 23,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "OmniAnomaly",
+      "learning_rate": [
+        0.0005
+      ],
+      "beta": [
+        0.0002
+      ],
+      "n_hidden": [
+        32
+      ],
+      "n_latent": [
+        16
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        0.001
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "OmniAnomaly: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 24,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 25,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "n_window": [
+        5
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Adversarial: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 26,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Basic",
+      "n_window": [
         10
       ],
-      "graph_num_heads": [
-        2, 4
-      ]
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Basic: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 27,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        128
+      ],
+      "dim_feedforward": [
+        16
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_SelfConditioning: best calibration_loss params, epochs scaled x10"
+    },
+    {
+      "index": 28,
+      "dataset": [
+        "TOL_1_1",
+        "TOL_2_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_1_2",
+        "TOL_2_1_2",
+        "TOL_2_2_2",
+        "TOL_3_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Transformer",
+      "n_window": [
+        10
+      ],
+      "batch_size": [
+        64
+      ],
+      "n_hidden": [
+        32
+      ],
+      "learning_rate": [
+        0.0002
+      ],
+      "q": [
+        1e-05
+      ],
+      "weight_decay": [
+        1e-05
+      ],
+      "epochs": [
+        50
+      ],
+      "notes": "TranAD_Transformer: best calibration_loss params, epochs scaled x10"
     }
   ]
 }
