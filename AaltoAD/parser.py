@@ -28,15 +28,13 @@ Examples:
 )
 
 # Single run arguments
-parser.add_argument('--dataset', 
-					metavar='-d', 
-					type=str, 
+parser.add_argument('-d', '--dataset',
+					type=str,
 					required=False,
 					default='synthetic',
                     help="Dataset name (or 'ALL' for all datasets)")
-parser.add_argument('--model', 
-					metavar='-m', 
-					type=str, 
+parser.add_argument('-m', '--model',
+					type=str,
 					required=False,
 					default='LSTM_Univariate',
                     help="Model name (or 'ALL' for all models)")
