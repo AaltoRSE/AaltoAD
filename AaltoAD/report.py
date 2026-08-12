@@ -682,7 +682,20 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
         if not threshold or threshold <= 0:
             print(f"No usable POT threshold for {model}; skipping in PDF plot.")
             continue
-        series[model] = df["prediction_error"].reset_index(drop=True) / threshold
+        test_scores = df["prediction_error"].reset_index(drop=True) / threshold
+        # Prepend calibration scores (negative steps) when the sidecar CSV
+        # exists, so the plot shows the data the threshold was fitted on.
+        calib_path = src.replace("_results.json", "_calib_scores.csv")
+        if os.path.exists(calib_path):
+            try:
+                calib = pd.read_csv(calib_path)["prediction_error"] / threshold
+                test_scores = pd.concat([
+                    pd.Series(calib.values, index=range(-len(calib), 0)),
+                    test_scores,
+                ])
+            except (ValueError, OSError, KeyError):
+                pass
+        series[model] = test_scores
         # Ground truth is shared across models for a dataset; capture it once.
         if ground_truth is None and "ground_truth" in df.columns:
             ground_truth = df["ground_truth"].reset_index(drop=True)
@@ -709,7 +722,11 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
             transform=ax.get_xaxis_transform(),
             label="ground_truth",
         )
-    ax.set_xlabel("test step")
+    if combined.index.min() < 0:
+        ax.axvline(0, color="black", linewidth=0.8, linestyle=":")
+        ax.set_xlabel("step (calibration < 0 ≤ test)")
+    else:
+        ax.set_xlabel("test step")
     ax.set_ylabel("prediction error / threshold")
     ax.set_title(f"Prediction error — {dataset}")
     ax.legend(loc="best", fontsize=8, ncol=2)
