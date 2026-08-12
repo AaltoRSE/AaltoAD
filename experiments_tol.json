@@ -34,7 +34,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "Attention: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -70,7 +70,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "CAE_M: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -113,7 +113,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "DAGMM: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -153,7 +153,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "GDN: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -200,7 +200,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "LSTM_AD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -246,7 +246,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "LSTM_AE: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -289,7 +289,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "LSTM_Univariate: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -328,7 +328,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "MAD_GAN: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -363,7 +363,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "MSCRED: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -406,7 +406,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "OmniAnomaly: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -453,7 +453,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "TranAD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -500,7 +500,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "TranAD_Adversarial: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -546,7 +546,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "TranAD_Basic: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -593,7 +593,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "TranAD_SelfConditioning: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -637,7 +637,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "TranAD_Transformer: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     },
@@ -681,7 +681,7 @@
         0.001
       ],
       "epochs": [
-        5
+        20
       ],
       "notes": "USAD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
     }
