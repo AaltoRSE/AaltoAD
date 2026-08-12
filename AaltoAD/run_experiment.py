@@ -514,6 +514,12 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	os.makedirs(os.path.dirname(labels_csv_path), exist_ok=True)
 	labels_df.to_csv(labels_csv_path, index=False)
 
+	# Also persist per-window calibration scores so reports can show the
+	# threshold in the context of the data it was fitted on.
+	if calibD is not None:
+		calib_csv_path = os.path.join('results', dataset_name, f'{model_name}_exp{experiment_id}_calib_scores.csv')
+		pd.DataFrame({'prediction_error': lossCfinal}).to_csv(calib_csv_path, index=False)
+
 	# Add metadata to results
 	result['git_hash'] = utils.get_git_hash()
 	result['model'] = model_name
