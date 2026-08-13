@@ -290,7 +290,7 @@ def is_stale_claim(dataset: str, model: str, exp_id: str, max_age_hours: float =
 	return False
 
 
-def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Dict) -> bool:
+def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Dict, test: bool = False) -> bool:
 	"""Run one experiment or sub-experiment from experiment file.
 
 	Args:
@@ -298,6 +298,9 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 		model: Model name
 		exp_id: Experiment ID (e.g., "5" or "5.2")
 		hyperparams: Dictionary of hyperparameters
+		test: When True, evaluate only — load the existing checkpoint, skip
+			training, and rewrite results/labels/calib outputs. Experiments
+			without a checkpoint are skipped instead of evaluated untrained.
 
 	Returns:
 		True if run successfully, False if skipped or failed
@@ -317,14 +320,24 @@ def run_single_experiment(dataset: str, model: str, exp_id: str, hyperparams: Di
 		# Initialize config for this dataset/model combination
 		constants.initialize(dataset, model)
 
+		if test:
+			# Eval-only refresh: require an existing checkpoint.
+			from AaltoAD.run_experiment import _hyperparams_hash, _data_hash
+			ckpt = os.path.join(
+				'checkpoints', f'{model}_{dataset}',
+				f'{_hyperparams_hash(hyperparams)}_{_data_hash(dataset)}', 'model.ckpt')
+			if not os.path.exists(ckpt):
+				print(f"✗ SKIP   Exp {exp_id}: {model} (no checkpoint for eval-only refresh)")
+				return False
+
 		result = run_experiment(
 			model_name=model,
 			dataset_name=dataset,
 			experiment_id=exp_id,
 			hyperparams_str=json.dumps(hyperparams),
 			less=False,
-			test=False,
-			retrain=True
+			test=test,
+			retrain=not test
 		)
 
 		result_path = get_result_path(dataset, model, exp_id)
@@ -373,7 +386,7 @@ def _write_failure_marker(dataset: str, model: str, exp_id: str,
 		print(f"  (could not write failure marker: {write_err})")
 
 
-def run_worker_loop(experiments: list, retrain: bool = False):
+def run_worker_loop(experiments: list, retrain: bool = False, test: bool = False):
 	"""Run a worker loop that claims and executes tasks until none remain.
 
 	Each iteration scans all sub-experiments, skips completed and claimed ones,
@@ -405,7 +418,7 @@ def run_worker_loop(experiments: list, retrain: bool = False):
 			print(f"Worker {worker_id} claimed Exp {exp_id}: {model} on {dataset}")
 
 			try:
-				success = run_single_experiment(dataset, model, exp_id, hyperparams)
+				success = run_single_experiment(dataset, model, exp_id, hyperparams, test=test)
 				if success:
 					completed += 1
 				else:
@@ -542,7 +555,7 @@ def handle_experiment_file(args):
 
 	# Worker loop mode
 	if args.worker:
-		run_worker_loop(experiments, retrain=args.retrain)
+		run_worker_loop(experiments, retrain=args.retrain, test=args.test)
 		return 0
 
 	# Array job mode
@@ -556,7 +569,7 @@ def handle_experiment_file(args):
 		exp_id, dataset, model, hyperparams = result
 		print(f"Array job {args.array_index} → Exp {exp_id}: {model} on {dataset}")
 
-		success = run_single_experiment(dataset, model, exp_id, hyperparams)
+		success = run_single_experiment(dataset, model, exp_id, hyperparams, test=args.test)
 		return 0 if success else 1
 
 	# Run mode - expand to sub-experiments and run all
@@ -576,7 +589,7 @@ def handle_experiment_file(args):
 			skipped += 1
 			continue
 
-		success = run_single_experiment(dataset, model, exp_id, hyperparams)
+		success = run_single_experiment(dataset, model, exp_id, hyperparams, test=args.test)
 		if success:
 			completed += 1
 		else:

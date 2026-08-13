@@ -393,13 +393,19 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
+	dropped = 0
 	if hasattr(model, 'n_window'):
+		# Windowing drops the first n_window positions of each split (no
+		# padding), so test labels must be trimmed to stay aligned.
+		dropped = model.n_window
 		if trainD is not None:
 			trainD = utils.convert_to_windows(trainD, model)
 		if testD is not None:
 			testD = utils.convert_to_windows(testD, model)
 		if calibD is not None:
 			calibD = utils.convert_to_windows(calibD, model)
+		if labels is not None:
+			labels = labels[dropped:]
 
 
 	### Training phase
@@ -497,6 +503,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	# Write labels with timestamps to a csv
 	timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
+	if timestamps is not None and dropped:
+		timestamps = timestamps[dropped:].reset_index(drop=True)
 	labels_df = pd.DataFrame({
 		'timestamp': timestamps
 	})
