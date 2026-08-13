@@ -720,7 +720,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
             color="tomato",
             alpha=0.15,
             transform=ax.get_xaxis_transform(),
-            label="ground_truth",
+            label="Anomaly",
         )
     if combined.index.min() < 0:
         ax.axvline(0, color="black", linewidth=0.8, linestyle=":")
@@ -783,9 +783,23 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
 
         # Scale by the POT threshold so the threshold maps to 1 and variation
         # around/below it is clearly visible on a fixed 0-3 axis.
-        df["prediction_error"] = df["prediction_error"] / threshold
+        series = df["prediction_error"].reset_index(drop=True) / threshold
 
-        ax = df[["prediction_error"]].plot(figsize=(10, 4), linewidth=0.8, ylim=(-0.2, 2))
+        # Prepend calibration scores at negative steps when the sidecar exists.
+        calib_path = src.replace("_results.json", "_calib_scores.csv")
+        n_calib = 0
+        if os.path.exists(calib_path):
+            try:
+                calib = pd.read_csv(calib_path)["prediction_error"] / threshold
+                n_calib = len(calib)
+                series = pd.concat([
+                    pd.Series(calib.values, index=range(-n_calib, 0)),
+                    series,
+                ])
+            except (ValueError, OSError, KeyError):
+                n_calib = 0
+
+        ax = series.to_frame("prediction_error").plot(figsize=(10, 4), linewidth=0.8, ylim=(-0.2, 2))
         ax.axhline(0.0, color="black", linewidth=0.8)
         ax.axhline(1.0, color="black", linestyle="--", linewidth=0.8, label="threshold")
         if "ground_truth" in df.columns:
@@ -800,7 +814,11 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
                 transform=ax.get_xaxis_transform(),
                 label="ground_truth",
             )
-        ax.set_xlabel("test step")
+        if n_calib:
+            ax.axvspan(-n_calib, 0, color="tab:blue", alpha=0.08, label="calibration")
+            ax.set_xlabel("step (calibration < 0 ≤ test)")
+        else:
+            ax.set_xlabel("test step")
         ax.set_ylabel("prediction error / threshold")
         ax.set_title(f"{model} — {dataset}")
         ax.legend(loc="best", fontsize=8)
