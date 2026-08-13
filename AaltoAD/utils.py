@@ -96,18 +96,17 @@ def convert_to_windows(data: torch.Tensor, model_obj) -> torch.Tensor:
 		model_obj: Model object that contains the n_window and flat_window attributes.
 	
 	Returns:
-		torch.Tensor: Stacked windows with shape (num_samples, window_size, num_features)
-			when flat_window is False, or (num_samples, window_size * num_features)
-			when flat_window is True.
+		torch.Tensor: Stacked windows with shape (num_samples - n_window, window_size, num_features)
+			when flat_window is False, or (num_samples - n_window, window_size * num_features)
+			when flat_window is True. The first n_window positions have no complete
+			history and are dropped (no padding), so callers must trim labels and
+			timestamps by n_window to stay aligned.
 	"""
 	windows = []
 	w_size = model_obj.n_window
 	flatten = getattr(model_obj, 'flat_window', False)
-	for i, g in enumerate(data):
-		if i >= w_size:
-			w = data[i - w_size:i]
-		else:
-			w = torch.cat([data[0].repeat(w_size - i, 1), data[0:i]])
+	for i in range(w_size, len(data)):
+		w = data[i - w_size:i]
 		windows.append(w.reshape(-1) if flatten else w)
 	return torch.stack(windows)
 
