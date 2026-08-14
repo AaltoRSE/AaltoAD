@@ -487,7 +487,6 @@ def handle_experiment_file(args):
 
 		for exp in experiments:
 			exp_idx = exp.get('index')
-			dataset = exp.get('dataset', '?')
 			model = exp.get('model', '?')
 			sub_exps = expand_experiment_to_subexperiments(exp)
 
@@ -495,10 +494,10 @@ def handle_experiment_file(args):
 				# Single configuration
 				exp_id, params = sub_exps[0]
 				param_str = ", ".join([f"{k}={v}" for k, v in params.items() if k != 'notes'])
-				print(f"{exp_id:<12} {dataset:<12} {model:<20} {param_str}")
+				print(f"{exp_id:<12} {model:<20} {param_str}")
 			else:
 				# Multiple sub-experiments
-				print(f"{exp_idx}.*      {dataset:<12} {model:<20} [{len(sub_exps)} sub-experiments]")
+				print(f"{exp_idx}.*      {model:<20} [{len(sub_exps)} sub-experiments]")
 				for exp_id, params in sub_exps[:3]:  # Show first 3
 					param_str = ", ".join([f"{k}={v}" for k, v in params.items() if k != 'notes'])
 					print(f"  {exp_id:<10} {'':<12} {'':<20} {param_str}")
@@ -525,20 +524,21 @@ def handle_experiment_file(args):
 	# Status mode - show completion status of sub-experiments
 	if args.status:
 		print(f"\nExperiment Status in {experiment_file}:")
-		print(f"{'Exp ID':<12} {'Dataset':<12} {'Model':<20} {'Status':<12} {'Complete/Total'}")
+		print(f"{'Exp ID':<12} {'Model':<20} {'Status':<12} {'Complete/Total'}")
 		print("-" * 80)
 
 		for exp in experiments:
 			exp_idx = exp.get('index')
-			dataset = exp.get('dataset', '?')
+			datasets = exp.get('dataset', '?')
 			model = exp.get('model', '?')
 			sub_exps = expand_experiment_to_subexperiments(exp)
 
 			# Count completed sub-experiments
 			completed_count = 0
 			for exp_id, _ in sub_exps:
-				if has_matching_result(dataset, model, exp_id):
-					completed_count += 1
+				for dataset in datasets:
+					if has_matching_result(dataset, model, exp_id):
+						completed_count += 1
 
 			total_count = len(sub_exps)
 
@@ -549,7 +549,7 @@ def handle_experiment_file(args):
 			else:
 				status = "◐ PARTIAL"
 
-			print(f"{exp_idx}.*      {dataset:<12} {model:<20} {status:<12} {completed_count}/{total_count}")
+			print(f"{exp_idx}.*      {model:<20} {status:<12} {completed_count}/{total_count}")
 
 		return 0
 
