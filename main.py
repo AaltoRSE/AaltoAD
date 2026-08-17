@@ -387,10 +387,11 @@ def _write_failure_marker(dataset: str, model: str, exp_id: str,
 
 
 def run_worker_loop(experiments: list, retrain: bool = False, test: bool = False):
-	"""Run a worker loop that claims and executes tasks until none remain.
+	"""Run a worker that makes a single pass over all sub-experiments.
 
-	Each iteration scans all sub-experiments, skips completed and claimed ones,
-	and tries to claim and run the next available task.
+	Each task is considered exactly once: completed and claimed tasks are
+	skipped, everything else is claimed and run. The worker exits at the end
+	of the list.
 	"""
 	all_subexps = collect_all_subexperiments(experiments)
 	worker_id = os.environ.get('SLURM_ARRAY_TASK_ID', str(os.getpid()))
@@ -399,38 +400,28 @@ def run_worker_loop(experiments: list, retrain: bool = False, test: bool = False
 	completed = 0
 	failed = 0
 
-	while True:
-		claimed_any = False
+	for exp_id, dataset, model, hyperparams in all_subexps:
+		# Skip if already has results
+		if not retrain and has_matching_result(dataset, model, exp_id):
+			continue
 
-		for exp_id, dataset, model, hyperparams in all_subexps:
-			# Skip if already has results
-			if not retrain and has_matching_result(dataset, model, exp_id):
-				continue
+		# Clean up stale claims
+		is_stale_claim(dataset, model, exp_id)
 
-			# Clean up stale claims
-			is_stale_claim(dataset, model, exp_id)
+		# Try to claim this task
+		if not try_claim_task(dataset, model, exp_id):
+			continue
 
-			# Try to claim this task
-			if not try_claim_task(dataset, model, exp_id):
-				continue
+		print(f"Worker {worker_id} claimed Exp {exp_id}: {model} on {dataset}")
 
-			claimed_any = True
-			print(f"Worker {worker_id} claimed Exp {exp_id}: {model} on {dataset}")
-
-			try:
-				success = run_single_experiment(dataset, model, exp_id, hyperparams, test=test)
-				if success:
-					completed += 1
-				else:
-					failed += 1
-			finally:
-				release_claim(dataset, model, exp_id)
-
-			# Break to rescan from the beginning
-			break
-
-		if not claimed_any:
-			break
+		try:
+			success = run_single_experiment(dataset, model, exp_id, hyperparams, test=test)
+			if success:
+				completed += 1
+			else:
+				failed += 1
+		finally:
+			release_claim(dataset, model, exp_id)
 
 	print(f"\nWorker {worker_id} finished. Completed: {completed}, Failed: {failed}")
 
