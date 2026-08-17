@@ -241,6 +241,19 @@ def _load_and_prepare(csv_path):
 	bytes_col    = _detect_column(df, ['bytes', 'length', 'len', 'pkt_size', 'size', 'octets', 'framelen', 'frame.len'])
 	src_port_col = _detect_column(df, ['src_port', 'sport', 'source_port', 'srcport', 'tcp.srcport', 'udp.srcport'])
 	dst_port_col = _detect_column(df, ['dst_port', 'dport', 'destination_port', 'dstport', 'tcp.dstport', 'udp.dstport'])
+	# Malformed lines that happen to have the right field count slip past
+	# on_bad_lines with their columns shifted, leaving non-numeric values
+	# (e.g. IP strings) in numeric columns. Their other fields are equally
+	# unreliable, so drop the whole row.
+	bad_rows = pd.Series(False, index=df.index)
+	for col in (bytes_col, src_port_col, dst_port_col):
+		if col:
+			numeric = pd.to_numeric(df[col], errors='coerce')
+			bad_rows |= numeric.isna() & df[col].notna()
+			df[col] = numeric
+	if bad_rows.any():
+		print(f"TOL: dropping {bad_rows.sum()} rows with shifted/non-numeric fields in {csv_path}")
+		df = df[~bad_rows]
 	df['ts_sec'] = parse_timestamp_column(df[timestamp_col])
 	df = df.dropna(subset=['ts_sec'])
 	df['ts_sec'] = df['ts_sec'].astype(int)
