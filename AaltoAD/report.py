@@ -31,10 +31,27 @@ DISPLAY_METRICS = [f"{method}.{m}" for method in METHODS for m in METHOD_METRICS
 LOWER_IS_BETTER = {"calibration_loss"}
 
 # Models are *selected* (best hyperparameters) by the `metric` argument
-# (default calibration_loss), but the summary tables are *ordered* by F1.
-# Calibration loss is not comparable across models, so it makes a poor ranking;
-# F1 reflects detection quality and is comparable.
+# (default calibration_loss). Tables are *ordered* by the selection metric when
+# it is comparable across models (a dotted method metric like 'oracle.f1');
+# calibration loss is not comparable across models, so it makes a poor ranking
+# and tables fall back to F1 instead.
 SUMMARY_SORT_METRIC = "pot.f1"
+
+
+def _table_sort_metric(metric):
+    """Metric used to order table rows for a given selection metric."""
+    return metric if "." in str(metric) else SUMMARY_SORT_METRIC
+
+
+# Color/linestyle pairs for the combined prediction-error plot, one per model
+# shown (the plot is capped at 5 models).
+PLOT_LINE_STYLES = [
+    ("black", "-"),
+    ("red", "--"),
+    ("blue", ":"),
+    ("green", "-."),
+    ("purple", "-"),
+]
 
 
 def _get(d, dotted_key):
@@ -247,10 +264,12 @@ def _build_summary(by_model, metric, unlabeled=False):
     # Labeled mode
     display_columns = DISPLAY_COLUMNS
 
-    # Order by F1 (detection quality), independent of the selection metric.
-    lower_is_better = SUMMARY_SORT_METRIC in LOWER_IS_BETTER
+    # Order by the selection metric when comparable across models (dotted
+    # metrics like oracle.f1); otherwise fall back to SUMMARY_SORT_METRIC.
+    table_sort = _table_sort_metric(metric)
+    lower_is_better = table_sort in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
-    sort_method, sort_sep, sort_metric = SUMMARY_SORT_METRIC.partition(".")
+    sort_method, sort_sep, sort_metric = table_sort.partition(".")
 
     grouped = []  # list of (sort_value, [method_rows], hp_row)
     for model, results in by_model.items():
@@ -487,8 +506,9 @@ UNLABELED_SLIDE_COLUMNS = [
 
 
 def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
-    """One row per model, slim metric set; selected by `metric`, ordered by F1."""
-    sort_metric = metric if unlabeled else SUMMARY_SORT_METRIC
+    """One row per model, slim metric set; selected and ordered by `metric`
+    (falling back to F1 ordering for non-comparable metrics)."""
+    sort_metric = metric if unlabeled else _table_sort_metric(metric)
     lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
@@ -602,7 +622,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
     Designed to be ``\\input``-ed inside a user-provided ``table`` float —
     no float wrapper is emitted.
     """
-    sort_metric = metric if unlabeled else SUMMARY_SORT_METRIC
+    sort_metric = metric if unlabeled else _table_sort_metric(metric)
     lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
@@ -673,6 +693,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
     series = {}
     ground_truth = None
     threshold_ratios = {}
+    best_by_model = {}
     for model, results in by_model.items():
         best = _best_result(results, metric)
         if not best:
@@ -710,6 +731,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
             except (ValueError, OSError, KeyError):
                 pass
         series[model] = test_scores
+        best_by_model[model] = best
         threshold_ratios[model] = (
             pot_thr / threshold if pot_thr else None,
             oracle_thr / threshold if oracle_thr else None,
@@ -722,11 +744,35 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
         print(f"No prediction_error data found for {dataset}; skipping PDF plot.")
         return
 
+    # Keep only the 5 best models (by `metric`) so the overlay stays readable;
+    # models without a usable metric value rank last.
+    if len(series) > 5:
+        def _metric_val(model):
+            try:
+                return float(_get(best_by_model[model], metric))
+            except (TypeError, ValueError):
+                return float("nan")
+
+        def _sort_key(model):
+            v = _metric_val(model)
+            if math.isnan(v):
+                return (1, 0.0)
+            return (0, v if metric in LOWER_IS_BETTER else -v)
+
+        keep = sorted(series, key=_sort_key)[:5]
+        series = {m: series[m] for m in keep}
+        threshold_ratios = {m: threshold_ratios[m] for m in keep}
+
     combined = pd.concat(series, axis=1)
 
     fig, ax = plt.subplots(figsize=(10, 4))
     combined.plot(ax=ax, ylim=(-0.2, 2), linewidth=0.8)
     model_lines = list(ax.get_lines())
+    # The ieee style cycles only 4 color/linestyle pairs, so a 5th line would
+    # repeat the 1st; restyle explicitly with a 5-entry cycle instead.
+    for line, (color, ls) in zip(model_lines, PLOT_LINE_STYLES):
+        line.set_color(color)
+        line.set_linestyle(ls)
     ax.axhline(0.0, color="black", linewidth=0.8)
     # Draw each model's POT (dashed) and oracle (dotted) thresholds in the
     # model's line color; black proxy lines provide one legend entry per style.
