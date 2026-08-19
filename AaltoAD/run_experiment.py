@@ -273,8 +273,7 @@ def load_model(
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
 	# Strip POT-only keys before passing to the constructor; every model now
 	# accepts `epochs` as a normal kwarg so no other special-casing is needed.
-	# `seed` is also not a constructor argument, but unlike POT-only keys it
-	# stays in the hyperparameter hash so each seed gets its own checkpoint.
+	# `seed` is not a constructor argument but stays in the hyperparameter hash.
 	model_kwargs = {k: v for k, v in hyperparams.items() if k not in POT_ONLY_KEYS and k != 'seed'}
 	torch.manual_seed(hyperparams.get('seed', 1))
 	model = model_class(dims, **model_kwargs).double()
