@@ -575,7 +575,8 @@
         0.0002
       ],
       "n_window": [
-        10,20
+        10,
+        20
       ],
       "batch_size": [
         128,
@@ -603,8 +604,407 @@
         10
       ],
       "graph_num_heads": [
-        2, 4
+        2,
+        4
       ]
+    },
+    {
+      "index": 45,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "Attention",
+      "learning_rate": 5e-05,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "Attention: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 29.0; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 46,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "CAE_M",
+      "learning_rate": 0.0001,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "CAE_M: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 30.5; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 47,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "DAGMM",
+      "learning_rate": 0.0002,
+      "n_hidden": 32,
+      "n_latent": 32,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "DAGMM: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 31.27; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 48,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "GDN",
+      "learning_rate": 0.0002,
+      "n_hidden": 32,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "GDN: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 32.19; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 49,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_AD",
+      "batch_size": 128,
+      "learning_rate": 0.001,
+      "n_hidden": 32,
+      "n_layers": 1,
+      "q": 0.001,
+      "sequence_length": 16,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "LSTM_AD: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 33.14; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 50,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_AE",
+      "batch_size": 64,
+      "learning_rate": 0.001,
+      "n_hidden": 16,
+      "n_layers": 1,
+      "q": 0.001,
+      "sequence_length": 16,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "LSTM_AE: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 34.9; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 51,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "LSTM_Univariate",
+      "batch_size": 256,
+      "learning_rate": 0.004,
+      "n_hidden": 4,
+      "n_layers": 2,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "LSTM_Univariate: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 35.28; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 52,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MAD_GAN",
+      "learning_rate": 0.0001,
+      "n_hidden": 16,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "MAD_GAN: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 36.8; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 53,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "MSCRED",
+      "learning_rate": 0.0001,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "MSCRED: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 37.3; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 54,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "OmniAnomaly",
+      "beta": 0.0002,
+      "learning_rate": 0.0005,
+      "n_hidden": 32,
+      "n_latent": 32,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "OmniAnomaly: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 38.7; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 55,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD",
+      "batch_size": 128,
+      "dim_feedforward": 16,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 39.29; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 56,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "batch_size": 128,
+      "dim_feedforward": 16,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_Adversarial: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 40.29; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 57,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Basic",
+      "batch_size": 128,
+      "dim_feedforward": 32,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_Basic: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 41.22; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 58,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "batch_size": 128,
+      "dim_feedforward": 32,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_SelfConditioning: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 42.34; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 59,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "TranAD_Transformer",
+      "batch_size": 64,
+      "learning_rate": 0.0002,
+      "n_hidden": 32,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_Transformer: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 43.34; 50 epochs, seeds 2 and 3"
+    },
+    {
+      "index": 60,
+      "dataset": [
+        "TOL_DNV_1_1",
+        "TOL_2_2_1",
+        "TOL_3_2_1",
+        "TOL_3_3_1",
+        "TOL_DNV_1_2",
+        "TOL_2_2_2",
+        "TOL_3_3_2"
+      ],
+      "model": "USAD",
+      "learning_rate": 0.0002,
+      "n_hidden": 16,
+      "n_latent": 8,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "USAD: lowest sum of calibration losses over 7 datasets (TOL_3_2_2 excluded, bad preprocessing), from exp 44.45; 50 epochs, seeds 2 and 3"
     }
   ]
 }
