@@ -273,7 +273,10 @@ def load_model(
 	hyperparams = utils.load_hyperparams_from_string(hyperparams_str) if hyperparams_str else {}
 	# Strip POT-only keys before passing to the constructor; every model now
 	# accepts `epochs` as a normal kwarg so no other special-casing is needed.
-	model_kwargs = {k: v for k, v in hyperparams.items() if k not in POT_ONLY_KEYS}
+	# `seed` is also not a constructor argument, but unlike POT-only keys it
+	# stays in the hyperparameter hash so each seed gets its own checkpoint.
+	model_kwargs = {k: v for k, v in hyperparams.items() if k not in POT_ONLY_KEYS and k != 'seed'}
+	torch.manual_seed(hyperparams.get('seed', 1))
 	model = model_class(dims, **model_kwargs).double()
 	applied_hyperparams = hyperparams
 	hp_hash = _hyperparams_hash(applied_hyperparams)
@@ -409,6 +412,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 
 	### Training phase
+	train_loss_curve, calib_loss_curve = [], []
 	if not test and trainD is not None:
 		print(f'{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}')
 		num_epochs = model.epochs
@@ -417,6 +421,16 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		for e in tqdm(list(range(epoch+1, epoch+num_epochs+1))):
 			lossT, lr = model.train_step(e, trainD, optimizer, scheduler, n_features)
 			accuracy_list.append((lossT, lr))
+			train_loss_curve.append(float(lossT))
+			if calibD is not None:
+				model.eval()
+				with torch.no_grad():
+					lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, n_features)
+				model.train()
+				calib_loss_curve.append(float(np.mean(lossC)))
+				tqdm.write(f'Epoch {e},\ttrain loss = {lossT:.6g},\tcalib loss = {calib_loss_curve[-1]:.6g}')
+			else:
+				tqdm.write(f'Epoch {e},\ttrain loss = {lossT:.6g}')
 		print(utils.color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+ utils.color.ENDC)
 		save_model(model, optimizer, scheduler, e, accuracy_list, model_name, dataset_name, hyperparams=applied_hyperparams, metadata=data_metadata)
 		if plot:
@@ -495,6 +509,11 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 
 	if calibD is not None:
 		result['calibration_loss'] = float(lossCfinal.mean())
+
+	if train_loss_curve:
+		result['training_loss_curve'] = train_loss_curve
+	if calib_loss_curve:
+		result['calibration_loss_curve'] = calib_loss_curve
 
 	if testD is not None:
 		result.update(diagnosis.hit_att(loss, labels))
