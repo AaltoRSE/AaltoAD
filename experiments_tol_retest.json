@@ -1,0 +1,1071 @@
+{
+  "description": "Eval-only retest of every TOL experiment with an existing result (indices 29-60). Grid format over all eight TOL datasets so any missing (dataset, sub-experiment) pairs are picked up too. Run with --test so checkpoints are loaded and only evaluation is redone.",
+  "experiments": [
+    {
+      "index": 29,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "Attention",
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        5,
+        10,
+        20
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "Attention: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 30,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "CAE_M",
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        10,
+        null
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "CAE_M: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 31,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "DAGMM",
+      "n_latent": [
+        16,
+        32
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "learning_rate": [
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "DAGMM: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 32,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "GDN",
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "GDN: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 33,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "LSTM_AD",
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        1,
+        2
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "batch_size": [
+        128,
+        256,
+        512
+      ],
+      "sequence_length": [
+        8,
+        16
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "LSTM_AD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 34,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "LSTM_AE",
+      "learning_rate": [
+        0.001
+      ],
+      "n_layers": [
+        1,
+        2
+      ],
+      "n_hidden": [
+        8,
+        16
+      ],
+      "batch_size": [
+        64,
+        128
+      ],
+      "sequence_length": [
+        16,
+        32
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "LSTM_AE: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 35,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "LSTM_Univariate",
+      "learning_rate": [
+        0.003,
+        0.004
+      ],
+      "n_hidden": [
+        1,
+        4
+      ],
+      "n_layers": [
+        1,
+        2
+      ],
+      "batch_size": [
+        256,
+        512
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "LSTM_Univariate: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 36,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "MAD_GAN",
+      "n_window": [
+        5,
+        10
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "learning_rate": [
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "MAD_GAN: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 37,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "MSCRED",
+      "learning_rate": [
+        0.0001,
+        0.0002
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "MSCRED: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 38,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "OmniAnomaly",
+      "learning_rate": [
+        0.0005,
+        0.001
+      ],
+      "beta": [
+        0.0002,
+        0.01
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "n_latent": [
+        16,
+        32
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "OmniAnomaly: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 39,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD",
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "TranAD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 40,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "TranAD_Adversarial: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 41,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_Basic",
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "TranAD_Basic: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 42,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        128,
+        256
+      ],
+      "dim_feedforward": [
+        16,
+        32
+      ],
+      "dropout": [
+        0.1
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "TranAD_SelfConditioning: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 43,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_Transformer",
+      "n_window": [
+        5,
+        10
+      ],
+      "batch_size": [
+        64,
+        128
+      ],
+      "n_hidden": [
+        16,
+        32
+      ],
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "TranAD_Transformer: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 44,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "USAD",
+      "learning_rate": [
+        5e-05,
+        0.0001,
+        0.0002
+      ],
+      "n_hidden": [
+        8,
+        16
+      ],
+      "n_latent": [
+        5,
+        8
+      ],
+      "n_window": [
+        5,
+        10
+      ],
+      "q": [
+        0.001
+      ],
+      "weight_decay": [
+        1e-05,
+        0.001
+      ],
+      "epochs": [
+        20
+      ],
+      "notes": "USAD: combined-sweep grid rerun per sub-dataset, q fixed at 1e-04"
+    },
+    {
+      "index": 45,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "Attention",
+      "learning_rate": 5e-05,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "Attention: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 46,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "CAE_M",
+      "learning_rate": 0.0001,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "CAE_M: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 47,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "DAGMM",
+      "learning_rate": 0.0002,
+      "n_hidden": 32,
+      "n_latent": 32,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "DAGMM: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 48,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "GDN",
+      "learning_rate": 0.0002,
+      "n_hidden": 32,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "GDN: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 49,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "LSTM_AD",
+      "batch_size": 128,
+      "learning_rate": 0.001,
+      "n_hidden": 32,
+      "n_layers": 1,
+      "q": 0.001,
+      "sequence_length": 16,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "LSTM_AD: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 50,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "LSTM_AE",
+      "batch_size": 64,
+      "learning_rate": 0.001,
+      "n_hidden": 16,
+      "n_layers": 1,
+      "q": 0.001,
+      "sequence_length": 16,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "LSTM_AE: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 51,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "LSTM_Univariate",
+      "batch_size": 256,
+      "learning_rate": 0.004,
+      "n_hidden": 4,
+      "n_layers": 2,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "LSTM_Univariate: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 52,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "MAD_GAN",
+      "learning_rate": 0.0001,
+      "n_hidden": 16,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "MAD_GAN: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 53,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "MSCRED",
+      "learning_rate": 0.0001,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "MSCRED: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 54,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "OmniAnomaly",
+      "beta": 0.0002,
+      "learning_rate": 0.0005,
+      "n_hidden": 32,
+      "n_latent": 32,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "OmniAnomaly: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 55,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD",
+      "batch_size": 128,
+      "dim_feedforward": 16,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 56,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_Adversarial",
+      "batch_size": 128,
+      "dim_feedforward": 16,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_Adversarial: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 57,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_Basic",
+      "batch_size": 128,
+      "dim_feedforward": 32,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_Basic: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 58,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_SelfConditioning",
+      "batch_size": 128,
+      "dim_feedforward": 32,
+      "dropout": 0.1,
+      "learning_rate": 0.0002,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_SelfConditioning: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 59,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "TranAD_Transformer",
+      "batch_size": 64,
+      "learning_rate": 0.0002,
+      "n_hidden": 32,
+      "n_window": 10,
+      "q": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "TranAD_Transformer: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    },
+    {
+      "index": 60,
+      "dataset": [
+        "TOL_2_2_1",
+        "TOL_2_2_2",
+        "TOL_3_2_1",
+        "TOL_3_2_2",
+        "TOL_3_3_1",
+        "TOL_3_3_2",
+        "TOL_DNV_1_1",
+        "TOL_DNV_1_2"
+      ],
+      "model": "USAD",
+      "learning_rate": 0.0002,
+      "n_hidden": 16,
+      "n_latent": 8,
+      "n_window": 5,
+      "q": 0.001,
+      "weight_decay": 0.001,
+      "epochs": 50,
+      "seed": [
+        2,
+        3
+      ],
+      "notes": "USAD: 50-epoch two-seed runs, reconstructed from result files for eval-only retest"
+    }
+  ]
+}
