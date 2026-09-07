@@ -7,12 +7,15 @@ import os
 from glob import glob
 
 import matplotlib
+from AaltoAD import constants
+from AaltoAD.thresholds import shared
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 from jinja2 import Template
 from matplotlib.backends.backend_pdf import PdfPages
+
 
 METHODS = ["pot", "oracle"]
 METHOD_METRICS = ["f1", "precision", "recall", "fpr", "threshold", "p_latency"]
@@ -910,9 +913,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
         )
     if combined.index.min() < 0:
         ax.axvline(0, color="black", linewidth=0.8, linestyle=":")
-        ax.set_xlabel("step (calibration < 0 ≤ test)")
-    else:
-        ax.set_xlabel("test step")
+    ax.set_xlabel("time step")
     ax.set_ylabel("prediction error / threshold")
     ax.set_title(f"Prediction error — {dataset}")
     # Single-row legend below the axes so peaks can never cover it.
@@ -1014,9 +1015,7 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
             )
         if n_calib:
             ax.axvspan(-n_calib, 0, color="tab:blue", alpha=0.08, label="calibration")
-            ax.set_xlabel("step (calibration < 0 ≤ test)")
-        else:
-            ax.set_xlabel("test step")
+        ax.set_xlabel("time step")
         ax.set_ylabel("prediction error / max(POT, oracle) threshold")
         ax.set_title(f"{model} — {dataset}")
         ax.legend(loc="best", fontsize=8)
@@ -1033,13 +1032,55 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
 # ---------------------------------------------------------------------------
 
 
+def _apply_shared_thresholds(by_dataset, results_folder):
+    """Replace pot/oracle blocks with thresholds fit jointly across datasets, in place.
+
+    Only configurations (model + hyperparameters) with a run in every dataset
+    are processed; per dataset the lowest-``calibration_loss`` run represents
+    the configuration. Each processed result gets ``shared_threshold = True``.
+    Others keep their per-dataset blocks. Fits are cached under
+    ``results_folder/_shared_thresholds/`` keyed by the CSV modification times.
+    """
+
+    datasets = list(by_dataset)
+    groups = shared.group_configurations(
+        by_dataset, _hp_key, lambda rs: _best_result(rs, "calibration_loss"))
+    complete = {k: v for k, v in groups.items() if set(v) == set(datasets)}
+    print(f"Fitting shared thresholds for {len(complete)} configurations across datasets {datasets}")
+
+    cache_file = shared.cache_path(results_folder, datasets)
+    cache = shared.load_cache(cache_file)
+    shared_count, skipped_count = {}, {}
+    for (model, _), members in groups.items():
+        if set(members) != set(datasets):
+            skipped_count[model] = skipped_count.get(model, 0) + 1
+
+    for (model, hp_key), results_by_dataset in complete.items():
+        q = next(iter(results_by_dataset.values())).get("applied_hyperparameters", {}).get("q", 1e-5)
+        constants.initialize(datasets[0], model)
+        blocks = shared.shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, constants.level)
+        if blocks is None:
+            skipped_count[model] = skipped_count.get(model, 0) + 1
+            continue
+        shared.apply_blocks(results_by_dataset, blocks)
+        shared_count[model] = shared_count.get(model, 0) + 1
+
+    shared.save_cache(cache_file, cache)
+    for model in sorted(set(shared_count) | set(skipped_count)):
+        print(f"  {model}: {shared_count.get(model, 0)} configuration(s) shared, "
+              f"{skipped_count.get(model, 0)} skipped (missing runs or CSVs)")
+
+
 def generate_report(dataset, metric="calibration_loss", results_folder="results"):
     """Generate HTML, PDF, CSV, and hyperparameter-markdown reports.
 
     `dataset` may be a single name, a comma-separated string, or a list of
     names. With several datasets, one hyperparameter set per model is selected
     by the best *sum* of `metric` over all of them, and each dataset's report
-    shows that shared configuration. Files are saved in reports/{dataset}/.
+    shows that shared configuration; the POT and oracle thresholds are also
+    refit jointly across the datasets (see `_apply_shared_thresholds`) before
+    selection, so both selection and the per-dataset tables use the same
+    shared thresholds. Files are saved in reports/{dataset}/.
     """
     if isinstance(dataset, str):
         datasets = [d for d in dataset.split(",") if d]
@@ -1055,6 +1096,9 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
         by_dataset[ds] = by_model
     if not by_dataset:
         return
+
+    if len(by_dataset) > 1:
+        _apply_shared_thresholds(by_dataset, results_folder)
 
     selected = _select_shared_best(by_dataset, metric)
     for ds in by_dataset:

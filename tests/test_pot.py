@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 import AaltoAD.pot as pot
+from AaltoAD.thresholds import pot_fit
 import AaltoAD.constants
 
 
@@ -42,8 +43,8 @@ def test_pot_eval_with_dummy_spot(monkeypatch):
             # pot_eval reads the calibration threshold from this attribute
             self.extreme_quantile = 0.6
 
-    # monkeypatch SPOT used inside pot module
-    monkeypatch.setattr(pot, "SPOT", DummySPOT)
+    # monkeypatch SPOT used by the fit helper pot_eval delegates to
+    monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
     res, preds = pot.pot_eval(init_score, score, label)
     assert isinstance(res, dict)
