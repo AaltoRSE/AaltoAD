@@ -80,6 +80,117 @@ def _load_results(dataset, results_folder="results"):
     return by_model
 
 
+def _metric_value(result, metric):
+    """Return the metric as a float, or None if absent/non-numeric/NaN."""
+    try:
+        v = float(_get(result, metric))
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(v) else v
+
+
+def _hp_key(result):
+    """Canonical key identifying a hyperparameter configuration."""
+    return json.dumps(result.get("applied_hyperparameters", {}), sort_keys=True)
+
+
+def _confusion_counts(result, method):
+    """Return (TP, FP, FN) for a method block, or None if any is absent.
+
+    POT blocks store upper-case keys, oracle blocks lower-case ones.
+    """
+    block = result.get(method)
+    if not isinstance(block, dict):
+        return None
+    out = []
+    for name in ("TP", "FP", "FN"):
+        v = block.get(name, block.get(name.lower()))
+        if v is None:
+            return None
+        try:
+            out.append(float(v))
+        except (TypeError, ValueError):
+            return None
+    return tuple(out)
+
+
+def _pooled_f1(results, method):
+    """F1 recomputed from confusion counts summed over `results`.
+
+    Returns None if any result lacks counts for `method`.
+    """
+    tp = fp = fn = 0.0
+    for r in results:
+        counts = _confusion_counts(r, method)
+        if counts is None:
+            return None
+        tp += counts[0]
+        fp += counts[1]
+        fn += counts[2]
+    denom = 2 * tp + fp + fn
+    return 0.0 if denom == 0 else 2 * tp / denom
+
+
+def _select_shared_best(by_dataset, metric):
+    """Select one hyperparameter set per model across all datasets.
+
+    For each model, group results by hyperparameter configuration (keeping the
+    best result per dataset within a configuration) and pick the configuration
+    with the best score over the listed datasets. When `metric` is an F1
+    (e.g. 'pot.f1'), the score is the F1 recomputed from confusion counts
+    pooled over the datasets; otherwise it is the sum of `metric`. Only
+    configurations with a run in every dataset are eligible; if a model has
+    none, it falls back to the best score over the available runs and warns.
+
+    Returns {dataset: {model: [result]}} with at most one result per model; an
+    empty list (with a warning) marks a dataset where the selected
+    configuration has no run.
+    """
+    lower = metric in LOWER_IS_BETTER
+    datasets = list(by_dataset)
+    per_model = {}  # model -> hp_key -> {dataset: (value, result)}
+    for ds, by_model in by_dataset.items():
+        for model, results in by_model.items():
+            for r in results:
+                v = _metric_value(r, metric)
+                if v is None:
+                    continue
+                slot = per_model.setdefault(model, {}).setdefault(_hp_key(r), {})
+                if ds not in slot or (v < slot[ds][0]) == lower:
+                    slot[ds] = (v, r)
+
+    selected = {ds: {} for ds in datasets}
+    for model, configs in per_model.items():
+        complete = {k: v for k, v in configs.items() if len(v) == len(datasets)}
+        pool = complete or configs
+        if not complete:
+            print(
+                f"Warning: {model}: no hyperparameter set has runs in all "
+                f"datasets; selecting by score over available runs."
+            )
+
+        def _score(key):
+            values = pool[key].values()
+            if metric.endswith(".f1"):
+                pooled = _pooled_f1([r for _, r in values], metric[: -len(".f1")])
+                if pooled is not None:
+                    return pooled
+            return sum(v for v, _ in values)
+
+        best_key = min(pool, key=_score) if lower else max(pool, key=_score)
+        for ds in datasets:
+            entry = configs[best_key].get(ds)
+            if entry is None:
+                print(
+                    f"Warning: {model}: selected hyperparameters have no run "
+                    f"for dataset {ds}."
+                )
+                selected[ds][model] = []
+            else:
+                selected[ds][model] = [entry[1]]
+    return selected
+
+
 def _best_result(results, metric):
     """Return the result dict with the best non-NaN metric value.
 
@@ -495,6 +606,16 @@ SLIDE_COLUMNS = [
     ("Eval time (s)", "eval_time"),
 ]
 
+# LaTeX summary table: oracle-threshold metrics only, without method labels.
+LATEX_COLUMNS = [
+    ("F1", "oracle.f1"),
+    ("Adjusted F1", "oracle_expanded.f1"),
+    ("FPR", "oracle.fpr"),
+    ("Latency", "oracle.p_latency"),
+    ("Calib. loss", "calibration_loss"),
+    ("Eval time (s)", "eval_time"),
+]
+
 # Unlabeled mode: alternate slim column spec.
 UNLABELED_SLIDE_COLUMNS = [
     ("Detected", _detected),
@@ -626,9 +747,9 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
     lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
-    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
+    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else LATEX_COLUMNS
 
-    # Slim metrics table (same columns as CSV).
+    # Slim metrics table (oracle-threshold metrics, see LATEX_COLUMNS).
     metric_rows = []
     for model, results in by_model.items():
         best = _best_result(results, metric)
@@ -683,16 +804,14 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
     """Overlay each model's best-result prediction_error for a dataset.
 
     For each model, take its best result (by `metric`), read the matching
-    ``*_labels.csv``, and plot the ``prediction_error`` column scaled by the higher of that
-    model's POT and oracle thresholds, so the higher threshold is 1. Both
-    thresholds are drawn per model (POT dashed, oracle dotted) and
-    ground-truth anomaly regions are shaded once. The figure is saved as both a
+    ``*_labels.csv``, and plot the ``prediction_error`` column scaled by that
+    model's oracle threshold, so the threshold is 1. The oracle threshold is
+    drawn once (dotted) and ground-truth anomaly regions are shaded once. The figure is saved as both a
     vector PDF (for ``\\includegraphics`` in a LaTeX/Overleaf document) and an
     SVG, sharing the basename of ``output_path``.
     """
     series = {}
     ground_truth = None
-    threshold_ratios = {}
     best_by_model = {}
     for model, results in by_model.items():
         best = _best_result(results, metric)
@@ -710,13 +829,11 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
             continue
         if "prediction_error" not in df.columns:
             continue
-        # Scale by the higher of the POT and oracle thresholds so it maps to 1.
-        pot_thr, oracle_thr = _thresholds(best)
-        candidates = [t for t in (pot_thr, oracle_thr) if t]
-        if not candidates:
-            print(f"No usable threshold for {model}; skipping in PDF plot.")
+        # Scale by the oracle threshold so it maps to 1.
+        _, threshold = _thresholds(best)
+        if not threshold:
+            print(f"No usable oracle threshold for {model}; skipping in PDF plot.")
             continue
-        threshold = max(candidates)
         test_scores = df["prediction_error"].reset_index(drop=True) / threshold
         # Prepend calibration scores (negative steps) when the sidecar CSV
         # exists, so the plot shows the data the threshold was fitted on.
@@ -732,10 +849,6 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
                 pass
         series[model] = test_scores
         best_by_model[model] = best
-        threshold_ratios[model] = (
-            pot_thr / threshold if pot_thr else None,
-            oracle_thr / threshold if oracle_thr else None,
-        )
         # Ground truth is shared across models for a dataset; capture it once.
         if ground_truth is None and "ground_truth" in df.columns:
             ground_truth = df["ground_truth"].reset_index(drop=True)
@@ -761,12 +874,18 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
 
         keep = sorted(series, key=_sort_key)[:5]
         series = {m: series[m] for m in keep}
-        threshold_ratios = {m: threshold_ratios[m] for m in keep}
 
-    combined = pd.concat(series, axis=1)
+    # Models have different calibration lengths, so the outer join leaves the
+    # union index unsorted; sort it or the lines wrap back to the start.
+    combined = pd.concat(series, axis=1).sort_index()
+
+    # Show most of the mass rather than the peaks: cap the y-axis at the
+    # 99.9th percentile of all plotted values, with a little headroom, and
+    # never below the threshold line at 1.
+    y_top = max(1.0, float(combined.stack().quantile(0.999))) * 1.15
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    combined.plot(ax=ax, ylim=(-0.2, 2), linewidth=0.8)
+    combined.plot(ax=ax, ylim=(-0.05 * y_top, y_top), linewidth=0.8)
     model_lines = list(ax.get_lines())
     # The ieee style cycles only 4 color/linestyle pairs, so a 5th line would
     # repeat the 1st; restyle explicitly with a 5-entry cycle instead.
@@ -774,16 +893,9 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
         line.set_color(color)
         line.set_linestyle(ls)
     ax.axhline(0.0, color="black", linewidth=0.8)
-    # Draw each model's POT (dashed) and oracle (dotted) thresholds in the
-    # model's line color; black proxy lines provide one legend entry per style.
-    for line, model in zip(model_lines, combined.columns):
-        pot_ratio, oracle_ratio = threshold_ratios[model]
-        if pot_ratio is not None:
-            ax.axhline(pot_ratio, color=line.get_color(), linestyle="--", linewidth=0.8)
-        if oracle_ratio is not None:
-            ax.axhline(oracle_ratio, color=line.get_color(), linestyle=":", linewidth=0.8)
-    ax.plot([], [], color="black", linestyle="--", linewidth=0.8, label="POT threshold")
-    ax.plot([], [], color="black", linestyle=":", linewidth=0.8, label="oracle threshold")
+    # Every series is scaled by its own oracle threshold, so one line at 1 is
+    # the oracle threshold for all models.
+    ax.axhline(1.0, color="black", linestyle=":", linewidth=0.8, label="threshold")
     if ground_truth is not None:
         mask = ground_truth.astype(bool)
         ax.fill_between(
@@ -801,9 +913,19 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path):
         ax.set_xlabel("step (calibration < 0 ≤ test)")
     else:
         ax.set_xlabel("test step")
-    ax.set_ylabel("prediction error / max(POT, oracle) threshold")
+    ax.set_ylabel("prediction error / threshold")
     ax.set_title(f"Prediction error — {dataset}")
-    ax.legend(loc="best", fontsize=8, ncol=2)
+    # Single-row legend below the axes so peaks can never cover it.
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=len(handles),
+        fontsize=8,
+        frameon=False,
+    )
     plt.tight_layout()
     base = os.path.splitext(output_path)[0]
     for fmt in ("pdf", "svg"):
@@ -912,15 +1034,35 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
 
 
 def generate_report(dataset, metric="calibration_loss", results_folder="results"):
-    """Generate HTML, PDF, CSV, and hyperparameter-markdown reports for a dataset.
+    """Generate HTML, PDF, CSV, and hyperparameter-markdown reports.
 
-    Files are saved in reports/{dataset}/ (e.g., reports/TOL_1_1/).
+    `dataset` may be a single name, a comma-separated string, or a list of
+    names. With several datasets, one hyperparameter set per model is selected
+    by the best *sum* of `metric` over all of them, and each dataset's report
+    shows that shared configuration. Files are saved in reports/{dataset}/.
     """
-    by_model = _load_results(dataset, results_folder)
-    if not by_model:
-        print(f'No results found for dataset "{dataset}" in {results_folder}/')
+    if isinstance(dataset, str):
+        datasets = [d for d in dataset.split(",") if d]
+    else:
+        datasets = list(dataset)
+
+    by_dataset = {}
+    for ds in datasets:
+        by_model = _load_results(ds, results_folder)
+        if not by_model:
+            print(f'No results found for dataset "{ds}" in {results_folder}/')
+            continue
+        by_dataset[ds] = by_model
+    if not by_dataset:
         return
 
+    selected = _select_shared_best(by_dataset, metric)
+    for ds in by_dataset:
+        _generate_dataset_report(ds, metric, selected[ds])
+
+
+def _generate_dataset_report(dataset, metric, by_model):
+    """Write all report files for one dataset from its (pre-selected) results."""
     # Determine unlabeled flag: True when at least one result has a pot confusion
     # matrix AND all results that have one satisfy _is_unlabeled.
     results_with_pot = [

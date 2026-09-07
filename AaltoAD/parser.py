@@ -32,7 +32,7 @@ parser.add_argument('-d', '--dataset',
 					type=str,
 					required=False,
 					default='synthetic',
-                    help="Dataset name (or 'ALL' for all datasets)")
+                    help="Dataset name (or 'ALL' for all datasets; with --report, a comma-separated list selects shared hyperparameters by summed metric)")
 parser.add_argument('-m', '--model',
 					type=str,
 					required=False,
