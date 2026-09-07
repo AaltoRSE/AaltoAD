@@ -412,3 +412,25 @@ def test_apply_blocks_overwrites_four_blocks_and_marks_shared():
     blocks = {"d": {"pot": "p", "pot_expanded": "pe", "oracle": "o", "oracle_expanded": "oe"}}
     shared_mod.apply_blocks({"d": r}, blocks)
     assert r == {"pot": "p", "pot_expanded": "pe", "oracle": "o", "oracle_expanded": "oe", "shared_threshold": True}
+
+
+def test_pooled_result_sums_counts_and_recomputes_metrics():
+    from AaltoAD.thresholds.pooled import pooled_result
+    r1 = {"model": "M", "dataset": "a", "experiment_id": "1.0", "calibration_loss": 1.0, "eval_time": 2.0,
+          "shared_threshold": True, "applied_hyperparameters": {"q": 1},
+          "pot": {"TP": 5, "FP": 5, "FN": 0, "TN": 10, "threshold": 0.3, "p_latency": 2.0},
+          "oracle": {"tp": 5, "fp": 0, "fn": 5, "tn": 10, "threshold": 0.7, "p_latency": None}}
+    r2 = {"model": "M", "dataset": "b", "experiment_id": "1.0", "calibration_loss": 3.0, "eval_time": 4.0,
+          "shared_threshold": True, "applied_hyperparameters": {"q": 1},
+          "pot": {"TP": 5, "FP": 0, "FN": 5, "TN": 10, "threshold": 0.3, "p_latency": 4.0},
+          "oracle": {"tp": 10, "fp": 0, "fn": 0, "tn": 10, "threshold": 0.7, "p_latency": 1.0}}
+    out = pooled_result([r1, r2])
+    assert out["dataset"] == "combined" and out["datasets"] == ["a", "b"] and out["shared_threshold"]
+    assert out["calibration_loss"] == 2.0 and out["eval_time"] == 6.0
+    assert out["pot"]["TP"] == 10 and out["pot"]["FP"] == 5 and out["pot"]["FN"] == 5
+    assert out["pot"]["f1"] == pytest.approx(2 * 10 / (2 * 10 + 5 + 5))
+    assert out["pot"]["fpr"] == pytest.approx(5 / 25) and out["pot"]["threshold"] == 0.3
+    assert out["pot"]["p_latency"] == 3.0 and out["oracle"]["p_latency"] == 1.0
+    assert out["oracle"]["tp"] == 15 and out["oracle"]["threshold"] == 0.7
+    assert "pot_expanded" not in out
+    assert pooled_result([]) is None
