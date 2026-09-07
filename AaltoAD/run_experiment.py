@@ -395,6 +395,13 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 		hyperparams_str=hyperparams_str, retrain=retrain, test=test
 	)
 
+	# Calibration immediately precedes test in time, so evaluate them as one
+	# continuous series: recurrent models get a baseline warmup before the
+	# anomaly and windowed models keep the windows straddling the boundary.
+	calib_testD = None
+	if calibD is not None and testD is not None:
+		calib_testD = torch.cat([calibD, testD])
+
 	dropped = 0
 	if hasattr(model, 'n_window'):
 		# Windowing drops the first n_window positions of each split (no
@@ -406,6 +413,8 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			testD = utils.convert_to_windows(testD, model)
 		if calibD is not None:
 			calibD = utils.convert_to_windows(calibD, model)
+		if calib_testD is not None:
+			calib_testD = utils.convert_to_windows(calib_testD, model)
 		if labels is not None:
 			labels = labels[dropped:]
 
@@ -443,10 +452,19 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 	
 	with torch.no_grad():
 		start = time()
-		if testD is not None:
+		if calib_testD is not None:
+			_eval_start = time()
+			lossAll, y_predAll = model.eval_step(0, calib_testD, optimizer, scheduler, n_features)
+			# The last len(testD) rows are the test split; everything before is calibration.
+			n_test = len(testD)
+			loss, y_pred = lossAll[-n_test:], y_predAll[-n_test:]
+			lossC = lossAll[:-n_test]
+			lossCfinal = np.mean(lossC, axis=1)
+		elif testD is not None:
 			_eval_start = time()
 			loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, n_features)
 
+		if testD is not None:
 			# test metrics
 			lossFinal = np.mean(loss, axis=1)
 			eval_time = float(time() - _eval_start)
@@ -461,7 +479,7 @@ def run_experiment(model_name: str, dataset_name: str, model_name_full: str = No
 			lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, n_features)
 			lossTfinal = np.mean(lossT, axis=1)
 
-		if calibD is not None:
+		if calibD is not None and calib_testD is None:
 			lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, n_features)
 			lossCfinal = np.mean(lossC, axis=1)
 
