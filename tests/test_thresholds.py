@@ -329,8 +329,10 @@ def test_apply_shared_thresholds_marks_results_and_leaves_incomplete_untouched(t
 
     assert complete_a.get("shared_threshold") is True
     assert complete_b.get("shared_threshold") is True
-    assert complete_a["pot"]["threshold"] == pytest.approx(complete_b["pot"]["threshold"])
-    assert complete_a["oracle"]["threshold"] == pytest.approx(complete_b["oracle"]["threshold"])
+    assert complete_a["shared"]["pot"]["threshold"] == pytest.approx(complete_b["shared"]["pot"]["threshold"])
+    assert complete_a["shared"]["oracle"]["threshold"] == pytest.approx(complete_b["shared"]["oracle"]["threshold"])
+    # local blocks (from the results JSON) are not overwritten
+    assert "pot" not in complete_a or complete_a["pot"] is not complete_a["shared"]["pot"]
 
     assert "shared_threshold" not in incomplete_a
 
@@ -407,11 +409,20 @@ def test_shared_blocks_cached_fits_once_and_reuses_cache(tmp_path, monkeypatch):
     assert shared_mod.cache_key("M", "{}") in cache
 
 
-def test_apply_blocks_overwrites_four_blocks_and_marks_shared():
+def test_apply_blocks_stores_shared_blocks_and_keeps_local():
     r = {"pot": 1, "oracle": 2}
     blocks = {"d": {"pot": "p", "pot_expanded": "pe", "oracle": "o", "oracle_expanded": "oe"}}
     shared_mod.apply_blocks({"d": r}, blocks)
-    assert r == {"pot": "p", "pot_expanded": "pe", "oracle": "o", "oracle_expanded": "oe", "shared_threshold": True}
+    assert r["pot"] == 1 and r["oracle"] == 2 and r["shared_threshold"] is True
+    assert r["shared"] == {"pot": "p", "pot_expanded": "pe", "oracle": "o", "oracle_expanded": "oe"}
+
+
+def test_with_blocks_swaps_method_blocks_or_returns_none():
+    r = {"pot": 1, "oracle": 2, "calibration_loss": 0.5, "shared": {"pot": "p", "oracle": "o"}}
+    view = shared_mod.with_blocks(r, "shared")
+    assert view["pot"] == "p" and view["oracle"] == "o" and view["calibration_loss"] == 0.5
+    assert r["pot"] == 1
+    assert shared_mod.with_blocks({"pot": 1}, "shared") is None
 
 
 def test_pooled_result_sums_counts_and_recomputes_metrics():
@@ -434,3 +445,16 @@ def test_pooled_result_sums_counts_and_recomputes_metrics():
     assert out["oracle"]["tp"] == 15 and out["oracle"]["threshold"] == 0.7
     assert "pot_expanded" not in out
     assert pooled_result([]) is None
+
+
+def test_pooled_result_uses_blocks_key_when_present():
+    from AaltoAD.thresholds.pooled import pooled_result
+    r1 = {"model": "M", "dataset": "a", "shared_threshold": True,
+          "pot": {"TP": 1, "FP": 0, "FN": 0, "TN": 0, "threshold": 0.1},
+          "shared": {"pot": {"TP": 7, "FP": 0, "FN": 0, "TN": 0, "threshold": 0.9}}}
+    r2 = {"model": "M", "dataset": "b", "shared_threshold": True,
+          "pot": {"TP": 1, "FP": 0, "FN": 0, "TN": 0, "threshold": 0.1},
+          "shared": {"pot": {"TP": 3, "FP": 0, "FN": 0, "TN": 0, "threshold": 0.9}}}
+    assert pooled_result([r1, r2])["pot"]["TP"] == 2
+    out = pooled_result([r1, r2], blocks_key="shared")
+    assert out["pot"]["TP"] == 10 and out["pot"]["threshold"] == 0.9
