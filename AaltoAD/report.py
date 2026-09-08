@@ -817,9 +817,21 @@ def _plot_threshold(result, metric):
     return oracle_thr if _plot_threshold_method(metric) == "oracle" else pot_thr
 
 
-def _plot_y_top(values):
-    """Upper y limit: 99.9th percentile of plotted values with headroom, never below the threshold at 1."""
-    return max(1.0, float(values.quantile(0.999))) * 1.15
+def _plot_y_top(values, ground_truth=None):
+    """Upper y limit: 99.9th percentile of the range-setting values with headroom, never below the threshold at 1.
+
+    `values` is a Series (or DataFrame) indexed by time step, calibration at
+    negative steps. With `ground_truth` (Series indexed 0..N-1), only the
+    calibration rows and the labelled-anomaly rows set the range, so large
+    spikes in the recovery phase clip instead of flattening the anomaly.
+    """
+    if ground_truth is not None:
+        anomaly_steps = ground_truth.index[ground_truth.astype(bool)]
+        keep = (values.index < 0) | values.index.isin(anomaly_steps)
+        if keep.any():
+            values = values[keep]
+    flat = values.stack() if isinstance(values, pd.DataFrame) else values
+    return max(1.0, float(flat.quantile(0.999))) * 1.15
 
 
 def _format_y_ticks(ax, y_top):
@@ -828,12 +840,14 @@ def _format_y_ticks(ax, y_top):
         ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.1e}"))
 
 
-def _generate_prediction_error_plot(dataset, metric, by_model, output_path, models=None):
+def _generate_prediction_error_plot(dataset, metric, by_model, output_path, models=None, blocks_key=None):
     """Overlay each model's best-result prediction_error for a dataset.
 
     `models`, when given, fixes which models are plotted (and their order)
     instead of the per-dataset top 5 by `metric`; multi-dataset reports pass
     the same list to every dataset so the overlays are comparable.
+    `blocks_key` (e.g. ``"shared"``) scales by the thresholds stored under that
+    key of each result instead of the local ones; models without it are skipped.
 
     For each model, take its best result (by `metric`), read the matching
     ``*_labels.csv``, and plot the ``prediction_error`` column scaled by that
@@ -862,7 +876,8 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
         if "prediction_error" not in df.columns:
             continue
         # Scale by the threshold of the method the metric names, so it maps to 1.
-        threshold = _plot_threshold(best, metric)
+        thr_source = shared.with_blocks(best, blocks_key) if blocks_key else best
+        threshold = _plot_threshold(thr_source, metric) if thr_source else None
         if not threshold:
             print(f"No usable {_plot_threshold_method(metric)} threshold for {model}; skipping in PDF plot.")
             continue
@@ -916,7 +931,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
     # Show most of the mass rather than the peaks: cap the y-axis at the
     # 99.9th percentile of all plotted values, with a little headroom, and
     # never below the threshold line at 1.
-    y_top = _plot_y_top(combined.stack())
+    y_top = _plot_y_top(combined, ground_truth)
 
     fig, ax = plt.subplots(figsize=(10, 4))
     combined.plot(ax=ax, ylim=(-0.05 * y_top, y_top), linewidth=0.8)
@@ -948,7 +963,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
         ax.axvline(0, color="black", linewidth=0.8, linestyle=":")
     ax.set_xlabel("time step")
     ax.set_ylabel(f"prediction error / {method} threshold")
-    ax.set_title(f"Prediction error — {dataset}")
+    ax.set_title(f"Prediction error — {dataset}" + (" (shared threshold)" if blocks_key else ""))
     # Single-row legend below the axes so peaks can never cover it.
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(
@@ -974,7 +989,7 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
 # ---------------------------------------------------------------------------
 
 
-def _generate_model_plots(dataset, metric, by_model, output_dir):
+def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None):
     """Plot the best result per model as prediction error vs. threshold.
 
     For each model, take its best result (by `metric`), read the matching
@@ -1003,8 +1018,11 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
         if "prediction_error" not in df.columns:
             continue
 
-        pot_thr, oracle_thr = _thresholds(best)
-        threshold = _plot_threshold(best, metric)
+        thr_source = shared.with_blocks(best, blocks_key) if blocks_key else best
+        if thr_source is None:
+            continue
+        pot_thr, oracle_thr = _thresholds(thr_source)
+        threshold = _plot_threshold(thr_source, metric)
         if not threshold:
             print(f"No usable {_plot_threshold_method(metric)} threshold for {model}; skipping plot.")
             continue
@@ -1026,7 +1044,7 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
             except (ValueError, OSError, KeyError):
                 n_calib = 0
 
-        y_top = _plot_y_top(series)
+        y_top = _plot_y_top(series, df["ground_truth"] if "ground_truth" in df.columns else None)
         ax = series.to_frame("prediction_error").plot(figsize=(10, 4), linewidth=0.8, ylim=(-0.05 * y_top, y_top))
         _format_y_ticks(ax, y_top)
         ax.axhline(0.0, color="black", linewidth=0.8)
@@ -1050,7 +1068,7 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
             ax.axvspan(-n_calib, 0, color="tab:blue", alpha=0.08, label="calibration")
         ax.set_xlabel("time step")
         ax.set_ylabel(f"prediction error / {_plot_threshold_method(metric)} threshold")
-        ax.set_title(f"{model} — {dataset}")
+        ax.set_title(f"{model} — {dataset}" + (" (shared threshold)" if blocks_key else ""))
         ax.legend(loc="best", fontsize=8)
         plt.tight_layout()
         for fmt in ("pdf", "svg"):
@@ -1066,12 +1084,13 @@ def _generate_model_plots(dataset, metric, by_model, output_dir):
 
 
 def _apply_shared_thresholds(by_dataset, results_folder):
-    """Replace pot/oracle blocks with thresholds fit jointly across datasets, in place.
+    """Attach pot/oracle blocks fit with thresholds shared across datasets, in place.
 
     Only configurations (model + hyperparameters) with a run in every dataset
     are processed; per dataset the lowest-``calibration_loss`` run represents
-    the configuration. Each processed result gets ``shared_threshold = True``.
-    Others keep their per-dataset blocks. Fits are cached under
+    the configuration. Each processed result gets its shared blocks under
+    ``result["shared"]`` and ``shared_threshold = True``; the local blocks stay
+    untouched and remain what per-dataset tables show. Fits are cached under
     ``results_folder/_shared_thresholds/`` keyed by the CSV modification times.
     """
 
@@ -1110,11 +1129,11 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
     `dataset` may be a single name, a comma-separated string, or a list of
     names. With several datasets, one hyperparameter set per model is selected
     by the best *sum* of `metric` over all of them, and each dataset's report
-    shows that shared configuration; the POT and oracle thresholds are also
-    refit jointly across the datasets (see `_apply_shared_thresholds`) before
-    selection, so both selection and the per-dataset tables use the same
-    shared thresholds. Files are saved in reports/{dataset}/, plus a
-    reports/combined/ summary with confusion counts pooled over the datasets.
+    shows that shared configuration with its local (per-dataset) thresholds.
+    POT and oracle thresholds are also fit jointly across the datasets (see
+    `_apply_shared_thresholds`); those shared thresholds drive the
+    reports/combined/ summary (confusion counts pooled over the datasets) and a
+    second set of plots per dataset. Files are saved in reports/{dataset}/.
     """
     if isinstance(dataset, str):
         datasets = [d for d in dataset.split(",") if d]
@@ -1140,7 +1159,7 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
         pooled = _pooled_by_model(selected)
         plot_models = _top_models(pooled, metric)
     for ds in by_dataset:
-        _generate_dataset_report(ds, metric, selected[ds], plot_models=plot_models)
+        _generate_dataset_report(ds, metric, selected[ds], plot_models=plot_models, shared_plots=len(by_dataset) > 1)
     if len(by_dataset) > 1:
         _generate_dataset_report("combined", metric, pooled, plot_models=plot_models)
 
@@ -1155,23 +1174,25 @@ def _top_models(by_model, metric, n=5):
 
 
 def _pooled_by_model(selected):
-    """Pool each model's selected per-dataset results into one combined result."""
+    """Pool each model's selected per-dataset results into one combined result, using the shared-threshold blocks."""
     from AaltoAD.thresholds.pooled import pooled_result
 
     models = {m for by_model in selected.values() for m in by_model}
     pooled = {}
     for model in sorted(models):
-        combined = pooled_result([r for by_model in selected.values() for r in by_model.get(model, [])])
+        combined = pooled_result([r for by_model in selected.values() for r in by_model.get(model, [])], blocks_key="shared")
         if combined:
             pooled[model] = [combined]
     return pooled
 
 
-def _generate_dataset_report(dataset, metric, by_model, plot_models=None):
+def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared_plots=False):
     """Write all report files for one dataset from its (pre-selected) results.
 
     `plot_models` fixes the models shown in the overlay plot (see
-    `_generate_prediction_error_plot`).
+    `_generate_prediction_error_plot`). With `shared_plots`, a second set of
+    plots scaled by the shared thresholds is written next to the local ones
+    (``prediction_errors_shared.*`` and ``plots_shared/``).
     """
     # Determine unlabeled flag: True when at least one result has a pot confusion
     # matrix AND all results that have one satisfy _is_unlabeled.
@@ -1203,3 +1224,7 @@ def _generate_dataset_report(dataset, metric, by_model, plot_models=None):
     _generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
     _generate_prediction_error_plot(dataset, metric, by_model, plot_path, models=plot_models)
     _generate_model_plots(dataset, metric, by_model, plots_dir)
+    if shared_plots:
+        shared_plot_path = os.path.join(dataset_dir, "prediction_errors_shared.pdf")
+        _generate_prediction_error_plot(dataset, metric, by_model, shared_plot_path, models=plot_models, blocks_key="shared")
+        _generate_model_plots(dataset, metric, by_model, os.path.join(dataset_dir, "plots_shared"), blocks_key="shared")

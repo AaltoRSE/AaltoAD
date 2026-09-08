@@ -153,9 +153,30 @@ def shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, level):
     return blocks
 
 
+METHOD_BLOCKS = ("pot", "pot_expanded", "oracle", "oracle_expanded")
+
+
 def apply_blocks(results_by_dataset, blocks):
-    """Overwrite each result's pot/oracle blocks with the shared ones and mark it shared."""
+    """Store the shared pot/oracle blocks under ``result["shared"]`` and mark the result.
+
+    The local (per-dataset) blocks stay in place; ``with_blocks(result, "shared")``
+    yields a view where the shared ones replace them.
+    """
     for ds, r in results_by_dataset.items():
-        for name in ("pot", "pot_expanded", "oracle", "oracle_expanded"):
-            r[name] = blocks[ds][name]
+        r["shared"] = {name: blocks[ds][name] for name in METHOD_BLOCKS}
         r["shared_threshold"] = True
+
+
+def with_blocks(result, key):
+    """Shallow copy of `result` with its four method blocks taken from ``result[key]``.
+
+    Returns ``None`` if `result` has no ``key`` entry.
+    """
+    alt = result.get(key)
+    if not isinstance(alt, dict):
+        return None
+    view = dict(result)
+    for name in METHOD_BLOCKS:
+        if name in alt:
+            view[name] = alt[name]
+    return view

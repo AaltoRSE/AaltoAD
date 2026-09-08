@@ -36,8 +36,13 @@ def _pooled_block(blocks):
     return out
 
 
-def pooled_result(results):
+def pooled_result(results, blocks_key=None):
     """Combine the per-dataset results of one model configuration into one result dict.
+
+    With `blocks_key` (e.g. ``"shared"``), each result's method blocks are
+    taken from ``result[blocks_key]`` when present (see ``shared.with_blocks``);
+    results lacking it contribute their local blocks and the output's
+    ``shared_threshold`` flag is False.
 
     Each method block (``pot``, ``pot_expanded``, ``oracle``,
     ``oracle_expanded``) gets pooled confusion counts and metrics recomputed
@@ -49,6 +54,9 @@ def pooled_result(results):
     results = [r for r in results if r]
     if not results:
         return None
+    if blocks_key:
+        from AaltoAD.thresholds.shared import with_blocks
+        results = [with_blocks(r, blocks_key) or r for r in results]
     first = results[0]
     out = {
         "model": first.get("model"),
