@@ -20,15 +20,16 @@ def test_plot_threshold_picks_method_threshold_and_rejects_invalid():
 
 
 def test_plot_y_top_ignores_recovery_rows_when_ground_truth_given():
-    # calibration at negative steps, anomaly at 0-1, recovery spike at 2-3
-    values = pd.Series([0.5, 0.5, 2.0, 2.0, 50.0, 50.0], index=[-2, -1, 0, 1, 2, 3])
+    # calibration at negative steps, anomaly at 0-1 (above the floor so the
+    # percentile branch is still exercised), recovery spike at 2-3
+    values = pd.Series([0.5, 0.5, 3.0, 3.0, 50.0, 50.0], index=[-2, -1, 0, 1, 2, 3])
     ground_truth = pd.Series([1, 1, 0, 0], index=[0, 1, 2, 3])
-    assert report._plot_y_top(values, ground_truth) == pytest.approx(2.0 * 1.15)
+    assert report._plot_y_top(values, ground_truth) == pytest.approx(3.0 * 1.15)
     assert report._plot_y_top(values) == pytest.approx(50.0 * 1.15)
 
 
-def test_plot_y_top_never_below_threshold_and_uses_percentile():
-    assert report._plot_y_top(pd.Series([0.1, 0.2, 0.3])) == pytest.approx(1.15)
+def test_plot_y_top_never_below_floor_and_uses_percentile():
+    assert report._plot_y_top(pd.Series([0.1, 0.2, 0.3])) == pytest.approx(2.3)
     assert report._plot_y_top(pd.Series([10.0] * 100)) == pytest.approx(11.5)
 
 
