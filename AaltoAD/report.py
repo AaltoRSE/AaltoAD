@@ -777,7 +777,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
 
 
 # ---------------------------------------------------------------------------
-# PDF prediction-error plot
+# Prediction-error overlay plot
 # ---------------------------------------------------------------------------
 
 
