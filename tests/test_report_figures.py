@@ -52,4 +52,8 @@ def test_save_png_writes_readable_file_at_expected_size(tmp_path):
     assert out_path.exists()
     image = mpimg.imread(str(out_path))
     width_px = image.shape[1]
-    assert 3800 <= width_px <= 4600
+    # save_png uses bbox_inches="tight", which crops surrounding whitespace;
+    # how much gets cropped has varied across matplotlib versions. Only
+    # require that most of the nominal width (FIGSIZE[0] * DPI) survives.
+    full_width_px = style.FIGSIZE[0] * style.DPI
+    assert 0.7 * full_width_px <= width_px <= full_width_px + 100
