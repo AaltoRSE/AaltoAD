@@ -11,7 +11,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "Attention",
       "learning_rate": [
@@ -46,7 +48,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "CAE_M",
       "learning_rate": [
@@ -80,7 +84,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "DAGMM",
       "n_latent": [
@@ -121,7 +127,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "GDN",
       "learning_rate": [
@@ -159,7 +167,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "LSTM_AD",
       "learning_rate": [
@@ -204,7 +214,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "LSTM_AE",
       "learning_rate": [
@@ -248,7 +260,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "LSTM_Univariate",
       "learning_rate": [
@@ -289,7 +303,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "MAD_GAN",
       "n_window": [
@@ -326,7 +342,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "MSCRED",
       "learning_rate": [
@@ -359,7 +377,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "OmniAnomaly",
       "learning_rate": [
@@ -400,7 +420,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "TranAD",
       "n_window": [
@@ -445,7 +467,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "TranAD_Adversarial",
       "n_window": [
@@ -490,7 +514,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "TranAD_Basic",
       "n_window": [
@@ -534,7 +560,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "TranAD_SelfConditioning",
       "n_window": [
@@ -579,7 +607,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "TranAD_Transformer",
       "n_window": [
@@ -621,7 +651,9 @@
         "TOL_3_3_1",
         "TOL_3_3_2",
         "TOL_DNV_1_1",
-        "TOL_DNV_1_2"
+        "TOL_DNV_1_2",
+        "TOL_2_1_1",
+        "TOL_2_1_2"
       ],
       "model": "USAD",
       "learning_rate": [
