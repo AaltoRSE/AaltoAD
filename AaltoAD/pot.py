@@ -1,106 +1,8 @@
 import numpy as np
 
-from AaltoAD.spot import SPOT
 from AaltoAD import constants
-from sklearn import metrics
-
-def calc_point2point(predict, actual):
-    """
-    calculate f1 score by predict and actual.
-    Args:
-        predict (np.ndarray): the predict label
-        actual (np.ndarray): np.ndarray
-    """
-    TP = np.sum(predict * actual)
-    TN = np.sum((1 - predict) * (1 - actual))
-    FP = np.sum(predict * (1 - actual))
-    FN = np.sum((1 - predict) * actual)
-    precision = TP / (TP + FP + 0.00001)
-    recall = TP / (TP + FN + 0.00001)
-    f1 = 2 * precision * recall / (precision + recall + 0.00001)
-    try:
-        roc_auc = metrics.roc_auc_score(actual, predict)
-    except:
-        roc_auc = 0
-    return f1, precision, recall, TP, TN, FP, FN, roc_auc
-
-
-# the below function is taken from OmniAnomaly code base directly
-def adjust_predicts(score, label,
-                    threshold=None,
-                    pred=None,
-                    calc_latency=False):
-    """
-    Calculate adjusted predict labels using given `score`, `threshold` (or given `pred`) and `label`.
-    Args:
-        score (np.ndarray): The anomaly score
-        label (np.ndarray): The ground-truth label
-        threshold (float): The threshold of anomaly score.
-            A point is labeled as "anomaly" if its score is lower than the threshold.
-        pred (np.ndarray or None): if not None, adjust `pred` and ignore `score` and `threshold`,
-        calc_latency (bool):
-    Returns:
-        np.ndarray: predict labels
-    """
-    if len(score) != len(label):
-        raise ValueError("score and label must have the same length")
-    score = np.asarray(score)
-    label = np.asarray(label)
-    latency = 0
-    if pred is None:
-        predict = score > threshold
-    else:
-        predict = pred
-    actual = label > 0.1
-    anomaly_state = False
-    anomaly_count = 0
-    for i in range(len(score)):
-        if actual[i] and predict[i] and not anomaly_state:
-                anomaly_state = True
-                anomaly_count += 1
-                for j in range(i, 0, -1):
-                    if not actual[j]:
-                        break
-                    else:
-                        if not predict[j]:
-                            predict[j] = True
-                            latency += 1
-        elif not actual[i]:
-            anomaly_state = False
-        if anomaly_state:
-            predict[i] = True
-    if calc_latency:
-        return predict, latency / (anomaly_count + 1e-4)
-    else:
-        return predict
-
-
-def segment_latency(pred, label):
-    """Average latency to first alarm per labeled anomaly segment.
-
-    For each contiguous run of label==1, latency is the offset from the
-    segment start to the first pred==1 inside it. A segment with no alarm
-    contributes its full length. Returns None if there are no segments.
-    """
-    pred = np.asarray(pred).astype(bool)
-    label = np.asarray(label).astype(bool)
-    if len(pred) != len(label):
-        raise ValueError("pred and label must have the same length")
-    padded = np.concatenate(([False], label, [False]))
-    diff = np.diff(padded.astype(np.int8))
-    starts = np.where(diff == 1)[0]
-    ends = np.where(diff == -1)[0]  # exclusive
-    if len(starts) == 0:
-        return None
-    latencies = []
-    for s, e in zip(starts, ends):
-        seg = pred[s:e]
-        if seg.any():
-            latencies.append(int(np.argmax(seg)))
-        else:
-            latencies.append(int(e - s))
-    return float(np.mean(latencies))
-
+from AaltoAD.thresholds.point_adjust import calc_point2point, adjust_predicts, segment_latency
+from AaltoAD.thresholds.pot_fit import fit_pot_threshold, pot_metrics
 
 def calc_seq(score, label, threshold, calc_latency=False):
     """
@@ -163,57 +65,21 @@ def pot_eval(init_score, score, label, q=1e-5, expand_segments=False):
     """
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
         pred = np.zeros_like(label)
-        return {
-            'f1': np.nan, 'precision': np.nan, 'recall': np.nan, 'fpr': np.nan,
-            'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
-            'ROC/AUC': np.nan, 'threshold': np.nan, 'p_latency': None,
-        }, pred
+        return pot_metrics(score, label, float('nan'), expand_segments), pred
 
     level = constants.level
+    pot_th = fit_pot_threshold(init_score, score, q, level)
+    if np.isnan(pot_th):
+        pred = np.zeros_like(label)
+        return pot_metrics(score, label, pot_th, expand_segments), pred
 
-    # If the level leaves too few peaks for the GPD fit (e.g. a small
-    # calibration set), lower it and retry.
-    retries = 0
-    while True:
-        try:
-            s = SPOT(q)  # SPOT object
-            s.fit(init_score, score)  # data import
-            s.initialize(level=level, min_extrema=False, verbose=False)  # initialization step
-        except Exception as e:
-            retries += 1
-            if retries > 100:
-                print(f'SPOT: giving up after {retries} retries: {e}')
-                pred = np.zeros_like(label)
-                return {
-                    'f1': np.nan, 'precision': np.nan, 'recall': np.nan, 'fpr': np.nan,
-                    'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
-                    'ROC/AUC': np.nan, 'threshold': np.nan, 'p_latency': None,
-                }, pred
-            level = level * 0.95
-        else:
-            break
-    # Threshold comes from the calibration data only: initialize() fits the
-    # GPD to the peaks of init_score and extrapolates the quantile at risk q.
-    pot_th = s.extreme_quantile
+    # Threshold comes from the calibration data only: fit_pot_threshold fits
+    # the GPD to the peaks of init_score and extrapolates the quantile at
+    # risk q.
     raw_pred = score > pot_th
-    p_latency = segment_latency(raw_pred, label)
     if expand_segments:
         pred = adjust_predicts(score, label, pot_th)
     else:
         pred = raw_pred
-    p_t = calc_point2point(pred, label)
-    fp, tn = float(p_t[5]), float(p_t[4])
-    fpr = fp / (fp + tn) if (fp + tn) else 0.0
-    return {
-        'f1': p_t[0],
-        'precision': p_t[1],
-        'recall': p_t[2],
-        'fpr': fpr,
-        'TP': p_t[3],
-        'TN': p_t[4],
-        'FP': p_t[5],
-        'FN': p_t[6],
-        'ROC/AUC': p_t[7],
-        'threshold': pot_th,
-        'p_latency': p_latency,
-    }, np.array(pred)
+    result = pot_metrics(score, label, pot_th, expand_segments)
+    return result, np.array(pred)
