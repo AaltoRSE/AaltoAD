@@ -7,7 +7,12 @@ import numpy as np
 
 from AaltoAD.thresholds.scores import load_run_scores
 from AaltoAD.thresholds.pot_fit import fit_pot_threshold, pot_metrics
+from AaltoAD.thresholds.conformal import conformal_metrics, conformal_threshold
 from AaltoAD.thresholds.oracle import oracle_metrics, shared_oracle_threshold
+
+# Bumped whenever the contents of a blocks dict change, so cached entries
+# written by an older version are refitted instead of silently reused.
+BLOCKS_VERSION = 3
 
 
 def _to_jsonable(value):
@@ -23,20 +28,23 @@ def _to_jsonable(value):
     return value
 
 
-def shared_threshold_blocks(results_by_dataset, q, level):
+def shared_threshold_blocks(results_by_dataset, q, level, conformal_q=None):
     """Fit and evaluate shared thresholds for one model/hyperparameter configuration.
 
     `results_by_dataset` is ``{dataset: result_dict}``, one result per
     dataset for the same configuration. Loads each dataset's calibration/test
     scores and labels, pools calibration scores to fit one POT threshold
-    (``fit_pot_threshold``), and concatenates test scores/labels to search
-    one raw and one segment-expanded oracle threshold
-    (``shared_oracle_threshold``). Per dataset, evaluates all four blocks
-    (``pot_metrics`` / ``oracle_metrics``) at the shared thresholds.
+    (``fit_pot_threshold``, at the run's swept risk `q`) and one conformal
+    threshold (``conformal_threshold`` at `conformal_q`, defaulting to `q` when
+    it is None), and concatenates test
+    scores/labels to search one raw and one segment-expanded oracle threshold
+    (``shared_oracle_threshold``). Per dataset, evaluates every block at the
+    shared thresholds.
 
-    Returns ``{dataset: {'pot': ..., 'pot_expanded': ..., 'oracle': ...,
-    'oracle_expanded': ...}}`` with plain, JSON-serialisable Python numeric
-    types, or ``None`` if any dataset's score CSVs could not be loaded.
+    Returns ``{dataset: {'conformal': ..., 'conformal_expanded': ..., 'pot':
+    ..., 'pot_expanded': ..., 'oracle': ..., 'oracle_expanded': ...}}`` with
+    plain, JSON-serialisable Python numeric types, or ``None`` if any dataset's
+    score CSVs could not be loaded.
     """
     per_dataset_scores = {}
     for ds, result in results_by_dataset.items():
@@ -48,6 +56,7 @@ def shared_threshold_blocks(results_by_dataset, q, level):
     pooled_calib = np.concatenate([calib for calib, _, _ in per_dataset_scores.values()])
     pooled_test = np.concatenate([test for _, test, _ in per_dataset_scores.values()])
     pot_threshold = fit_pot_threshold(pooled_calib, pooled_test, q, level)
+    conformal_thr = conformal_threshold(pooled_calib, q if conformal_q is None else conformal_q)
 
     test_list = [test for _, test, _ in per_dataset_scores.values()]
     label_list = [labels for _, _, labels in per_dataset_scores.values()]
@@ -57,6 +66,8 @@ def shared_threshold_blocks(results_by_dataset, q, level):
     blocks = {}
     for ds, (_, test, labels) in per_dataset_scores.items():
         blocks[ds] = {
+            'conformal': conformal_metrics(test, labels, conformal_thr, False),
+            'conformal_expanded': conformal_metrics(test, labels, conformal_thr, True),
             'pot': pot_metrics(test, labels, pot_threshold, False),
             'pot_expanded': pot_metrics(test, labels, pot_threshold, True),
             'oracle': oracle_metrics(test, labels, oracle_threshold_raw, False),
@@ -132,39 +143,55 @@ def source_mtimes(results_by_dataset):
     return sources
 
 
-def shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, level):
+def shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, level, conformal_q=None):
     """Return shared-threshold blocks for one configuration, fitting only on a cache miss.
 
-    A cache entry is reused when its recorded CSV modification times match
-    the current files; otherwise ``shared_threshold_blocks`` is called and
-    the result stored in `cache` (mutated in place). Returns the blocks, or
-    ``None`` if the source CSVs are missing or the fit could not be done.
+    A cache entry is reused when its recorded CSV modification times, block
+    version and `conformal_q` all match; otherwise ``shared_threshold_blocks``
+    is called and the result stored in `cache` (mutated in place). Returns the
+    blocks, or ``None`` if the source CSVs are missing or the fit could not be
+    done.
     """
     sources = source_mtimes(results_by_dataset)
     if sources is None:
         return None
     key = cache_key(model, hp_key)
     entry = cache.get(key)
-    if entry and entry.get("sources") == sources:
+    if (entry and entry.get("sources") == sources
+            and entry.get("version") == BLOCKS_VERSION
+            and entry.get("conformal_q") == conformal_q):
         return entry["blocks"]
-    blocks = shared_threshold_blocks(results_by_dataset, q, level)
+    blocks = shared_threshold_blocks(results_by_dataset, q, level, conformal_q)
     if blocks is not None:
-        cache[key] = {"blocks": blocks, "sources": sources}
+        cache[key] = {"blocks": blocks, "sources": sources, "version": BLOCKS_VERSION,
+                      "conformal_q": conformal_q}
     return blocks
 
 
-METHOD_BLOCKS = ("pot", "pot_expanded", "oracle", "oracle_expanded")
+METHOD_BLOCKS = ("conformal", "conformal_expanded", "pot", "pot_expanded", "oracle", "oracle_expanded")
+
+# A conformal threshold is defined by the calibration sample it is fitted on,
+# and the report fits it on the pooled calibration of every dataset it covers.
+# There is therefore no meaningful per-dataset conformal block to preserve: the
+# shared fit *is* the conformal result, so it is also written to the top level,
+# where --threshold-method conformal reads it.
+SHARED_ONLY_BLOCKS = ("conformal", "conformal_expanded")
 
 
 def apply_blocks(results_by_dataset, blocks):
-    """Store the shared pot/oracle blocks under ``result["shared"]`` and mark the result.
+    """Store the shared blocks under ``result["shared"]`` and mark the result.
 
-    The local (per-dataset) blocks stay in place; ``with_blocks(result, "shared")``
-    yields a view where the shared ones replace them.
+    The local (per-dataset) pot/oracle blocks stay in place;
+    ``with_blocks(result, "shared")`` yields a view where the shared ones
+    replace them. `SHARED_ONLY_BLOCKS` are additionally written to the top
+    level, since they have no local counterpart.
     """
     for ds, r in results_by_dataset.items():
-        r["shared"] = {name: blocks[ds][name] for name in METHOD_BLOCKS}
+        r["shared"] = {name: blocks[ds][name] for name in METHOD_BLOCKS if name in blocks[ds]}
         r["shared_threshold"] = True
+        for name in SHARED_ONLY_BLOCKS:
+            if name in blocks[ds]:
+                r[name] = blocks[ds][name]
 
 
 def with_blocks(result, key):

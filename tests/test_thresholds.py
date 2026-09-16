@@ -1,4 +1,5 @@
 import json
+import math
 import os
 
 import numpy as np
@@ -7,6 +8,7 @@ import pytest
 
 import AaltoAD.constants
 import AaltoAD.pot as pot
+from AaltoAD.thresholds import conformal
 from AaltoAD.thresholds import oracle as oracle_mod
 from AaltoAD.thresholds import pot_fit
 from AaltoAD.thresholds import scores as scores_mod
@@ -458,3 +460,68 @@ def test_pooled_result_uses_blocks_key_when_present():
     assert pooled_result([r1, r2])["pot"]["TP"] == 2
     out = pooled_result([r1, r2], blocks_key="shared")
     assert out["pot"]["TP"] == 10 and out["pot"]["threshold"] == 0.9
+
+
+# ---------------------------------------------------------------------------
+# 7. thresholds.conformal
+# ---------------------------------------------------------------------------
+
+
+def test_conformal_threshold_leaves_at_most_q_of_calibration_above():
+    calib = np.arange(1, 1001, dtype=float)  # 1..1000
+    for q in (0.05, 0.01, 0.001):
+        threshold = conformal.conformal_threshold(calib, q)
+        above = float(np.mean(calib > threshold))
+        assert above <= q
+
+
+def test_conformal_threshold_uses_the_conformal_rank():
+    calib = np.arange(1, 101, dtype=float)  # n = 100
+    # rank = ceil((100 + 1) * 0.95) = 96, so the 96th smallest score.
+    assert conformal.conformal_threshold(calib, 0.05) == 96.0
+
+
+def test_conformal_threshold_caps_at_the_largest_calibration_score():
+    calib = np.arange(1, 11, dtype=float)
+    # q below 1/(n+1) cannot be guaranteed; the largest score is the most
+    # conservative threshold the calibration set offers.
+    assert conformal.conformal_threshold(calib, 1e-9) == 10.0
+
+
+def test_conformal_threshold_ignores_nans_and_reports_an_empty_sample():
+    calib = np.array([1.0, np.nan, 2.0, 3.0])
+    # The NaN leaves n = 3, so rank = ceil(4 * 0.5) = 2: the 2nd smallest score.
+    assert conformal.conformal_threshold(calib, 0.5) == 2.0
+    assert math.isnan(conformal.conformal_threshold(np.array([np.nan]), 0.1))
+
+
+def test_conformal_metrics_scores_above_the_threshold():
+    scores = np.array([0.0, 2.0, 0.0, 2.0])
+    labels = np.array([0, 1, 0, 1])
+    block = conformal.conformal_metrics(scores, labels, 1.0, False)
+    assert block["TP"] == 2 and block["FP"] == 0
+    # calc_point2point adds a small epsilon to keep its divisions finite.
+    assert block["f1"] == pytest.approx(1.0, abs=1e-4)
+    assert block["threshold"] == 1.0
+
+
+def test_select_shared_best_pools_f1_and_averages_other_metrics():
+    from AaltoAD import report
+
+    def result(hp, latency, tp, fp, fn, tn):
+        return {"applied_hyperparameters": {"n": hp},
+                "conformal": {"p_latency": latency, "f1": 0.0, "fpr": fp / (fp + tn),
+                              "TP": tp, "FP": fp, "FN": fn, "TN": tn}}
+
+    # Config 1 is the faster of the two on average (mean 7 against mean 9),
+    # though it is the slower one on dataset B.
+    by_dataset = {
+        "A": {"M": [result(1, 5, 5, 0, 5, 90), result(2, 9, 5, 0, 5, 90)]},
+        "B": {"M": [result(1, 9, 5, 0, 5, 90), result(2, 9, 5, 0, 5, 90)]},
+    }
+    chosen = report._select_shared_best(by_dataset, "latency", "conformal")
+    assert chosen["A"]["M"][0]["applied_hyperparameters"] == {"n": 1}
+
+    # By f1 the two configs tie on pooled counts, so the first stays.
+    chosen_f1 = report._select_shared_best(by_dataset, "f1", "conformal")
+    assert chosen_f1["A"]["M"][0]["applied_hyperparameters"] == {"n": 1}

@@ -2,7 +2,7 @@
 
 import copy
 
-METHOD_BLOCKS = ("pot", "pot_expanded", "oracle", "oracle_expanded")
+METHOD_BLOCKS = ("conformal", "conformal_expanded", "pot", "pot_expanded", "oracle", "oracle_expanded")
 
 
 def _count(block, name):
@@ -44,8 +44,7 @@ def pooled_result(results, blocks_key=None):
     results lacking it contribute their local blocks and the output's
     ``shared_threshold`` flag is False.
 
-    Each method block (``pot``, ``pot_expanded``, ``oracle``,
-    ``oracle_expanded``) gets pooled confusion counts and metrics recomputed
+    Each method block in `METHOD_BLOCKS` gets pooled confusion counts and metrics recomputed
     from them. ``calibration_loss`` is the mean and ``eval_time`` the sum over
     datasets. ``model`` and ``applied_hyperparameters`` come from the first
     result; ``dataset`` becomes ``"combined"`` and ``datasets`` lists the

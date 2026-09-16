@@ -9,7 +9,6 @@ from tqdm import tqdm
 from glob import glob
 
 import matplotlib
-import matplotlib.ticker
 from AaltoAD import constants
 from AaltoAD.report_figures import downsample, style
 from AaltoAD.thresholds import shared
@@ -34,20 +33,84 @@ DISPLAY_COLUMNS.append("calibration_loss")
 # Used by --metric flag; default points at pot.f1 (raw, non-PA).
 DISPLAY_METRICS = [f"{method}.{m}" for method in METHODS for m in METHOD_METRICS]
 
-# Metrics where lower is better (affects _best_result and sort order).
-LOWER_IS_BETTER = {"calibration_loss"}
+# Metrics where a smaller value is the better one.
+LOWER_IS_BETTER = {"p_latency", "fpr", "threshold", "calibration_loss"}
 
-# Models are *selected* (best hyperparameters) by the `metric` argument
-# (default calibration_loss). Tables are *ordered* by the selection metric when
-# it is comparable across models (a dotted method metric like 'oracle.f1');
-# calibration loss is not comparable across models, so it makes a poor ranking
-# and tables fall back to F1 instead.
+# Metrics that live at the top level of a result rather than inside a threshold
+# method's block.
+TOP_LEVEL_METRICS = {"calibration_loss", "eval_time"}
+
+# Spellings accepted on the command line for a metric's real name.
+METRIC_ALIASES = {"latency": "p_latency", "precision": "precision", "recall": "recall"}
+
 SUMMARY_SORT_METRIC = "pot.f1"
 
 
+def metric_list(metric):
+    """Normalize a `--metric` argument into a tuple of bare metric names.
+
+    Accepts a comma-separated string, a sequence, or a single name, and takes
+    the metric out of a dotted path, so 'latency,fpr,f1', ('p_latency', 'fpr',
+    'f1') and 'conformal.f1' all work. The threshold method comes from
+    `--threshold`, not from here.
+    """
+    if isinstance(metric, str):
+        parts = [p.strip() for p in metric.replace(" ", ",").split(",")]
+    else:
+        parts = [str(p).strip() for p in metric]
+    names = []
+    for part in parts:
+        if not part:
+            continue
+        name = part.split(".")[-1] if "." in part else part
+        names.append(METRIC_ALIASES.get(name, name))
+    return tuple(names)
+
+
+def metric_display(metric):
+    """Human-readable form of a metric argument, for table headers and titles."""
+    return ",".join(metric_list(metric))
+
+
+def _metric_path(name, method):
+    """Full lookup path for a bare metric name: 'f1' -> '<method>.f1'."""
+    if "." in name or name in TOP_LEVEL_METRICS:
+        return name
+    return f"{method}.{name}"
+
+
+def _rank_key(result, metric, method):
+    """Sort key ranking one result by `metric`, best first.
+
+    `metric` is a tuple of bare names (see `metric_list`) read from the `method`
+    block, each in its natural direction. A missing value sorts last within its
+    own term, so a model that never fires cannot outrank one that does.
+    """
+    key = []
+    for name in metric_list(metric):
+        value = _metric_value(result, _metric_path(name, method)) if result else None
+        if value is None:
+            key.append(float("inf"))
+        else:
+            key.append(value if name in LOWER_IS_BETTER else -value)
+    return tuple(key)
+
+# How many models the prediction-error overlay shows. Kept small so the overlay
+# stays readable; --plot-models overrides it.
+DEFAULT_PLOT_MODELS = constants.PLOT_MODELS
+
+# Plots are drawn on a fixed scale: every series is divided by its own
+# threshold, so 1 is the threshold for every model and a common scale makes
+# plots comparable across models and cases. Values above the clip are "far over
+# threshold" either way, and clipping them keeps the interesting range legible.
+PLOT_VALUE_CLIP = 2.0
+PLOT_Y_TOP = 2.2
+
+
 def _table_sort_metric(metric):
-    """Metric used to order table rows for a given selection metric."""
-    return metric if "." in str(metric) else SUMMARY_SORT_METRIC
+    """Fallback single metric for the unlabeled tables, which cannot rank by detections."""
+    metric = metric if isinstance(metric, str) else ",".join(metric)
+    return metric if "." in metric else SUMMARY_SORT_METRIC
 
 
 def _get(d, dotted_key):
@@ -127,33 +190,32 @@ def _pooled_f1(results, method):
     return 0.0 if denom == 0 else 2 * tp / denom
 
 
-def _select_shared_best(by_dataset, metric):
+def _select_shared_best(by_dataset, metric, method=None):
     """Select one hyperparameter set per model across all datasets.
 
     For each model, group results by hyperparameter configuration (keeping the
     best result per dataset within a configuration) and pick the configuration
-    with the best score over the listed datasets. When `metric` is an F1
-    (e.g. 'pot.f1'), the score is the F1 recomputed from confusion counts
-    pooled over the datasets; otherwise it is the sum of `metric`. Only
-    configurations with a run in every dataset are eligible; if a model has
-    none, it falls back to the best score over the available runs and warns.
+    with the best score over the listed datasets. Each term of `metric` is
+    aggregated across the datasets: an F1 is recomputed from pooled confusion
+    counts, since averaging F1 values is not meaningful, and everything else is
+    averaged. Only configurations with a run in every dataset are eligible; if a
+    model has none, it falls back to the best score over the available runs and
+    warns.
 
     Returns {dataset: {model: [result]}} with at most one result per model; an
     empty list (with a warning) marks a dataset where the selected
     configuration has no run.
     """
-    lower = metric in LOWER_IS_BETTER
+    method = method or THRESHOLD_METHOD
+    metric = metric_list(metric)
     datasets = list(by_dataset)
-    per_model = {}  # model -> hp_key -> {dataset: (value, result)}
+    per_model = {}  # model -> hp_key -> {dataset: result}
     for ds, by_model in by_dataset.items():
         for model, results in by_model.items():
             for r in results:
-                v = _metric_value(r, metric)
-                if v is None:
-                    continue
                 slot = per_model.setdefault(model, {}).setdefault(_hp_key(r), {})
-                if ds not in slot or (v < slot[ds][0]) == lower:
-                    slot[ds] = (v, r)
+                if ds not in slot or _rank_key(r, metric, method) < _rank_key(slot[ds], metric, method):
+                    slot[ds] = r
 
     selected = {ds: {} for ds in datasets}
     for model, configs in per_model.items():
@@ -166,14 +228,26 @@ def _select_shared_best(by_dataset, metric):
             )
 
         def _score(key):
-            values = pool[key].values()
-            if metric.endswith(".f1"):
-                pooled = _pooled_f1([r for _, r in values], metric[: -len(".f1")])
-                if pooled is not None:
-                    return pooled
-            return sum(v for v, _ in values)
+            """Aggregate each metric term over the datasets, best first."""
+            results = list(pool[key].values())
+            score = []
+            for name in metric:
+                if name == "f1":
+                    # An average of F1 values is not meaningful; recompute it
+                    # from the confusion counts pooled over the datasets.
+                    pooled = _pooled_f1(results, method)
+                    score.append(float("inf") if pooled is None else -pooled)
+                    continue
+                values = [_metric_value(r, _metric_path(name, method)) for r in results]
+                values = [v for v in values if v is not None]
+                if not values:
+                    score.append(float("inf"))
+                else:
+                    mean = sum(values) / len(values)
+                    score.append(mean if name in LOWER_IS_BETTER else -mean)
+            return tuple(score)
 
-        best_key = min(pool, key=_score) if lower else max(pool, key=_score)
+        best_key = min(pool, key=_score)
         for ds in datasets:
             entry = configs[best_key].get(ds)
             if entry is None:
@@ -183,37 +257,22 @@ def _select_shared_best(by_dataset, metric):
                 )
                 selected[ds][model] = []
             else:
-                selected[ds][model] = [entry[1]]
+                selected[ds][model] = [entry]
     return selected
 
 
-def _best_result(results, metric):
-    """Return the result dict with the best non-NaN metric value.
+def _best_result(results, metric, method=None):
+    """Return the best of `results` by `metric`, read from the `method` block.
 
-    For metrics in LOWER_IS_BETTER, returns the result with the minimum value;
-    otherwise returns the result with the maximum value.
-    `metric` may be a dotted path like 'pot.f1' to reach into the nested schema.
+    Ranking is `_rank_key`, so a multi-part metric such as ('p_latency', 'fpr',
+    'f1') is resolved term by term. A result missing every term ranks last but
+    is still returned when it is all there is, so its other columns render
+    instead of blanking the row to N/A.
     """
-
-    def _val(r):
-        v = _get(r, metric)
-        if v is None:
-            return float("nan")
-        try:
-            return float(v)
-        except (TypeError, ValueError):
-            return float("nan")
-
-    valid = [r for r in results if not math.isnan(_val(r))]
-    if not valid:
-        # No result has this metric (e.g. calibration_loss missing on
-        # old-style results that used the training threshold). Fall back to
-        # the first result so its available metrics still render instead of
-        # blanking the whole row to N/A.
-        return results[0] if results else None
-    if metric in LOWER_IS_BETTER:
-        return min(valid, key=_val)
-    return max(valid, key=_val)
+    if not results:
+        return None
+    method = method or THRESHOLD_METHOD
+    return min(results, key=lambda r: _rank_key(r, metric, method))
 
 
 def _fmt(value):
@@ -296,7 +355,27 @@ def _col_value(result, path_or_fn):
     return _get(result, path_or_fn)
 
 
-def _build_summary(by_model, metric, unlabeled=False):
+def _sort_rows(rows, order, lower_is_better, key="model"):
+    """Sort ``(sort_value, row, ...)`` tuples in place.
+
+    With `order` (``{model: position}``) the report's one model order wins;
+    without it, rows fall back to sorting by their own metric value.
+    """
+    if order is not None:
+        rows.sort(key=lambda t: order.get(t[1][key], len(order)))
+    else:
+        rows.sort(key=lambda t: t[0], reverse=not lower_is_better)
+
+
+def _sort_grouped(grouped, order, lower_is_better):
+    """`_sort_rows` for `_build_summary`'s ``(sort_value, method_rows, hp_row)`` tuples."""
+    if order is not None:
+        grouped.sort(key=lambda t: order.get(t[2]["row"], len(order)))
+    else:
+        grouped.sort(key=lambda t: t[0], reverse=not lower_is_better)
+
+
+def _build_summary(by_model, metric, unlabeled=False, order=None):
     """Build metric rows and hyperparameter rows for best result per model.
 
     In labeled mode (unlabeled=False):
@@ -326,8 +405,10 @@ def _build_summary(by_model, metric, unlabeled=False):
                     all_hp_keys.append(k)
                     seen_hp.add(k)
 
-    # Determine lower-is-better for missing-value sentinel in sort.
-    lower_is_better = metric in LOWER_IS_BETTER
+    # Single fallback metric for the unlabeled path, which has no detections to
+    # rank by; everywhere else `order` decides.
+    sort_metric = _table_sort_metric(metric)
+    lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
     if unlabeled:
@@ -352,7 +433,7 @@ def _build_summary(by_model, metric, unlabeled=False):
                 for c in display_columns:
                     row[c] = "N/A"
             try:
-                sort_val = float(_get(best, metric)) if best else missing_sort_val
+                sort_val = float(_get(best, sort_metric)) if best else missing_sort_val
                 if math.isnan(sort_val):
                     sort_val = missing_sort_val
             except (TypeError, ValueError):
@@ -362,7 +443,7 @@ def _build_summary(by_model, metric, unlabeled=False):
             for k in all_hp_keys:
                 h_row[k] = _fmt(hp[k]) if k in hp else ""
             grouped.append((sort_val, [row], h_row))
-        grouped.sort(key=lambda t: t[0], reverse=not lower_is_better)
+        _sort_grouped(grouped, order, lower_is_better)
         for _, rows, h_row in grouped:
             metric_rows.extend(rows)
             hp_rows.append(h_row)
@@ -411,8 +492,8 @@ def _build_summary(by_model, metric, unlabeled=False):
         if not sort_sep and best:
             try:
                 sv = (
-                    float(_get(best, metric))
-                    if _get(best, metric) is not None
+                    float(_get(best, sort_metric))
+                    if _get(best, sort_metric) is not None
                     else missing_sort_val
                 )
                 if math.isnan(sv):
@@ -426,7 +507,7 @@ def _build_summary(by_model, metric, unlabeled=False):
             h_row[k] = _fmt(hp[k]) if k in hp else ""
         grouped.append((sort_val, method_rows, h_row))
 
-    grouped.sort(key=lambda t: t[0], reverse=not lower_is_better)
+    _sort_grouped(grouped, order, lower_is_better)
     for _, method_rows, h_row in grouped:
         metric_rows.extend(method_rows)
         hp_rows.append(h_row)
@@ -504,14 +585,14 @@ _HTML_TEMPLATE = """\
 """
 
 
-def _generate_html(dataset, metric, by_model, output_path, unlabeled=False):
+def _generate_html(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     metric_rows, hp_rows, hp_keys, display_columns = _build_summary(
-        by_model, metric, unlabeled=unlabeled
+        by_model, metric, unlabeled=unlabeled, order=order
     )
     template = Template(_HTML_TEMPLATE)
     html = template.render(
         dataset=dataset,
-        metric=metric,
+        metric=metric_display(metric),
         display_columns=display_columns,
         metric_rows=metric_rows,
         hp_rows=hp_rows,
@@ -559,9 +640,9 @@ def _draw_table_page(pdf, title, columns, rows):
     plt.close(fig)
 
 
-def _generate_pdf(dataset, metric, by_model, output_path, unlabeled=False):
+def _generate_pdf(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     metric_rows, hp_rows, hp_keys, display_columns = _build_summary(
-        by_model, metric, unlabeled=unlabeled
+        by_model, metric, unlabeled=unlabeled, order=order
     )
 
     # Rename internal 'row' key to a display label
@@ -573,13 +654,13 @@ def _generate_pdf(dataset, metric, by_model, output_path, unlabeled=False):
     with PdfPages(output_path) as pdf:
         _draw_table_page(
             pdf,
-            title=f"Metrics — Dataset: {dataset}  (best by {metric})",
+            title=f"Metrics — Dataset: {dataset}  (best by {metric_display(metric)})",
             columns=["Model / method"] + display_columns,
             rows=metric_rows,
         )
         _draw_table_page(
             pdf,
-            title=f"Hyperparameters — Dataset: {dataset}  (best by {metric})",
+            title=f"Hyperparameters — Dataset: {dataset}  (best by {metric_display(metric)})",
             columns=["Model"] + hp_keys,
             rows=hp_rows,
         )
@@ -598,18 +679,45 @@ SLIDE_COLUMNS = [
     ("POT FPR", "pot.fpr"),
     ("POT latency", "pot.p_latency"),
     ("Oracle F1", "oracle.f1"),
-    ("Calib. loss", "calibration_loss"),
     ("Eval time (s)", "eval_time"),
 ]
 
-# LaTeX summary table: oracle-threshold metrics only, without method labels.
-LATEX_COLUMNS = [
-    ("F1", "oracle.f1"),
-    ("Adjusted F1", "oracle_expanded.f1"),
-    ("FPR", "oracle.fpr"),
-    ("Latency", "oracle.p_latency"),
-    ("Calib. loss", "calibration_loss"),
-    ("Eval time (s)", "eval_time"),
+# Default threshold method the report quotes and scales by (--threshold-method
+# overrides). Table headers carry no method label, so every generated table and
+# plot in one report refers to one and the same method.
+THRESHOLD_METHOD = constants.THRESHOLD_METHOD
+
+# Default metric: selects each model's hyperparameters and, unless
+# --model-order says otherwise, orders the models in every table and plot.
+METRIC = tuple(constants.METRIC)
+
+# Ordering metrics where a smaller value is the better one.
+LOWER_IS_BETTER = {"p_latency", "fpr", "threshold", "calibration_loss"}
+
+
+def method_name(value):
+    """Method named by `value`: 'conformal' and 'conformal.f1' both give 'conformal'."""
+    name = str(value).split(".")[0]
+    return name[: -len("_expanded")] if name.endswith("_expanded") else name
+
+
+def _latex_columns(method=THRESHOLD_METHOD):
+    """Summary-table columns reading the `method` threshold block."""
+    return [
+        ("F1", f"{method}.f1"),
+        ("Adjusted F1", f"{method}_expanded.f1"),
+        ("FPR", f"{method}.fpr"),
+        ("Latency", f"{method}.p_latency"),
+        ("Eval time (s)", "eval_time"),
+    ]
+
+# Cross-case overview: one table per metric, as (file suffix, caption phrase,
+# metric name under THRESHOLD_METHOD). Split by metric because a single table of
+# model x case x three metrics is unreadable at this width.
+OVERVIEW_TABLES = [
+    ("f1", "F1", "f1"),
+    ("fpr", "false positive rate", "fpr"),
+    ("latency", "detection latency in time steps", "p_latency"),
 ]
 
 # Unlabeled mode: alternate slim column spec.
@@ -617,15 +725,14 @@ UNLABELED_SLIDE_COLUMNS = [
     ("Detected", _detected),
     ("Detection rate", _detection_rate),
     ("Threshold", "pot.threshold"),
-    ("Calib. loss", "calibration_loss"),
     ("Eval time (s)", "eval_time"),
 ]
 
 
-def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
+def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     """One row per model, slim metric set; selected and ordered by `metric`
     (falling back to F1 ordering for non-comparable metrics)."""
-    sort_metric = metric if unlabeled else _table_sort_metric(metric)
+    sort_metric = _table_sort_metric(metric)
     lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
@@ -646,7 +753,7 @@ def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
         if sort_val != sort_val:  # NaN
             sort_val = missing_sort_val
         rows.append((sort_val, row))
-    rows.sort(key=lambda t: t[0], reverse=not lower_is_better)
+    _sort_rows(rows, order, lower_is_better, key="model")
 
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["model"] + [c for c, _ in slide_cols])
@@ -656,14 +763,15 @@ def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False):
     print(f"CSV summary written to {output_path}")
 
 
-def _generate_hp_markdown(dataset, metric, by_model, output_path):
+def _generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
     """One line per model listing its best-result hyperparameters."""
-    lower_is_better = metric in LOWER_IS_BETTER
+    sort_metric = _table_sort_metric(metric)
+    lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
     lines = [
         f"# Hyperparameters — {dataset}",
-        f"_Best result per model by {metric}_",
+        f"_Best result per model by {metric_display(metric)}_",
         "",
     ]
     entries = []
@@ -671,15 +779,15 @@ def _generate_hp_markdown(dataset, metric, by_model, output_path):
         best = _best_result(results, metric)
         hp = best.get("applied_hyperparameters", {}) if best else {}
         try:
-            sort_val = float(_get(best, metric)) if best else missing_sort_val
+            sort_val = float(_get(best, sort_metric)) if best else missing_sort_val
         except (TypeError, ValueError):
             sort_val = missing_sort_val
         if sort_val != sort_val:
             sort_val = missing_sort_val
         parts = ", ".join(f"{k}={_fmt(v)}" for k, v in sorted(hp.items()))
-        entries.append((sort_val, f"- **{model}**: {parts if parts else '(defaults)'}"))
-    entries.sort(key=lambda t: t[0], reverse=not lower_is_better)
-    lines.extend(line for _, line in entries)
+        entries.append((sort_val, {"model": model}, f"- **{model}**: {parts if parts else '(defaults)'}"))
+    _sort_rows(entries, order, lower_is_better, key="model")
+    lines.extend(line for _, _row, line in entries)
 
     with open(output_path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -733,17 +841,98 @@ def _latex_tabular(columns, rows, caption=None, label=None):
     return "\n".join(lines)
 
 
-def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
+def _case_id(dataset):
+    """Short test-case id for a dataset name: TOL_DNV_1_1 -> '1.1', TOL_2_2_1 -> '2.2.1'."""
+    name = dataset
+    for prefix in ("TOL_", "DNV_"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+    return name.replace("_", ".")
+
+
+def _case_sort_key(case_id):
+    """Natural order for case ids, so 1.2 < 2.1.1 < 2.2.1 < 3.3.2 rather than string order."""
+    return [(0, int(part), "") if part.isdigit() else (1, 0, part) for part in case_id.split(".")]
+
+
+def _generate_overview_latex(by_dataset, metric, output_dir, threshold_method=THRESHOLD_METHOD,
+                             model_order=None):
+    """Write one model-by-test-case table per entry in `OVERVIEW_TABLES`.
+
+    Rows are models and columns test cases (there are far more models than
+    cases). Every table shares one row order — `model_order` again, each of its
+    metrics averaged over the cases — so the three can be read side by side.
+    Values come from the `threshold_method` block of each model's selected run,
+    the same numbers the per-case summary tables show.
+
+    A latency cell is an em dash when the model produced no true positives on
+    that case: `segment_latency` charges an undetected segment its full length,
+    which would otherwise read as a real (very slow) detection.
+    """
+    model_order = metric_list(metric if model_order is None else model_order)
+    cases = sorted({_case_id(ds) for ds in by_dataset}, key=_case_sort_key)
+    best = {}
+    for dataset, by_model in by_dataset.items():
+        case = _case_id(dataset)
+        for model, results in by_model.items():
+            result = _best_result(results, metric)
+            if result is not None:
+                best[(model, case)] = result
+    models = {model for model, _ in best}
+
+    def mean_rank_key(model):
+        """`_rank_key` with each metric averaged over the cases the model ran on."""
+        keys = [
+            _rank_key(best[(model, case)], model_order, threshold_method)
+            for case in cases
+            if (model, case) in best
+        ]
+        if not keys:
+            return tuple(float("inf") for _ in model_order)
+        return tuple(sum(values) / len(values) for values in zip(*keys))
+
+    order = sorted(models, key=lambda model: (mean_rank_key(model), model))
+
+    def cell(model, case, name):
+        result = best.get((model, case))
+        if result is None:
+            return "N/A"
+        if name == "p_latency":
+            counts = _confusion_counts(result, threshold_method)
+            if counts is not None and counts[0] == 0:
+                return "---"
+        return _fmt(_get(result, f"{threshold_method}.{name}"))
+
+    os.makedirs(output_dir, exist_ok=True)
+    for suffix, phrase, name in OVERVIEW_TABLES:
+        rows = [
+            {"model": model, **{case: cell(model, case, name) for case in cases}}
+            for model in order
+        ]
+        output_path = os.path.join(output_dir, f"overview_{suffix}.tex")
+        with open(output_path, "w") as f:
+            f.write("\n".join([
+                f"% Auto-generated by AaltoAD.report — {phrase} per model and test case, "
+                f"threshold_method={threshold_method}, rows ordered by mean F1",
+                _latex_tabular(["model"] + cases, rows),
+                "",
+            ]))
+        print(f"Overview table written to {output_path}")
+
+
+def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False,
+                    threshold_method=THRESHOLD_METHOD, order=None):
     """Write a LaTeX file with two tabular blocks (metrics + hyperparameters).
 
+    `threshold_method` names the threshold block the columns are read from.
     Designed to be ``\\input``-ed inside a user-provided ``table`` float —
     no float wrapper is emitted.
     """
-    sort_metric = metric if unlabeled else _table_sort_metric(metric)
+    sort_metric = _table_sort_metric(metric)
     lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
-    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else LATEX_COLUMNS
+    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else _latex_columns(threshold_method)
 
     # Slim metrics table (oracle-threshold metrics, see LATEX_COLUMNS).
     metric_rows = []
@@ -762,12 +951,13 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
         if sort_val != sort_val:
             sort_val = missing_sort_val
         metric_rows.append((sort_val, row))
-    metric_rows.sort(key=lambda t: t[0], reverse=not lower_is_better)
+    _sort_rows(metric_rows, order, lower_is_better, key="model")
     metric_rows = [r for _, r in metric_rows]
     metric_cols = ["model"] + [c for c, _ in slide_cols]
 
     parts = [
-        f"% Auto-generated by TranAD.report — dataset={dataset}, metric={metric}",
+        f"% Auto-generated by AaltoAD.report — dataset={dataset}, metric={metric_display(metric)}, "
+        f"threshold_method={threshold_method}",
         _latex_tabular(metric_cols, metric_rows),
         "",
     ]
@@ -781,71 +971,56 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False):
 # ---------------------------------------------------------------------------
 
 
+# Methods a per-model plot draws a reference line for, when the result has them.
+REFERENCE_METHODS = ("conformal", "pot", "oracle")
+
+
 def _thresholds(result):
-    """Return (pot, oracle) thresholds as floats, None where missing/invalid."""
-    parsed = []
-    for key in ("pot.threshold", "oracle.threshold"):
-        value = _get(result, key)
-        try:
-            value = float(value)
-        except (TypeError, ValueError):
-            value = None
-        if value is not None and value <= 0:
-            value = None
-        parsed.append(value)
-    return tuple(parsed)
+    """``{method: threshold}`` for every `REFERENCE_METHODS` block with a usable threshold."""
+    found = {}
+    for method in REFERENCE_METHODS:
+        value = _plot_threshold(result, method)
+        if value is not None:
+            found[method] = value
+    return found
 
 
-def _plot_threshold_method(metric):
-    """Method whose threshold the plots scale by: 'oracle' for oracle.* metrics, else 'pot'."""
-    return "oracle" if str(metric).startswith("oracle") else "pot"
-
-
-def _plot_threshold(result, metric):
+def _plot_threshold(result, method):
     """Threshold used to scale a result's errors in plots, or None if missing/non-positive."""
-    pot_thr, oracle_thr = _thresholds(result)
-    return oracle_thr if _plot_threshold_method(metric) == "oracle" else pot_thr
+    block = result.get(method) if isinstance(result, dict) else None
+    if not isinstance(block, dict):
+        return None
+    try:
+        value = float(block.get("threshold"))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 and not math.isnan(value) else None
 
 
-def _plot_y_top(values, ground_truth=None):
-    """Upper y limit: 99.9th percentile of the range-setting values with headroom, never below 2.
-
-    `values` is a Series (or DataFrame) indexed by time step, calibration at
-    negative steps. With `ground_truth` (Series indexed 0..N-1), only the
-    calibration rows and the labelled-anomaly rows set the range, so large
-    spikes in the recovery phase clip instead of flattening the anomaly.
-    """
-    if ground_truth is not None:
-        anomaly_steps = ground_truth.index[ground_truth.astype(bool)]
-        keep = (values.index < 0) | values.index.isin(anomaly_steps)
-        if keep.any():
-            values = values[keep]
-    flat = values.stack() if isinstance(values, pd.DataFrame) else values
-    return max(2.0, float(flat.quantile(0.999))) * 1.15
+def _clip_for_plot(values):
+    """Clip threshold-scaled values to `PLOT_VALUE_CLIP` so every plot shares one y scale."""
+    return values.clip(upper=PLOT_VALUE_CLIP)
 
 
-def _format_y_ticks(ax, y_top):
-    """Write y ticks in scientific notation on each tick (no corner multiplier) when the range exceeds 1000."""
-    if y_top > 1000:
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.1e}"))
-
-
-def _generate_prediction_error_plot(dataset, metric, by_model, output_path, models=None, blocks_key=None):
+def _generate_prediction_error_plot(dataset, metric, by_model, output_path, models=None, blocks_key=None,
+                                    n_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
+                                    model_order=None):
     """Overlay each model's best-result prediction_error for a dataset.
 
     `models`, when given, fixes which models are plotted (and their order)
-    instead of the per-dataset top 5 by `metric`; multi-dataset reports pass
-    the same list to every dataset so the overlays are comparable.
+    instead of the top `n_models` by `model_order`; the combined report of a
+    multi-dataset run passes its pooled ranking that way.
     `blocks_key` (e.g. ``"shared"``) scales by the thresholds stored under that
     key of each result instead of the local ones; models without it are skipped.
 
     For each model, take its best result (by `metric`), read the matching
     ``*_labels.csv``, and plot the ``prediction_error`` column scaled by that
-    model's oracle threshold, so the threshold is 1. The oracle threshold is
-    drawn once (dashed) and ground-truth anomaly regions are shaded once. The
+    model's `threshold_method` threshold, so the threshold is 1 for every
+    model. It is drawn once (dashed) and anomaly regions are shaded once. The
     series are downsampled to every 10th time step before plotting. The
     figure is saved as a PNG at ``output_path``.
     """
+    model_order = metric_list(metric if model_order is None else model_order)
     series = {}
     ground_truth = None
     best_by_model = {}
@@ -865,11 +1040,11 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
             continue
         if "prediction_error" not in df.columns:
             continue
-        # Scale by the threshold of the method the metric names, so it maps to 1.
+        # Scale by the report's threshold, so it maps to 1 for every model.
         thr_source = shared.with_blocks(best, blocks_key) if blocks_key else best
-        threshold = _plot_threshold(thr_source, metric) if thr_source else None
+        threshold = _plot_threshold(thr_source, threshold_method) if thr_source else None
         if not threshold:
-            print(f"No usable {_plot_threshold_method(metric)} threshold for {model}; skipping in plot.")
+            print(f"No usable {threshold_method} threshold for {model}; skipping in plot.")
             continue
         test_scores = df["prediction_error"].reset_index(drop=True) / threshold
         # Prepend calibration scores (negative steps) when the sidecar CSV
@@ -885,7 +1060,9 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
             except (ValueError, OSError, KeyError):
                 pass
         series[model] = test_scores
-        best_by_model[model] = best
+        # Rank on the same blocks the series is scaled by, so a shared-threshold
+        # plot ranks by the shared metrics.
+        best_by_model[model] = thr_source
         # Ground truth is shared across models for a dataset; capture it once.
         if ground_truth is None and "ground_truth" in df.columns:
             ground_truth = df["ground_truth"].reset_index(drop=True)
@@ -894,50 +1071,35 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
         print(f"No prediction_error data found for {dataset}; skipping plot.")
         return
 
-    # Keep only the 5 best models (by `metric`) so the overlay stays readable;
-    # models without a usable metric value rank last.
+    # Keep only the `n_models` best models (see `_rank_key`) so the overlay
+    # stays readable.
     if models is not None:
         series = {m: series[m] for m in models if m in series}
-    elif len(series) > 5:
-        def _metric_val(model):
-            try:
-                return float(_get(best_by_model[model], metric))
-            except (TypeError, ValueError):
-                return float("nan")
-
-        def _sort_key(model):
-            v = _metric_val(model)
-            if math.isnan(v):
-                return (1, 0.0)
-            return (0, v if metric in LOWER_IS_BETTER else -v)
-
-        keep = sorted(series, key=_sort_key)[:5]
+    elif len(series) > n_models:
+        keep = sorted(
+            series,
+            key=lambda m: _rank_key(best_by_model[m], model_order, threshold_method),
+        )[:n_models]
         series = {m: series[m] for m in keep}
 
     # Models have different calibration lengths, so the outer join leaves the
     # union index unsorted; sort it or the lines wrap back to the start.
     combined = pd.concat(series, axis=1).sort_index()
 
-    # Show most of the mass rather than the peaks: cap the y-axis at the
-    # 99.9th percentile of all plotted values, with a little headroom, and
-    # never below 2.
-    y_top = _plot_y_top(combined, ground_truth)
-    combined = downsample.every_nth_step(combined, 10)
+    combined = _clip_for_plot(downsample.every_nth_step(combined, 10))
 
     fig, ax = style.new_figure()
     style.plot_series(ax, combined)
-    ax.set_ylim(0, y_top)
-    _format_y_ticks(ax, y_top)
+    ax.set_ylim(0, PLOT_Y_TOP)
     # Every series is scaled by its own threshold, so one line at 1 is the
     # threshold for all models.
-    method = _plot_threshold_method(metric)
-    style.draw_threshold_line(ax, 1.0, f"{method} threshold")
+    style.draw_threshold_line(ax, 1.0, f"{threshold_method} threshold")
     if ground_truth is not None:
         style.shade_anomalies(ax, ground_truth)
     if combined.index.min() < 0:
         style.mark_calibration_end(ax)
     ax.set_xlabel("time step")
-    ax.set_ylabel(f"prediction error / {method} threshold")
+    ax.set_ylabel(f"prediction error / {threshold_method} threshold")
     style.legend_below(ax)
     style.save_png(fig, output_path)
 
@@ -947,7 +1109,8 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
 # ---------------------------------------------------------------------------
 
 
-def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None):
+def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None,
+                          threshold_method=THRESHOLD_METHOD):
     """Plot the best result per model as prediction error vs. threshold.
 
     For each model, take its best result (by `metric`), read the matching
@@ -979,10 +1142,10 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
         thr_source = shared.with_blocks(best, blocks_key) if blocks_key else best
         if thr_source is None:
             continue
-        pot_thr, oracle_thr = _thresholds(thr_source)
-        threshold = _plot_threshold(thr_source, metric)
+        reference = _thresholds(thr_source)
+        threshold = _plot_threshold(thr_source, threshold_method)
         if not threshold:
-            print(f"No usable {_plot_threshold_method(metric)} threshold for {model}; skipping plot.")
+            print(f"No usable {threshold_method} threshold for {model}; skipping plot.")
             continue
 
         # Scale by the threshold of the method the metric names so it maps to 1.
@@ -1002,26 +1165,22 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
             except (ValueError, OSError, KeyError):
                 n_calib = 0
 
-        y_top = _plot_y_top(series, df["ground_truth"] if "ground_truth" in df.columns else None)
-        series = downsample.every_nth_step(series, 10)
+        series = _clip_for_plot(downsample.every_nth_step(series, 10))
 
-        method = _plot_threshold_method(metric)
         fig, ax = style.new_figure()
         style.plot_series(ax, series.rename("prediction_error"))
-        ax.set_ylim(0, y_top)
-        _format_y_ticks(ax, y_top)
-        if pot_thr:
-            color = "tab:red" if method == "pot" else "grey"
-            style.draw_threshold_line(ax, pot_thr / threshold, "POT threshold", color=color)
-        if oracle_thr:
-            color = "tab:red" if method == "oracle" else "grey"
-            style.draw_threshold_line(ax, oracle_thr / threshold, "oracle threshold", color=color)
+        ax.set_ylim(0, PLOT_Y_TOP)
+        # Every method the result carries is drawn for comparison; the one the
+        # report is generated for is the red line the series is scaled by.
+        for name, value in reference.items():
+            color = "tab:red" if name == threshold_method else "grey"
+            style.draw_threshold_line(ax, value / threshold, f"{name} threshold", color=color)
         if "ground_truth" in df.columns:
             style.shade_anomalies(ax, df["ground_truth"])
         if n_calib:
             style.mark_calibration_end(ax)
         ax.set_xlabel("time step")
-        ax.set_ylabel(f"prediction error / {method} threshold")
+        ax.set_ylabel(f"prediction error / {threshold_method} threshold")
         ax.set_title(f"{model} — {dataset}" + (" (shared threshold)" if blocks_key else ""))
         style.legend_below(ax)
         out_path = os.path.join(output_dir, f"{model}.png")
@@ -1033,15 +1192,19 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
 # ---------------------------------------------------------------------------
 
 
-def _apply_shared_thresholds(by_dataset, results_folder):
-    """Attach pot/oracle blocks fit with thresholds shared across datasets, in place.
+def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q):
+    """Attach conformal/pot/oracle blocks fit with thresholds shared across datasets, in place.
 
     Only configurations (model + hyperparameters) with a run in every dataset
     are processed; per dataset the lowest-``calibration_loss`` run represents
     the configuration. Each processed result gets its shared blocks under
-    ``result["shared"]`` and ``shared_threshold = True``; the local blocks stay
-    untouched and remain what per-dataset tables show. Fits are cached under
-    ``results_folder/_shared_thresholds/`` keyed by the CSV modification times.
+    ``result["shared"]`` and ``shared_threshold = True``; the local pot/oracle
+    blocks stay untouched and remain what per-dataset tables show, while the
+    conformal blocks, which have no local counterpart, are written to the top
+    level as well (see ``shared.apply_blocks``). POT uses each configuration's
+    swept ``q``; the conformal threshold uses `conformal_q`. Fits are cached
+    under ``results_folder/_shared_thresholds/`` keyed by the CSV modification
+    times.
     """
 
     datasets = list(by_dataset)
@@ -1060,7 +1223,8 @@ def _apply_shared_thresholds(by_dataset, results_folder):
     for (model, hp_key), results_by_dataset in tqdm(complete.items(), desc="shared thresholds", unit="config"):
         q = next(iter(results_by_dataset.values())).get("applied_hyperparameters", {}).get("q", 1e-5)
         constants.initialize(datasets[0], model)
-        blocks = shared.shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, constants.level)
+        blocks = shared.shared_blocks_cached(cache, model, hp_key, results_by_dataset, q,
+                                             constants.level, conformal_q)
         if blocks is None:
             skipped_count[model] = skipped_count.get(model, 0) + 1
             continue
@@ -1073,7 +1237,9 @@ def _apply_shared_thresholds(by_dataset, results_folder):
               f"{skipped_count.get(model, 0)} skipped (missing runs or CSVs)")
 
 
-def generate_report(dataset, metric="calibration_loss", results_folder="results"):
+def generate_report(dataset, metric=METRIC, results_folder="results",
+                    n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
+                    model_order=None, conformal_q=constants.CONFORMAL_Q):
     """Generate HTML, PDF, CSV, and hyperparameter-markdown reports.
 
     `dataset` may be a single name, a comma-separated string, or a list of
@@ -1084,7 +1250,22 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
     `_apply_shared_thresholds`); those shared thresholds drive the
     reports/combined/ summary (confusion counts pooled over the datasets) and a
     second set of plots per dataset. Files are saved in reports/{dataset}/.
+    `n_plot_models` is how many models each prediction-error overlay shows; the
+    models are the best `n_plot_models` by `metric` on that dataset.
+    A multi-dataset run also writes the cross-case overview tables to
+    reports/overview_*.tex (see `_generate_overview_latex`).
+
+    `threshold_method` is the threshold every table quotes and every plot is
+    scaled by. `metric` is a tuple of metric names inside it (see
+    `metric_list`): it selects each model's run — aggregated over the datasets,
+    an F1 recomputed from pooled counts rather than averaged — and orders the
+    models everywhere, unless `model_order` gives a separate ordering.
+    `conformal_q` is the false alarm rate the conformal threshold targets.
     """
+    # One metric does both jobs unless the caller separates them.
+    metric = metric_list(metric)
+    model_order = metric if model_order is None else metric_list(model_order)
+
     if isinstance(dataset, str):
         datasets = [d for d in dataset.split(",") if d]
     else:
@@ -1100,27 +1281,55 @@ def generate_report(dataset, metric="calibration_loss", results_folder="results"
     if not by_dataset:
         return
 
-    if len(by_dataset) > 1:
-        _apply_shared_thresholds(by_dataset, results_folder)
+    # Always fit the shared thresholds: the conformal threshold is defined by
+    # the calibration sample it is fitted on, and this is where that fit happens
+    # (with one dataset listed, "shared across the datasets" is just that one).
+    _apply_shared_thresholds(by_dataset, results_folder, conformal_q)
 
-    selected = _select_shared_best(by_dataset, metric)
-    plot_models = None
-    if len(by_dataset) > 1:
-        pooled = _pooled_by_model(selected)
-        plot_models = _top_models(pooled, metric)
+    selected = _select_shared_best(by_dataset, metric, threshold_method)
+    # Each dataset's overlay picks its own best `n_plot_models` (plot_models=None),
+    # so a model that only wins on one case still shows up there. The combined
+    # report is a single pooled ranking, so it gets the pooled top list.
     for ds in by_dataset:
-        _generate_dataset_report(ds, metric, selected[ds], plot_models=plot_models, shared_plots=len(by_dataset) > 1)
+        _generate_dataset_report(ds, metric, selected[ds],
+                                 shared_plots=len(by_dataset) > 1, n_plot_models=n_plot_models,
+                                 threshold_method=threshold_method, model_order=model_order)
     if len(by_dataset) > 1:
-        _generate_dataset_report("combined", metric, pooled, plot_models=plot_models)
+        _generate_overview_latex(selected, metric, "reports", threshold_method=threshold_method,
+                                 model_order=model_order)
+        pooled = _pooled_by_model(selected)
+        _generate_dataset_report("combined", metric, pooled,
+                                 plot_models=_top_models(pooled, metric, n=n_plot_models,
+                                                         threshold_method=threshold_method,
+                                                         model_order=model_order),
+                                 n_plot_models=n_plot_models, threshold_method=threshold_method,
+                                 model_order=model_order)
 
 
-def _top_models(by_model, metric, n=5):
-    """Names of the `n` best models by `metric` over `by_model`; models without a value rank last."""
-    lower = metric in LOWER_IS_BETTER
-    def key(model):
-        v = _metric_value(_best_result(by_model[model], metric), metric)
-        return (1, 0.0) if v is None else (0, v if lower else -v)
-    return sorted(by_model, key=key)[:n]
+def _order_models(by_model, metric, threshold_method=THRESHOLD_METHOD, model_order=None):
+    """Model names in the report's display order, best first.
+
+    `metric` selects each model's best run (its hyperparameters); the ranking
+    across models reads `model_order` from the `threshold_method` block, or
+    `metric` itself when no separate ordering is given (see `_rank_key`). Every
+    table and plot in a report uses this one order.
+    """
+    model_order = metric_list(metric if model_order is None else model_order)
+    return sorted(
+        by_model,
+        key=lambda m: _rank_key(_best_result(by_model[m], metric, threshold_method), model_order, threshold_method),
+    )
+
+
+def _order_rank(by_model, metric, threshold_method=THRESHOLD_METHOD, model_order=None):
+    """``{model: position}`` in the display order, for sorting already-built table rows."""
+    return {m: i for i, m in enumerate(_order_models(by_model, metric, threshold_method, model_order))}
+
+
+def _top_models(by_model, metric, n=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
+                model_order=None):
+    """Names of the `n` models a plot should show, in `_order_models` order."""
+    return _order_models(by_model, metric, threshold_method, model_order)[:n]
 
 
 def _pooled_by_model(selected):
@@ -1136,7 +1345,9 @@ def _pooled_by_model(selected):
     return pooled
 
 
-def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared_plots=False):
+def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared_plots=False,
+                             n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
+                             model_order=None):
     """Write all report files for one dataset from its (pre-selected) results.
 
     `plot_models` fixes the models shown in the overlay plot (see
@@ -1167,14 +1378,24 @@ def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared
     plot_path = os.path.join(dataset_dir, f"prediction_errors.png")
     plots_dir = os.path.join(dataset_dir, "plots")
 
-    _generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled)
-    _generate_pdf(dataset, metric, by_model, pdf_path, unlabeled=unlabeled)
-    _generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled)
-    _generate_hp_markdown(dataset, metric, by_model, hp_path)
-    _generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled)
-    _generate_prediction_error_plot(dataset, metric, by_model, plot_path, models=plot_models)
-    _generate_model_plots(dataset, metric, by_model, plots_dir)
+    # One model order for every table and plot of this dataset. Unlabeled runs
+    # have no detections to rank, so they keep their own metric sort.
+    order = None if unlabeled else _order_rank(by_model, metric, threshold_method, model_order)
+
+    _generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled, order=order)
+    _generate_pdf(dataset, metric, by_model, pdf_path, unlabeled=unlabeled, order=order)
+    _generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled, order=order)
+    _generate_hp_markdown(dataset, metric, by_model, hp_path, order=order)
+    _generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled,
+                    threshold_method=threshold_method, order=order)
+    _generate_prediction_error_plot(dataset, metric, by_model, plot_path, models=plot_models,
+                                    n_models=n_plot_models, threshold_method=threshold_method,
+                                    model_order=model_order)
+    _generate_model_plots(dataset, metric, by_model, plots_dir, threshold_method=threshold_method)
     if shared_plots:
         shared_plot_path = os.path.join(dataset_dir, "prediction_errors_shared.png")
-        _generate_prediction_error_plot(dataset, metric, by_model, shared_plot_path, models=plot_models, blocks_key="shared")
-        _generate_model_plots(dataset, metric, by_model, os.path.join(dataset_dir, "plots_shared"), blocks_key="shared")
+        _generate_prediction_error_plot(dataset, metric, by_model, shared_plot_path, models=plot_models,
+                                        blocks_key="shared", n_models=n_plot_models,
+                                        threshold_method=threshold_method, model_order=model_order)
+        _generate_model_plots(dataset, metric, by_model, os.path.join(dataset_dir, "plots_shared"),
+                              blocks_key="shared", threshold_method=threshold_method)

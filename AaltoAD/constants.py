@@ -34,6 +34,26 @@ MERLIN_PERCENTILES = {
     "MBA": (99, 2),
 }
 
+# How many models the report's prediction-error overlay plots show (best first).
+PLOT_MODELS = 3
+
+# Threshold method the report quotes in tables and scales plots by
+# (--threshold-method).
+THRESHOLD_METHOD = "conformal"
+
+# Target false alarm rate for the conformal threshold (--conformal-q): at most
+# this fraction of the calibration scores sit above it. A reporting choice, not
+# a swept hyperparameter, so it is set here rather than read from a run.
+CONFORMAL_Q = 1e-3
+
+# The report's metric (--metric): metric names inside the threshold method's
+# block, most significant first. It selects each model's hyperparameters and
+# orders the models in every table and plot, unless --model-order gives the
+# ordering its own metric. Each name is ranked in its natural direction, so
+# this reads "fastest detection first, then fewest false positives, then best
+# F1 to break a tie".
+METRIC = ("p_latency", "fpr", "f1")
+
 # These will be initialized by main.py after parsing arguments
 level = None
 percentile_merlin = None
