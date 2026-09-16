@@ -41,6 +41,13 @@ PLOT_MODELS = 3
 # (--threshold-method).
 THRESHOLD_METHOD = "conformal"
 
+# How plotted series are reduced from 7200 points to something drawable
+# (--downsample): "min", "max" or "mean" of each window, "range" for a min-max
+# band, or "nth" to keep every Nth step. A range shows both extremes, so it
+# affords a wider window.
+DOWNSAMPLE = "range"
+DOWNSAMPLE_WINDOWS = {"nth": 10, "min": 10, "max": 10, "mean": 10, "range": 20}
+
 # Target false alarm rate for the conformal threshold (--conformal-q): at most
 # this fraction of the calibration scores sit above it. A reporting choice, not
 # a swept hyperparameter, so it is set here rather than read from a run.

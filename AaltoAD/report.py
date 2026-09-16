@@ -106,6 +106,33 @@ DEFAULT_PLOT_MODELS = constants.PLOT_MODELS
 PLOT_VALUE_CLIP = 2.0
 PLOT_Y_TOP = 2.2
 
+# Default downsampling of plotted series (--downsample, --downsample-window).
+DOWNSAMPLE = constants.DOWNSAMPLE
+DOWNSAMPLE_WINDOWS = dict(constants.DOWNSAMPLE_WINDOWS)
+
+
+DOWNSAMPLERS = {
+    "min": downsample.min_in_window,
+    "max": downsample.max_in_window,
+    "mean": downsample.mean_in_window,
+    "nth": downsample.every_nth_step,
+}
+
+
+def _downsample(series, mode=DOWNSAMPLE, window=None):
+    """Reduce a plotted series, returning ``(low, high)``; `low` is None for a plain line.
+
+    `mode` is one of `DOWNSAMPLERS` or "range" (see
+    `AaltoAD.report_figures.downsample`). Clipping happens here too, so every
+    plot is drawn on the same scale.
+    """
+    window = DOWNSAMPLE_WINDOWS.get(mode, 10) if window is None else window
+    if mode == "range":
+        low, high = downsample.min_max_in_window(series, window)
+        return _clip_for_plot(low), _clip_for_plot(high)
+    reduce = DOWNSAMPLERS.get(mode, downsample.max_in_window)
+    return None, _clip_for_plot(reduce(series, window))
+
 
 def _table_sort_metric(metric):
     """Fallback single metric for the unlabeled tables, which cannot rank by detections."""
@@ -1004,7 +1031,8 @@ def _clip_for_plot(values):
 
 def _generate_prediction_error_plot(dataset, metric, by_model, output_path, models=None, blocks_key=None,
                                     n_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
-                                    model_order=None):
+                                    model_order=None, downsample_mode=DOWNSAMPLE,
+                                    downsample_window=None):
     """Overlay each model's best-result prediction_error for a dataset.
 
     `models`, when given, fixes which models are plotted (and their order)
@@ -1086,10 +1114,13 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
     # union index unsorted; sort it or the lines wrap back to the start.
     combined = pd.concat(series, axis=1).sort_index()
 
-    combined = _clip_for_plot(downsample.every_nth_step(combined, 10))
+    low, combined = _downsample(combined, downsample_mode, downsample_window)
 
     fig, ax = style.new_figure()
-    style.plot_series(ax, combined)
+    if low is None:
+        style.plot_series(ax, combined)
+    else:
+        style.plot_bands(ax, low, combined)
     ax.set_ylim(0, PLOT_Y_TOP)
     # Every series is scaled by its own threshold, so one line at 1 is the
     # threshold for all models.
@@ -1110,7 +1141,8 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
 
 
 def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None,
-                          threshold_method=THRESHOLD_METHOD):
+                          threshold_method=THRESHOLD_METHOD, downsample_mode=DOWNSAMPLE,
+                          downsample_window=None):
     """Plot the best result per model as prediction error vs. threshold.
 
     For each model, take its best result (by `metric`), read the matching
@@ -1165,10 +1197,14 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
             except (ValueError, OSError, KeyError):
                 n_calib = 0
 
-        series = _clip_for_plot(downsample.every_nth_step(series, 10))
+        low, series = _downsample(series, downsample_mode, downsample_window)
+        series = series.rename("prediction_error")
 
         fig, ax = style.new_figure()
-        style.plot_series(ax, series.rename("prediction_error"))
+        if low is None:
+            style.plot_series(ax, series)
+        else:
+            style.plot_bands(ax, low.rename("prediction_error"), series)
         ax.set_ylim(0, PLOT_Y_TOP)
         # Every method the result carries is drawn for comparison; the one the
         # report is generated for is the red line the series is scaled by.
@@ -1239,7 +1275,8 @@ def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.C
 
 def generate_report(dataset, metric=METRIC, results_folder="results",
                     n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
-                    model_order=None, conformal_q=constants.CONFORMAL_Q):
+                    model_order=None, conformal_q=constants.CONFORMAL_Q,
+                    downsample_mode=DOWNSAMPLE, downsample_window=None):
     """Generate HTML, PDF, CSV, and hyperparameter-markdown reports.
 
     `dataset` may be a single name, a comma-separated string, or a list of
@@ -1260,7 +1297,8 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
     `metric_list`): it selects each model's run — aggregated over the datasets,
     an F1 recomputed from pooled counts rather than averaged — and orders the
     models everywhere, unless `model_order` gives a separate ordering.
-    `conformal_q` is the false alarm rate the conformal threshold targets.
+    `conformal_q` is the false alarm rate the conformal threshold targets, and
+    `downsample_mode`/`downsample_window` decide how plotted series are reduced.
     """
     # One metric does both jobs unless the caller separates them.
     metric = metric_list(metric)
@@ -1293,7 +1331,8 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
     for ds in by_dataset:
         _generate_dataset_report(ds, metric, selected[ds],
                                  shared_plots=len(by_dataset) > 1, n_plot_models=n_plot_models,
-                                 threshold_method=threshold_method, model_order=model_order)
+                                 threshold_method=threshold_method, model_order=model_order,
+                                 downsample_mode=downsample_mode, downsample_window=downsample_window)
     if len(by_dataset) > 1:
         _generate_overview_latex(selected, metric, "reports", threshold_method=threshold_method,
                                  model_order=model_order)
@@ -1303,7 +1342,8 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
                                                          threshold_method=threshold_method,
                                                          model_order=model_order),
                                  n_plot_models=n_plot_models, threshold_method=threshold_method,
-                                 model_order=model_order)
+                                 model_order=model_order, downsample_mode=downsample_mode,
+                                 downsample_window=downsample_window)
 
 
 def _order_models(by_model, metric, threshold_method=THRESHOLD_METHOD, model_order=None):
@@ -1347,7 +1387,7 @@ def _pooled_by_model(selected):
 
 def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared_plots=False,
                              n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
-                             model_order=None):
+                             model_order=None, downsample_mode=DOWNSAMPLE, downsample_window=None):
     """Write all report files for one dataset from its (pre-selected) results.
 
     `plot_models` fixes the models shown in the overlay plot (see
@@ -1390,12 +1430,17 @@ def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared
                     threshold_method=threshold_method, order=order)
     _generate_prediction_error_plot(dataset, metric, by_model, plot_path, models=plot_models,
                                     n_models=n_plot_models, threshold_method=threshold_method,
-                                    model_order=model_order)
-    _generate_model_plots(dataset, metric, by_model, plots_dir, threshold_method=threshold_method)
+                                    model_order=model_order, downsample_mode=downsample_mode,
+                                    downsample_window=downsample_window)
+    _generate_model_plots(dataset, metric, by_model, plots_dir, threshold_method=threshold_method,
+                          downsample_mode=downsample_mode, downsample_window=downsample_window)
     if shared_plots:
         shared_plot_path = os.path.join(dataset_dir, "prediction_errors_shared.png")
         _generate_prediction_error_plot(dataset, metric, by_model, shared_plot_path, models=plot_models,
                                         blocks_key="shared", n_models=n_plot_models,
-                                        threshold_method=threshold_method, model_order=model_order)
+                                        threshold_method=threshold_method, model_order=model_order,
+                                        downsample_mode=downsample_mode,
+                                        downsample_window=downsample_window)
         _generate_model_plots(dataset, metric, by_model, os.path.join(dataset_dir, "plots_shared"),
-                              blocks_key="shared", threshold_method=threshold_method)
+                              blocks_key="shared", threshold_method=threshold_method,
+                              downsample_mode=downsample_mode, downsample_window=downsample_window)

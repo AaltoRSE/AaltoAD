@@ -605,7 +605,8 @@ def main():
 	if args.report:
 		generate_report(args.dataset, metric=args.metric, n_plot_models=args.plot_models,
 		                threshold_method=report.method_name(args.threshold),
-		                model_order=args.model_order, conformal_q=args.conformal_q)
+		                model_order=args.model_order, conformal_q=args.conformal_q,
+		                downsample_mode=args.downsample, downsample_window=args.downsample_window)
 		return 0
 
 	# Determine which mode to run

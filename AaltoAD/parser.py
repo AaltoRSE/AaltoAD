@@ -113,6 +113,19 @@ parser.add_argument('--conformal-q',
                     help="False alarm rate the conformal threshold targets: at most this fraction of the "
                          f"calibration scores sit above it (default: {constants.CONFORMAL_Q:g}). POT keeps "
                          "using each run's own swept q.")
+parser.add_argument('--downsample',
+                    type=str,
+                    choices=['min', 'max', 'mean', 'range', 'nth'],
+                    default=constants.DOWNSAMPLE,
+                    help="How a plotted series is reduced to something drawable: the min, max or mean of "
+                         "each window, a min-max 'range' band, or 'nth' to keep every Nth step "
+                         f"(default: {constants.DOWNSAMPLE}). 'min' and 'nth' can hide a narrow peak that "
+                         "crosses the threshold, and 'max' hides the dips; 'range' keeps both.")
+parser.add_argument('--downsample-window',
+                    type=int,
+                    default=None,
+                    help="Steps per plotted point (default: per mode, "
+                         + ", ".join(f"{k} {v}" for k, v in constants.DOWNSAMPLE_WINDOWS.items()) + ").")
 parser.add_argument('--model-order',
                     type=str,
                     default=None,
