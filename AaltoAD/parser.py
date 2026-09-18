@@ -107,12 +107,32 @@ parser.add_argument('--threshold', '--threshold-method',
                     help="Threshold method the report's metrics are read from: conformal, pot or oracle "
                          f"(default: {constants.THRESHOLD_METHOD}). Tables quote it and plots are scaled "
                          "by it.")
+parser.add_argument('--pool-baselines',
+                    action='store_true',
+                    default=constants.POOL_BASELINES,
+                    help="Fit one threshold on the calibration data of every --dataset pooled together, "
+                         "instead of thresholding each dataset on its own baseline (the default). Pooling "
+                         "assumes the baselines are alike; a contaminated one then sets the threshold for "
+                         "all the others.")
 parser.add_argument('--conformal-q',
                     type=float,
                     default=constants.CONFORMAL_Q,
                     help="False alarm rate the conformal threshold targets: at most this fraction of the "
                          f"calibration scores sit above it (default: {constants.CONFORMAL_Q:g}). POT keeps "
                          "using each run's own swept q.")
+parser.add_argument('--table-columns',
+                    type=str,
+                    default=','.join(constants.TABLE_COLUMNS),
+                    help="Comma-separated columns of the per-case LaTeX summary table "
+                         f"(default: {','.join(constants.TABLE_COLUMNS)}). Also available: adjusted_f1, "
+                         "precision, recall, threshold, calibration_loss, eval_time. The CSV and HTML "
+                         "reports always keep the full set.")
+parser.add_argument('--table-blocks',
+                    type=int,
+                    default=constants.TABLE_BLOCKS,
+                    help="How many models the per-case LaTeX summary table sets side by side per row "
+                         f"(default: {constants.TABLE_BLOCKS}); 1 gives one model per row. Models fill "
+                         "column-major, so the row order still reads downwards.")
 parser.add_argument('--downsample',
                     type=str,
                     choices=['min', 'max', 'mean', 'range', 'nth'],

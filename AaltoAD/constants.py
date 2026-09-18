@@ -48,6 +48,26 @@ THRESHOLD_METHOD = "conformal"
 DOWNSAMPLE = "range"
 DOWNSAMPLE_WINDOWS = {"nth": 10, "min": 10, "max": 10, "mean": 10, "range": 20}
 
+# Columns of the per-case LaTeX summary table (--table-columns). Names resolve
+# inside the threshold method's block, except the top-level ones.
+TABLE_COLUMNS = ("f1", "fpr", "latency")
+
+# Models per row in the per-case LaTeX summary table (--table-blocks): with few
+# columns the table is narrow enough to set two side by side.
+TABLE_BLOCKS = 2
+
+# Whether one threshold is fit on the calibration data of every dataset in a
+# report pooled together (--pool-baselines), or each dataset is thresholded on
+# its own baseline. Pooling assumes the baselines are alike; when one of them
+# is contaminated it sets the threshold for all the others.
+POOL_BASELINES = False
+
+# Whether one threshold is fit on the calibration data of every dataset in a
+# report pooled together (--pool-baselines), or each dataset is thresholded on
+# its own baseline. Pooling assumes the baselines are alike; when one of them
+# is contaminated it sets the threshold for all the others.
+POOL_BASELINES = False
+
 # Target false alarm rate for the conformal threshold (--conformal-q): at most
 # this fraction of the calibration scores sit above it. A reporting choice, not
 # a swept hyperparameter, so it is set here rather than read from a run.

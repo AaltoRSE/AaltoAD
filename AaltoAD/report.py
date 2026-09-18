@@ -79,16 +79,39 @@ def _metric_path(name, method):
     return f"{method}.{name}"
 
 
+def _no_detection(result, method):
+    """True when `result`'s `method` block has no true positives.
+
+    `segment_latency` charges an undetected segment its full length, so such a
+    latency records how long the segment was, not how long detection took. It
+    must not be ranked or printed as a detection time — and its value varies
+    with the model's warm-up, which makes it look faster the more rows a model
+    drops before scoring.
+    """
+    counts = _confusion_counts(result, method) if result else None
+    return counts is not None and counts[0] == 0
+
+
+def _fmt_metric(result, path, method):
+    """Format one metric cell, as an em dash for a latency that is really a non-detection."""
+    if isinstance(path, str) and path.endswith(".p_latency") and _no_detection(result, method):
+        return "---"
+    return _fmt(_col_value(result, path))
+
+
 def _rank_key(result, metric, method):
     """Sort key ranking one result by `metric`, best first.
 
     `metric` is a tuple of bare names (see `metric_list`) read from the `method`
     block, each in its natural direction. A missing value sorts last within its
-    own term, so a model that never fires cannot outrank one that does.
+    own term, and so does the latency of a model that never fired (see
+    `_no_detection`), so a model that never fires cannot outrank one that does.
     """
     key = []
     for name in metric_list(metric):
         value = _metric_value(result, _metric_path(name, method)) if result else None
+        if name == "p_latency" and _no_detection(result, method):
+            value = None
         if value is None:
             key.append(float("inf"))
         else:
@@ -103,6 +126,8 @@ DEFAULT_PLOT_MODELS = constants.PLOT_MODELS
 # threshold, so 1 is the threshold for every model and a common scale makes
 # plots comparable across models and cases. Values above the clip are "far over
 # threshold" either way, and clipping them keeps the interesting range legible.
+POOL_BASELINES = constants.POOL_BASELINES
+
 PLOT_VALUE_CLIP = 2.0
 PLOT_Y_TOP = 2.2
 
@@ -728,15 +753,45 @@ def method_name(value):
     return name[: -len("_expanded")] if name.endswith("_expanded") else name
 
 
-def _latex_columns(method=THRESHOLD_METHOD):
-    """Summary-table columns reading the `method` threshold block."""
-    return [
-        ("F1", f"{method}.f1"),
-        ("Adjusted F1", f"{method}_expanded.f1"),
-        ("FPR", f"{method}.fpr"),
-        ("Latency", f"{method}.p_latency"),
-        ("Eval time (s)", "eval_time"),
-    ]
+# Header and lookup for every column --table-columns can name. An "_expanded"
+# path reaches the point-adjusted block of the same method.
+TABLE_COLUMN_SPECS = {
+    "f1": ("F1", "{method}.f1"),
+    "adjusted_f1": ("Adjusted F1", "{method}_expanded.f1"),
+    "precision": ("Precision", "{method}.precision"),
+    "recall": ("Recall", "{method}.recall"),
+    "fpr": ("FPR", "{method}.fpr"),
+    "p_latency": ("Latency", "{method}.p_latency"),
+    "threshold": ("Threshold", "{method}.threshold"),
+    "calibration_loss": ("Calib. loss", "calibration_loss"),
+    "eval_time": ("Eval time (s)", "eval_time"),
+}
+
+TABLE_COLUMNS = tuple(constants.TABLE_COLUMNS)
+TABLE_BLOCKS = constants.TABLE_BLOCKS
+
+
+def table_column_list(columns):
+    """Normalize a `--table-columns` argument into a tuple of column names."""
+    if isinstance(columns, str):
+        parts = [p.strip() for p in columns.replace(" ", ",").split(",")]
+    else:
+        parts = [str(p).strip() for p in columns]
+    return tuple(METRIC_ALIASES.get(p, p) for p in parts if p)
+
+
+def _latex_columns(method=THRESHOLD_METHOD, columns=TABLE_COLUMNS):
+    """Summary-table columns reading the `method` threshold block.
+
+    `columns` names entries of `TABLE_COLUMN_SPECS`; an unknown name is read as
+    a metric of the method's block so a column can be asked for without being
+    listed there. Raises nothing — an absent metric simply renders as N/A.
+    """
+    specs = []
+    for name in table_column_list(columns):
+        header, path = TABLE_COLUMN_SPECS.get(name, (name, "{method}." + name))
+        specs.append((header, path.format(method=method)))
+    return specs
 
 # Cross-case overview: one table per metric, as (file suffix, caption phrase,
 # metric name under THRESHOLD_METHOD). Split by metric because a single table of
@@ -849,20 +904,47 @@ def _latex_escape(s):
     return "".join(out)
 
 
-def _latex_tabular(columns, rows, caption=None, label=None):
-    """Render a tabular block (no surrounding table float)."""
-    align = "l" + "r" * (len(columns) - 1)
+def _blocked_rows(rows, blocks):
+    """Split `rows` into `blocks` side-by-side columns, filled top to bottom.
+
+    Returns a list of tuples, one per printed line, each holding the row of
+    every block (None where a block has run out). Column-major, so reading down
+    the first block and continuing down the second follows the row order.
+    """
+    if blocks < 2 or not rows:
+        return [(row,) for row in rows]
+    height = -(-len(rows) // blocks)  # ceiling division
+    columns = [rows[i * height:(i + 1) * height] for i in range(blocks)]
+    return [
+        tuple(column[i] if i < len(column) else None for column in columns)
+        for i in range(height)
+    ]
+
+
+def _latex_tabular(columns, rows, caption=None, label=None, blocks=1):
+    """Render a tabular block (no surrounding table float).
+
+    With `blocks` > 1 the column set is repeated that many times side by side,
+    separated by a wide gap, and the rows are dealt into them by
+    `_blocked_rows` — a narrow table set two-up is half as tall.
+    """
+    blocks = max(1, blocks)
+    one = "l" + "r" * (len(columns) - 1)
+    align = r"@{\qquad}".join([one] * blocks)
+    header = " & ".join([" & ".join(_latex_escape(c) for c in columns)] * blocks)
+
     lines = []
     if caption or label:
         lines.append("% " + (caption or "") + (f"  [{label}]" if label else ""))
     lines.append(r"\begin{tabular}{" + align + r"}")
     lines.append(r"\hline")
-    lines.append(" & ".join(_latex_escape(c) for c in columns) + r" \\")
+    lines.append(header + r" \\")
     lines.append(r"\hline")
-    for row in rows:
-        lines.append(
-            " & ".join(_latex_escape(row.get(c, "")) for c in columns) + r" \\"
-        )
+    for line in _blocked_rows(rows, blocks):
+        cells = []
+        for row in line:
+            cells.extend(_latex_escape(row.get(c, "")) if row else "" for c in columns)
+        lines.append(" & ".join(cells) + r" \\")
     lines.append(r"\hline")
     lines.append(r"\end{tabular}")
     return "\n".join(lines)
@@ -924,11 +1006,7 @@ def _generate_overview_latex(by_dataset, metric, output_dir, threshold_method=TH
         result = best.get((model, case))
         if result is None:
             return "N/A"
-        if name == "p_latency":
-            counts = _confusion_counts(result, threshold_method)
-            if counts is not None and counts[0] == 0:
-                return "---"
-        return _fmt(_get(result, f"{threshold_method}.{name}"))
+        return _fmt_metric(result, f"{threshold_method}.{name}", threshold_method)
 
     os.makedirs(output_dir, exist_ok=True)
     for suffix, phrase, name in OVERVIEW_TABLES:
@@ -948,10 +1026,13 @@ def _generate_overview_latex(by_dataset, metric, output_dir, threshold_method=TH
 
 
 def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False,
-                    threshold_method=THRESHOLD_METHOD, order=None):
+                    threshold_method=THRESHOLD_METHOD, order=None, columns=TABLE_COLUMNS,
+                    blocks=TABLE_BLOCKS):
     """Write a LaTeX file with two tabular blocks (metrics + hyperparameters).
 
-    `threshold_method` names the threshold block the columns are read from.
+    `threshold_method` names the threshold block the columns are read from and
+    `columns` which ones appear (see `_latex_columns`) and `blocks` how many
+    models are set side by side per row.
     Designed to be ``\\input``-ed inside a user-provided ``table`` float —
     no float wrapper is emitted.
     """
@@ -959,7 +1040,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False,
     lower_is_better = sort_metric in LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
-    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else _latex_columns(threshold_method)
+    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else _latex_columns(threshold_method, columns)
 
     # Slim metrics table (oracle-threshold metrics, see LATEX_COLUMNS).
     metric_rows = []
@@ -968,7 +1049,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False,
         row = {"model": model}
         for label, path_or_fn in slide_cols:
             if best:
-                row[label] = _fmt(_col_value(best, path_or_fn))
+                row[label] = _fmt_metric(best, path_or_fn, threshold_method)
             else:
                 row[label] = "N/A"
         try:
@@ -985,7 +1066,7 @@ def _generate_latex(dataset, metric, by_model, output_path, unlabeled=False,
     parts = [
         f"% Auto-generated by AaltoAD.report — dataset={dataset}, metric={metric_display(metric)}, "
         f"threshold_method={threshold_method}",
-        _latex_tabular(metric_cols, metric_rows),
+        _latex_tabular(metric_cols, metric_rows, blocks=blocks),
         "",
     ]
     with open(output_path, "w") as f:
@@ -1228,8 +1309,27 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
 # ---------------------------------------------------------------------------
 
 
-def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q):
-    """Attach conformal/pot/oracle blocks fit with thresholds shared across datasets, in place.
+def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q,
+                             pool_baselines=POOL_BASELINES):
+    """Attach conformal/pot/oracle blocks to every result, in place.
+
+    With `pool_baselines`, one threshold per configuration is fit on the
+    calibration data of every dataset pooled together — which assumes the
+    baselines are alike, and lets a contaminated one set the threshold for all
+    the rest. By default each dataset is fit on its own baseline instead, by
+    running the same machinery once per dataset; the blocks still land where
+    the pooled ones would, so the combined report and the shared plots keep
+    working on separately fitted thresholds.
+    """
+    if not pool_baselines and len(by_dataset) > 1:
+        for dataset, by_model in by_dataset.items():
+            _fit_threshold_blocks({dataset: by_model}, results_folder, conformal_q)
+        return
+    _fit_threshold_blocks(by_dataset, results_folder, conformal_q)
+
+
+def _fit_threshold_blocks(by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q):
+    """Fit and attach threshold blocks over the given datasets, pooling their calibration.
 
     Only configurations (model + hyperparameters) with a run in every dataset
     are processed; per dataset the lowest-``calibration_loss`` run represents
@@ -1240,14 +1340,15 @@ def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.C
     level as well (see ``shared.apply_blocks``). POT uses each configuration's
     swept ``q``; the conformal threshold uses `conformal_q`. Fits are cached
     under ``results_folder/_shared_thresholds/`` keyed by the CSV modification
-    times.
+    times. With a single dataset the "pool" is that dataset's own calibration,
+    which is how `_apply_shared_thresholds` fits separate baselines.
     """
 
     datasets = list(by_dataset)
     groups = shared.group_configurations(
         by_dataset, _hp_key, lambda rs: _best_result(rs, "calibration_loss"))
     complete = {k: v for k, v in groups.items() if set(v) == set(datasets)}
-    print(f"Fitting shared thresholds for {len(complete)} configurations across datasets {datasets}")
+    print(f"Fitting thresholds for {len(complete)} configurations on the calibration of {datasets}")
 
     cache_file = shared.cache_path(results_folder, datasets)
     cache = shared.load_cache(cache_file)
@@ -1275,8 +1376,9 @@ def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.C
 
 def generate_report(dataset, metric=METRIC, results_folder="results",
                     n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
-                    model_order=None, conformal_q=constants.CONFORMAL_Q,
-                    downsample_mode=DOWNSAMPLE, downsample_window=None):
+                    model_order=None, conformal_q=constants.CONFORMAL_Q, pool_baselines=POOL_BASELINES,
+                    downsample_mode=DOWNSAMPLE, downsample_window=None,
+                    table_columns=TABLE_COLUMNS, table_blocks=TABLE_BLOCKS):
     """Generate HTML, PDF, CSV, and hyperparameter-markdown reports.
 
     `dataset` may be a single name, a comma-separated string, or a list of
@@ -1297,8 +1399,12 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
     `metric_list`): it selects each model's run — aggregated over the datasets,
     an F1 recomputed from pooled counts rather than averaged — and orders the
     models everywhere, unless `model_order` gives a separate ordering.
-    `conformal_q` is the false alarm rate the conformal threshold targets, and
-    `downsample_mode`/`downsample_window` decide how plotted series are reduced.
+    `conformal_q` is the false alarm rate the conformal threshold targets,
+    `pool_baselines` whether one threshold is fit across all the datasets'
+    calibration data instead of one per dataset, and
+    `downsample_mode`/`downsample_window` decide how plotted series are reduced,
+    `table_columns` which columns the LaTeX summary shows and `table_blocks`
+    how many models it sets side by side.
     """
     # One metric does both jobs unless the caller separates them.
     metric = metric_list(metric)
@@ -1322,7 +1428,7 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
     # Always fit the shared thresholds: the conformal threshold is defined by
     # the calibration sample it is fitted on, and this is where that fit happens
     # (with one dataset listed, "shared across the datasets" is just that one).
-    _apply_shared_thresholds(by_dataset, results_folder, conformal_q)
+    _apply_shared_thresholds(by_dataset, results_folder, conformal_q, pool_baselines)
 
     selected = _select_shared_best(by_dataset, metric, threshold_method)
     # Each dataset's overlay picks its own best `n_plot_models` (plot_models=None),
@@ -1332,7 +1438,8 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
         _generate_dataset_report(ds, metric, selected[ds],
                                  shared_plots=len(by_dataset) > 1, n_plot_models=n_plot_models,
                                  threshold_method=threshold_method, model_order=model_order,
-                                 downsample_mode=downsample_mode, downsample_window=downsample_window)
+                                 downsample_mode=downsample_mode, downsample_window=downsample_window,
+                                 table_columns=table_columns, table_blocks=table_blocks)
     if len(by_dataset) > 1:
         _generate_overview_latex(selected, metric, "reports", threshold_method=threshold_method,
                                  model_order=model_order)
@@ -1343,7 +1450,8 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
                                                          model_order=model_order),
                                  n_plot_models=n_plot_models, threshold_method=threshold_method,
                                  model_order=model_order, downsample_mode=downsample_mode,
-                                 downsample_window=downsample_window)
+                                 downsample_window=downsample_window, table_columns=table_columns,
+                                 table_blocks=table_blocks)
 
 
 def _order_models(by_model, metric, threshold_method=THRESHOLD_METHOD, model_order=None):
@@ -1387,7 +1495,8 @@ def _pooled_by_model(selected):
 
 def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared_plots=False,
                              n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
-                             model_order=None, downsample_mode=DOWNSAMPLE, downsample_window=None):
+                             model_order=None, downsample_mode=DOWNSAMPLE, downsample_window=None,
+                             table_columns=TABLE_COLUMNS, table_blocks=TABLE_BLOCKS):
     """Write all report files for one dataset from its (pre-selected) results.
 
     `plot_models` fixes the models shown in the overlay plot (see
@@ -1427,7 +1536,8 @@ def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared
     _generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled, order=order)
     _generate_hp_markdown(dataset, metric, by_model, hp_path, order=order)
     _generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled,
-                    threshold_method=threshold_method, order=order)
+                    threshold_method=threshold_method, order=order, columns=table_columns,
+                    blocks=table_blocks)
     _generate_prediction_error_plot(dataset, metric, by_model, plot_path, models=plot_models,
                                     n_models=n_plot_models, threshold_method=threshold_method,
                                     model_order=model_order, downsample_mode=downsample_mode,

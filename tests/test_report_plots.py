@@ -118,3 +118,58 @@ def test_metric_list_accepts_the_spellings_the_cli_allows():
 def test_metric_path_keeps_top_level_metrics_out_of_the_method_block():
     assert report._metric_path("f1", "conformal") == "conformal.f1"
     assert report._metric_path("calibration_loss", "conformal") == "calibration_loss"
+
+
+def test_latex_columns_default_to_the_paper_set():
+    assert report._latex_columns("conformal") == [
+        ("F1", "conformal.f1"),
+        ("FPR", "conformal.fpr"),
+        ("Latency", "conformal.p_latency"),
+    ]
+
+
+def test_latex_columns_take_the_names_they_are_given():
+    columns = report._latex_columns("pot", "f1,adjusted_f1,eval_time")
+    assert columns == [
+        ("F1", "pot.f1"),
+        ("Adjusted F1", "pot_expanded.f1"),
+        ("Eval time (s)", "eval_time"),
+    ]
+    # An unlisted name is read from the method's own block.
+    assert report._latex_columns("pot", "recall")[0] == ("Recall", "pot.recall")
+
+
+def test_latex_tabular_deals_rows_into_blocks_column_major():
+    rows = [{"model": f"M{i}"} for i in range(5)]
+    table = report._latex_tabular(["model"], rows, blocks=2)
+    assert r"\begin{tabular}{l@{\qquad}l}" in table
+    assert r"model & model \\" in table
+    # Five rows over two blocks: three lines, the last with an empty right cell.
+    assert r"M0 & M3 \\" in table
+    assert r"M2 &  \\" in table
+
+
+def test_blocked_rows_keeps_order_within_a_block():
+    rows = list(range(6))
+    assert report._blocked_rows(rows, 2) == [(0, 3), (1, 4), (2, 5)]
+    assert report._blocked_rows(rows, 1) == [(0,), (1,), (2,), (3,), (4,), (5,)]
+
+
+def test_rank_key_ignores_the_latency_of_a_model_that_never_fired():
+    # Both "detect" at step 100, but `never` has no true positives, so its
+    # latency is just the segment length and must not win the comparison.
+    detected = {"conformal": {"p_latency": 1790, "fpr": 0.0, "f1": 0.01, "TP": 5, "FP": 0, "FN": 10}}
+    never = {"conformal": {"p_latency": 1734, "fpr": 0.0, "f1": 0.0, "TP": 0, "FP": 0, "FN": 1734}}
+    order = ("p_latency", "fpr", "f1")
+    assert report._rank_key(detected, order, "conformal") < report._rank_key(never, order, "conformal")
+
+
+def test_no_detection_and_its_dash():
+    never = {"conformal": {"p_latency": 1734, "fpr": 0.0, "TP": 0, "FP": 0, "FN": 1734}}
+    detected = {"conformal": {"p_latency": 12, "fpr": 0.0, "TP": 5, "FP": 0, "FN": 1}}
+    assert report._no_detection(never, "conformal")
+    assert not report._no_detection(detected, "conformal")
+    assert report._fmt_metric(never, "conformal.p_latency", "conformal") == "---"
+    assert report._fmt_metric(detected, "conformal.p_latency", "conformal") == "12"
+    # Other columns are unaffected by a non-detection.
+    assert report._fmt_metric(never, "conformal.fpr", "conformal") == "0"

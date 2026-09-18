@@ -299,7 +299,7 @@ def test_load_cache_missing_path_returns_empty_dict(tmp_path):
 # 6. report._apply_shared_thresholds
 # ---------------------------------------------------------------------------
 
-def test_apply_shared_thresholds_marks_results_and_leaves_incomplete_untouched(tmp_path, monkeypatch):
+def test_pooled_baselines_share_one_threshold_and_leave_incomplete_untouched(tmp_path, monkeypatch):
     import AaltoAD.report as report
 
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
@@ -320,7 +320,7 @@ def test_apply_shared_thresholds_marks_results_and_leaves_incomplete_untouched(t
         ds_b_name: report._load_results(ds_b_name, results_folder=str(tmp_path)),
     }
 
-    report._apply_shared_thresholds(by_dataset, results_folder=str(tmp_path))
+    report._apply_shared_thresholds(by_dataset, results_folder=str(tmp_path), pool_baselines=True)
 
     r_a = by_dataset[ds_a_name]["M"]
     r_b = by_dataset[ds_b_name]["M"]
@@ -337,6 +337,36 @@ def test_apply_shared_thresholds_marks_results_and_leaves_incomplete_untouched(t
     assert "pot" not in complete_a or complete_a["pot"] is not complete_a["shared"]["pot"]
 
     assert "shared_threshold" not in incomplete_a
+
+
+def test_separate_baselines_fit_each_dataset_on_its_own_calibration(tmp_path, monkeypatch):
+    """The default: every dataset is thresholded on its own baseline."""
+    import AaltoAD.report as report
+
+    monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
+    ds_a_name, ds_b_name = "synthetic_a", "synthetic_b"
+    _write_dataset(tmp_path, ds_a_name, seed=1)
+    _write_dataset(tmp_path, ds_b_name, seed=2)
+    by_dataset = {
+        ds: report._load_results(ds, results_folder=str(tmp_path))
+        for ds in (ds_a_name, ds_b_name)
+    }
+
+    report._apply_shared_thresholds(by_dataset, results_folder=str(tmp_path))
+
+    a = [r for r in by_dataset[ds_a_name]["M"] if r.get("applied_hyperparameters") == {}][0]
+    b = [r for r in by_dataset[ds_b_name]["M"] if r.get("applied_hyperparameters") == {}][0]
+    # Different calibration data, so different thresholds — unlike the pooled
+    # fit. (POT is not checked here: DummySPOT returns a fixed threshold.)
+    assert a["conformal"]["threshold"] != pytest.approx(b["conformal"]["threshold"])
+
+    # Each conformal threshold is the one its own calibration gives.
+    from AaltoAD.thresholds.conformal import conformal_threshold
+    import AaltoAD.constants as constants
+    for ds, r in ((ds_a_name, a), (ds_b_name, b)):
+        calib = pd.read_csv(r["_source_path"].replace("_results.json", "_calib_scores.csv"))
+        expected = conformal_threshold(calib["prediction_error"].to_numpy(), constants.CONFORMAL_Q)
+        assert r["conformal"]["threshold"] == pytest.approx(expected)
 
 
 def test_apply_shared_thresholds_second_call_hits_cache(tmp_path, monkeypatch):
