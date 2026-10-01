@@ -970,7 +970,8 @@ def _generate_overview_latex(by_dataset, metric, output_dir, threshold_method=TH
 
     Rows are models and columns test cases (there are far more models than
     cases). Every table shares one row order — `model_order` again, each of its
-    metrics averaged over the cases — so the three can be read side by side.
+    metrics averaged over the cases, or a hand-picked `NameOrder` verbatim —
+    so the three can be read side by side.
     Values come from the `threshold_method` block of each model's selected run,
     the same numbers the per-case summary tables show.
 
@@ -978,7 +979,8 @@ def _generate_overview_latex(by_dataset, metric, output_dir, threshold_method=TH
     that case: `segment_latency` charges an undetected segment its full length,
     which would otherwise read as a real (very slow) detection.
     """
-    model_order = metric_list(metric if model_order is None else model_order)
+    if not isinstance(model_order, NameOrder):
+        model_order = metric_list(metric if model_order is None else model_order)
     cases = sorted({_case_id(ds) for ds in by_dataset}, key=_case_sort_key)
     best = {}
     for dataset, by_model in by_dataset.items():
@@ -1000,7 +1002,10 @@ def _generate_overview_latex(by_dataset, metric, output_dir, threshold_method=TH
             return tuple(float("inf") for _ in model_order)
         return tuple(sum(values) / len(values) for values in zip(*keys))
 
-    order = sorted(models, key=lambda model: (mean_rank_key(model), model))
+    if isinstance(model_order, NameOrder):
+        order = [model for model in model_order if model in models]
+    else:
+        order = sorted(models, key=lambda model: (mean_rank_key(model), model))
 
     def cell(model, case, name):
         result = best.get((model, case))
@@ -1129,7 +1134,8 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
     series are downsampled to every 10th time step before plotting. The
     figure is saved as a PNG at ``output_path``.
     """
-    model_order = metric_list(metric if model_order is None else model_order)
+    if not isinstance(model_order, NameOrder):
+        model_order = metric_list(metric if model_order is None else model_order)
     series = {}
     ground_truth = None
     best_by_model = {}
@@ -1181,9 +1187,12 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
         return
 
     # Keep only the `n_models` best models (see `_rank_key`) so the overlay
-    # stays readable.
+    # stays readable. A hand-picked order names them outright.
     if models is not None:
         series = {m: series[m] for m in models if m in series}
+    elif isinstance(model_order, NameOrder):
+        keep = [m for m in model_order if m in series][:n_models]
+        series = {m: series[m] for m in keep}
     elif len(series) > n_models:
         keep = sorted(
             series,
@@ -1374,6 +1383,72 @@ def _fit_threshold_blocks(by_dataset, results_folder, conformal_q=constants.CONF
               f"{skipped_count.get(model, 0)} skipped (missing runs or CSVs)")
 
 
+# Hand-picked model order: a JSON array of model names, e.g.
+# ["TranAD", "LSTM_AE", "USAD"]. When --model-order is not given and this file
+# exists, the report includes exactly those models, in exactly that order.
+MODEL_ORDER_FILE = os.path.join("reports", "model-order.json")
+
+
+class NameOrder(tuple):
+    """A hand-picked, ordered selection of model names.
+
+    Threaded through `model_order` in place of a metric tuple. A helper that
+    receives one orders the models by these names instead of ranking them by
+    metric values, and models not named here are left out of the report
+    entirely (see `_filter_named_models`).
+    """
+
+
+def _read_model_order_file(path=MODEL_ORDER_FILE):
+    """Load a hand-picked model order from `path`, or None when there is no file.
+
+    The file holds a JSON array of model names. Anything else raises
+    ValueError: a malformed order file should stop the report rather than
+    silently fall back to a metric ranking.
+    """
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        names = json.load(f)
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        raise ValueError(f"{path} must contain a JSON array of model names")
+    print(f"Using hand-picked model order from {path}: {', '.join(names)}")
+    return NameOrder(names)
+
+
+def _resolve_model_order(model_order, metric):
+    """The one order value the report threads everywhere.
+
+    An explicit `model_order` wins and keeps its metric semantics (a
+    `NameOrder` passes through as such). With none given, the hand-picked
+    `MODEL_ORDER_FILE` is used when it exists, and `metric` itself otherwise —
+    so `--model-order` bypasses the file, and without it the file bypasses the
+    metric ordering.
+    """
+    if isinstance(model_order, NameOrder):
+        return model_order
+    if model_order is not None:
+        return metric_list(model_order)
+    named = _read_model_order_file()
+    return metric if named is None else named
+
+
+def _filter_named_models(by_dataset, names):
+    """Keep only the models `names` lists, in every dataset of `by_dataset`.
+
+    A name with no results in any dataset is skipped with a warning, so a typo
+    in the order file is visible instead of silently shrinking the report.
+    """
+    known = {model for by_model in by_dataset.values() for model in by_model}
+    for name in names:
+        if name not in known:
+            print(f'Warning: model "{name}" in {MODEL_ORDER_FILE} has no results; skipping.')
+    return {
+        ds: {model: by_model[model] for model in names if model in by_model}
+        for ds, by_model in by_dataset.items()
+    }
+
+
 def generate_report(dataset, metric=METRIC, results_folder="results",
                     n_plot_models=DEFAULT_PLOT_MODELS, threshold_method=THRESHOLD_METHOD,
                     model_order=None, conformal_q=constants.CONFORMAL_Q, pool_baselines=POOL_BASELINES,
@@ -1398,7 +1473,11 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
     scaled by. `metric` is a tuple of metric names inside it (see
     `metric_list`): it selects each model's run — aggregated over the datasets,
     an F1 recomputed from pooled counts rather than averaged — and orders the
-    models everywhere, unless `model_order` gives a separate ordering.
+    models everywhere, unless `model_order` gives a separate ordering. With no
+    `model_order` at all, a hand-picked ``reports/model-order.json`` — a JSON
+    array of model names — takes over when it exists: the report then includes
+    exactly those models, in exactly that order, everywhere models are
+    selected or ordered; a name with no results is skipped with a warning.
     `conformal_q` is the false alarm rate the conformal threshold targets,
     `pool_baselines` whether one threshold is fit across all the datasets'
     calibration data instead of one per dataset, and
@@ -1406,9 +1485,10 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
     `table_columns` which columns the LaTeX summary shows and `table_blocks`
     how many models it sets side by side.
     """
-    # One metric does both jobs unless the caller separates them.
+    # One metric does both jobs unless the caller separates them — or the
+    # hand-picked order file does (see `_resolve_model_order`).
     metric = metric_list(metric)
-    model_order = metric if model_order is None else metric_list(model_order)
+    model_order = _resolve_model_order(model_order, metric)
 
     if isinstance(dataset, str):
         datasets = [d for d in dataset.split(",") if d]
@@ -1424,6 +1504,11 @@ def generate_report(dataset, metric=METRIC, results_folder="results",
         by_dataset[ds] = by_model
     if not by_dataset:
         return
+
+    # A hand-picked order also picks the models: everything else only ever
+    # sees the models it names.
+    if isinstance(model_order, NameOrder):
+        by_dataset = _filter_named_models(by_dataset, model_order)
 
     # Always fit the shared thresholds: the conformal threshold is defined by
     # the calibration sample it is fitted on, and this is where that fit happens
@@ -1459,9 +1544,13 @@ def _order_models(by_model, metric, threshold_method=THRESHOLD_METHOD, model_ord
 
     `metric` selects each model's best run (its hyperparameters); the ranking
     across models reads `model_order` from the `threshold_method` block, or
-    `metric` itself when no separate ordering is given (see `_rank_key`). Every
-    table and plot in a report uses this one order.
+    `metric` itself when no separate ordering is given (see `_rank_key`). A
+    hand-picked `NameOrder` is its own answer: its names in its order, limited
+    to the models present. Every table and plot in a report uses this one
+    order.
     """
+    if isinstance(model_order, NameOrder):
+        return [m for m in model_order if m in by_model]
     model_order = metric_list(metric if model_order is None else model_order)
     return sorted(
         by_model,
@@ -1528,8 +1617,12 @@ def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared
     plots_dir = os.path.join(dataset_dir, "plots")
 
     # One model order for every table and plot of this dataset. Unlabeled runs
-    # have no detections to rank, so they keep their own metric sort.
-    order = None if unlabeled else _order_rank(by_model, metric, threshold_method, model_order)
+    # have no detections to rank, so they keep their own metric sort — unless
+    # the order is hand-picked names, which need no detections.
+    if unlabeled and not isinstance(model_order, NameOrder):
+        order = None
+    else:
+        order = _order_rank(by_model, metric, threshold_method, model_order)
 
     _generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled, order=order)
     _generate_pdf(dataset, metric, by_model, pdf_path, unlabeled=unlabeled, order=order)

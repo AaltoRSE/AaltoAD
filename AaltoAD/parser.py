@@ -150,7 +150,9 @@ parser.add_argument('--model-order',
                     type=str,
                     default=None,
                     help="Comma-separated metrics that order the models, if they should be ordered by "
-                         "something other than --metric. Same spelling rules as --metric.")
+                         "something other than --metric. Same spelling rules as --metric. Without this "
+                         "flag, a hand-picked reports/model-order.json (a JSON array of model names) is "
+                         "used if present: the report then shows exactly those models in that order.")
 
 def parse_arguments():
 	"""Parse command-line arguments and return the args object."""
