@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
 
-from AaltoAD.report_figures import downsample, style
+from AaltoAD.report.report_figures import downsample, style
 
 
 def test_every_nth_step_series_keeps_multiples_of_step():

@@ -8,6 +8,7 @@ import pytest
 
 import AaltoAD.constants
 import AaltoAD.pot as pot
+import AaltoAD.report.report as report
 from AaltoAD.thresholds import conformal
 from AaltoAD.thresholds import oracle as oracle_mod
 from AaltoAD.thresholds import pot_fit
@@ -300,8 +301,6 @@ def test_load_cache_missing_path_returns_empty_dict(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_pooled_baselines_share_one_threshold_and_leave_incomplete_untouched(tmp_path, monkeypatch):
-    import AaltoAD.report as report
-
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
     # POT_INIT resolves by prefix, so "synthetic_a"/"synthetic_b" match "synthetic".
@@ -341,8 +340,6 @@ def test_pooled_baselines_share_one_threshold_and_leave_incomplete_untouched(tmp
 
 def test_separate_baselines_fit_each_dataset_on_its_own_calibration(tmp_path, monkeypatch):
     """The default: every dataset is thresholded on its own baseline."""
-    import AaltoAD.report as report
-
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
     ds_a_name, ds_b_name = "synthetic_a", "synthetic_b"
     _write_dataset(tmp_path, ds_a_name, seed=1)
@@ -370,7 +367,6 @@ def test_separate_baselines_fit_each_dataset_on_its_own_calibration(tmp_path, mo
 
 
 def test_apply_shared_thresholds_second_call_hits_cache(tmp_path, monkeypatch):
-    import AaltoAD.report as report
     from AaltoAD.thresholds import shared as shared_module
 
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
@@ -536,7 +532,6 @@ def test_conformal_metrics_scores_above_the_threshold():
 
 
 def test_select_shared_best_pools_f1_and_averages_other_metrics():
-    from AaltoAD import report
 
     def result(hp, latency, tp, fp, fn, tn):
         return {"applied_hyperparameters": {"n": hp},

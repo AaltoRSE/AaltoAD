@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-import AaltoAD.report as report
+import AaltoAD.report.report as report
 
 
 def test_method_name_normalises_dotted_metrics():
@@ -166,66 +166,52 @@ def test_rank_key_ignores_the_latency_of_a_model_that_never_fired():
     assert report._rank_key(detected, order, "conformal") < report._rank_key(never, order, "conformal")
 
 
-def _write_model_order(tmp_path, names):
-    reports = tmp_path / "reports"
-    reports.mkdir()
+def _write_model_order(tmp_path, dataset, names):
+    reports = tmp_path / "reports" / dataset
+    reports.mkdir(parents=True)
     (reports / "model-order.json").write_text(json.dumps(names))
 
 
-def test_resolve_model_order_reads_the_hand_picked_file(tmp_path, monkeypatch):
+def test_plot_model_selection_reads_each_datasets_own_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    _write_model_order(tmp_path, ["TranAD", "LSTM_AE", "USAD"])
-    order = report._resolve_model_order(None, ("f1",))
-    assert isinstance(order, report.NameOrder)
-    assert tuple(order) == ("TranAD", "LSTM_AE", "USAD")
+    _write_model_order(tmp_path, "ds1", ["B", "A"])
+    _write_model_order(tmp_path, "ds2", ["A"])
+    by_model = {"A": ["rA"], "B": ["rB"], "C": ["rC"]}
+    # Exactly the named models, in the file's order, per dataset.
+    assert report._plot_model_selection("ds1", by_model) == ["B", "A"]
+    assert report._plot_model_selection("ds2", by_model) == ["A"]
+    # No file: None, which leaves the plot to its usual top-n ranking.
+    assert report._plot_model_selection("ds3", by_model) is None
 
 
-def test_resolve_model_order_falls_back_to_the_metric_without_a_file(tmp_path, monkeypatch):
+def test_plot_model_selection_warns_about_and_skips_an_unknown_name(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    assert report._resolve_model_order(None, ("f1",)) == ("f1",)
+    _write_model_order(tmp_path, "ds1", ["B", "Missing", "A"])
+    kept = report._plot_model_selection("ds1", {"A": ["rA"], "B": ["rB"]})
+    assert kept == ["B", "A"]
+    out = capsys.readouterr().out
+    assert '"Missing"' in out and "no results" in out
+    assert '"A"' not in out and '"B"' not in out
 
 
-def test_explicit_model_order_bypasses_the_hand_picked_file(tmp_path, monkeypatch):
+def test_model_order_file_leaves_rankings_and_tables_alone(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    _write_model_order(tmp_path, ["TranAD"])
-    order = report._resolve_model_order("latency,fpr", ("f1",))
-    assert not isinstance(order, report.NameOrder)
-    assert order == ("p_latency", "fpr")
+    _write_model_order(tmp_path, "ds1", ["A"])
+    by_model = {
+        "A": [{"conformal": {"p_latency": 40, "fpr": 0.0, "f1": 0.9}}],
+        "B": [{"conformal": {"p_latency": 5, "fpr": 0.1, "f1": 0.5}}],
+    }
+    # The ranking helpers never read the file: every model stays, in metric order.
+    assert report._order_models(by_model, "latency,fpr,f1") == ["B", "A"]
+    assert report._order_rank(by_model, "latency,fpr,f1") == {"B": 0, "A": 1}
+    assert report._top_models(by_model, "latency,fpr,f1", n=2) == ["B", "A"]
 
 
 def test_read_model_order_file_rejects_anything_but_a_list_of_names(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    _write_model_order(tmp_path, {"order": ["TranAD"]})
+    _write_model_order(tmp_path, "ds1", {"order": ["TranAD"]})
     with pytest.raises(ValueError):
-        report._read_model_order_file()
-
-
-def test_order_models_follows_a_hand_picked_name_order():
-    by_model = {
-        "A": [{"conformal": {"p_latency": 40, "fpr": 0.0, "f1": 0.9}}],
-        "B": [{"conformal": {"p_latency": 5, "fpr": 0.1, "f1": 0.5}}],
-        "C": [{"conformal": {"p_latency": 1, "fpr": 0.0, "f1": 0.99}}],
-    }
-    order = report.NameOrder(("B", "A"))
-    # Exactly the named models, in the named order; C is left out even though
-    # it ranks best by every metric.
-    assert report._order_models(by_model, "latency,fpr,f1", model_order=order) == ["B", "A"]
-    assert report._top_models(by_model, "latency,fpr,f1", n=3, model_order=order) == ["B", "A"]
-    assert report._order_rank(by_model, "latency,fpr,f1", model_order=order) == {"B": 0, "A": 1}
-
-
-def test_filter_named_models_warns_about_and_skips_an_unknown_name(capsys):
-    by_dataset = {
-        "ds1": {"A": ["rA"], "B": ["rB"]},
-        "ds2": {"A": ["rA2"]},
-    }
-    names = report.NameOrder(("B", "Missing", "A"))
-    filtered = report._filter_named_models(by_dataset, names)
-    assert filtered == {"ds1": {"B": ["rB"], "A": ["rA"]}, "ds2": {"A": ["rA2"]}}
-    assert list(filtered["ds1"]) == ["B", "A"]
-    out = capsys.readouterr().out
-    assert '"Missing"' in out and "no results" in out
-    assert '"A"' not in out and '"B"' not in out
+        report._read_model_order_file(report._model_order_path("ds1"))
 
 
 def test_no_detection_and_its_dash():
