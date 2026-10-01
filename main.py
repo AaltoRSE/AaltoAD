@@ -11,7 +11,6 @@ import time
 from AaltoAD.parser import parser
 from AaltoAD import constants
 from AaltoAD.run_experiment import run_experiment, run_all
-from AaltoAD import report
 from AaltoAD.report import generate_report
 
 # Suppress matplotlib font warnings
@@ -603,12 +602,7 @@ def main():
 	args = parser.parse_args()
 
 	if args.report:
-		generate_report(args.dataset, metric=args.metric, n_plot_models=args.plot_models,
-		                threshold_method=report.method_name(args.threshold),
-		                model_order=args.model_order, conformal_q=args.conformal_q,
-		                pool_baselines=args.pool_baselines,
-		                downsample_mode=args.downsample, downsample_window=args.downsample_window,
-		                table_columns=args.table_columns, table_blocks=args.table_blocks)
+		generate_report(args)
 		return 0
 
 	# Determine which mode to run
