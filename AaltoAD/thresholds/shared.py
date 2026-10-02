@@ -53,25 +53,35 @@ def shared_threshold_blocks(results_by_dataset, q, level, conformal_q=None):
             return None
         per_dataset_scores[ds] = loaded
 
-    pooled_calib = np.concatenate([calib for calib, _, _ in per_dataset_scores.values()])
+    pooled_calib = np.concatenate(
+        [calib for calib, _, _ in per_dataset_scores.values()]
+    )
     pooled_test = np.concatenate([test for _, test, _ in per_dataset_scores.values()])
     pot_threshold = fit_pot_threshold(pooled_calib, pooled_test, q, level)
-    conformal_thr = conformal_threshold(pooled_calib, q if conformal_q is None else conformal_q)
+    conformal_thr = conformal_threshold(
+        pooled_calib, q if conformal_q is None else conformal_q
+    )
 
     test_list = [test for _, test, _ in per_dataset_scores.values()]
     label_list = [labels for _, _, labels in per_dataset_scores.values()]
-    oracle_threshold_raw = shared_oracle_threshold(test_list, label_list, expand_segments=False)
-    oracle_threshold_expanded = shared_oracle_threshold(test_list, label_list, expand_segments=True)
+    oracle_threshold_raw = shared_oracle_threshold(
+        test_list, label_list, expand_segments=False
+    )
+    oracle_threshold_expanded = shared_oracle_threshold(
+        test_list, label_list, expand_segments=True
+    )
 
     blocks = {}
     for ds, (_, test, labels) in per_dataset_scores.items():
         blocks[ds] = {
-            'conformal': conformal_metrics(test, labels, conformal_thr, False),
-            'conformal_expanded': conformal_metrics(test, labels, conformal_thr, True),
-            'pot': pot_metrics(test, labels, pot_threshold, False),
-            'pot_expanded': pot_metrics(test, labels, pot_threshold, True),
-            'oracle': oracle_metrics(test, labels, oracle_threshold_raw, False),
-            'oracle_expanded': oracle_metrics(test, labels, oracle_threshold_expanded, True),
+            "conformal": conformal_metrics(test, labels, conformal_thr, False),
+            "conformal_expanded": conformal_metrics(test, labels, conformal_thr, True),
+            "pot": pot_metrics(test, labels, pot_threshold, False),
+            "pot_expanded": pot_metrics(test, labels, pot_threshold, True),
+            "oracle": oracle_metrics(test, labels, oracle_threshold_raw, False),
+            "oracle_expanded": oracle_metrics(
+                test, labels, oracle_threshold_expanded, True
+            ),
         }
     return _to_jsonable(blocks)
 
@@ -118,7 +128,9 @@ def group_configurations(by_dataset, hp_key, pick_best):
             for r in results:
                 by_hp.setdefault(hp_key(r), []).append(r)
             for key, candidates in by_hp.items():
-                chosen = candidates[0] if len(candidates) == 1 else pick_best(candidates)
+                chosen = (
+                    candidates[0] if len(candidates) == 1 else pick_best(candidates)
+                )
                 groups.setdefault((model, key), {})[ds] = chosen
     return groups
 
@@ -135,15 +147,19 @@ def source_mtimes(results_by_dataset):
         src = r.get("_source_path")
         if not src:
             return None
-        paths = [src.replace("_results.json", "_labels.csv"),
-                 src.replace("_results.json", "_calib_scores.csv")]
+        paths = [
+            src.replace("_results.json", "_labels.csv"),
+            src.replace("_results.json", "_calib_scores.csv"),
+        ]
         if not all(os.path.exists(p) for p in paths):
             return None
         sources[ds] = [os.path.getmtime(p) for p in paths]
     return sources
 
 
-def shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, level, conformal_q=None):
+def shared_blocks_cached(
+    cache, model, hp_key, results_by_dataset, q, level, conformal_q=None
+):
     """Return shared-threshold blocks for one configuration, fitting only on a cache miss.
 
     A cache entry is reused when its recorded CSV modification times, block
@@ -157,18 +173,32 @@ def shared_blocks_cached(cache, model, hp_key, results_by_dataset, q, level, con
         return None
     key = cache_key(model, hp_key)
     entry = cache.get(key)
-    if (entry and entry.get("sources") == sources
-            and entry.get("version") == BLOCKS_VERSION
-            and entry.get("conformal_q") == conformal_q):
+    if (
+        entry
+        and entry.get("sources") == sources
+        and entry.get("version") == BLOCKS_VERSION
+        and entry.get("conformal_q") == conformal_q
+    ):
         return entry["blocks"]
     blocks = shared_threshold_blocks(results_by_dataset, q, level, conformal_q)
     if blocks is not None:
-        cache[key] = {"blocks": blocks, "sources": sources, "version": BLOCKS_VERSION,
-                      "conformal_q": conformal_q}
+        cache[key] = {
+            "blocks": blocks,
+            "sources": sources,
+            "version": BLOCKS_VERSION,
+            "conformal_q": conformal_q,
+        }
     return blocks
 
 
-METHOD_BLOCKS = ("conformal", "conformal_expanded", "pot", "pot_expanded", "oracle", "oracle_expanded")
+METHOD_BLOCKS = (
+    "conformal",
+    "conformal_expanded",
+    "pot",
+    "pot_expanded",
+    "oracle",
+    "oracle_expanded",
+)
 
 # A conformal threshold is defined by the calibration sample it is fitted on,
 # and the report fits it on the pooled calibration of every dataset it covers.
@@ -187,7 +217,9 @@ def apply_blocks(results_by_dataset, blocks):
     level, since they have no local counterpart.
     """
     for ds, r in results_by_dataset.items():
-        r["shared"] = {name: blocks[ds][name] for name in METHOD_BLOCKS if name in blocks[ds]}
+        r["shared"] = {
+            name: blocks[ds][name] for name in METHOD_BLOCKS if name in blocks[ds]
+        }
         r["shared_threshold"] = True
         for name in SHARED_ONLY_BLOCKS:
             if name in blocks[ds]:

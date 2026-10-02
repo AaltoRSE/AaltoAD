@@ -28,7 +28,10 @@ def load_run_scores(result):
         calib_df = pd.read_csv(calib_path)
     except (OSError, ValueError):
         return None
-    if "prediction_error" not in labels_df.columns or "ground_truth" not in labels_df.columns:
+    if (
+        "prediction_error" not in labels_df.columns
+        or "ground_truth" not in labels_df.columns
+    ):
         return None
     if "prediction_error" not in calib_df.columns:
         return None

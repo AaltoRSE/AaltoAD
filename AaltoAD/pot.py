@@ -1,15 +1,22 @@
 import numpy as np
 
 from AaltoAD import constants
-from AaltoAD.thresholds.point_adjust import calc_point2point, adjust_predicts, segment_latency
+from AaltoAD.thresholds.point_adjust import (
+    calc_point2point,
+    adjust_predicts,
+    segment_latency,
+)
 from AaltoAD.thresholds.pot_fit import fit_pot_threshold, pot_metrics
+
 
 def calc_seq(score, label, threshold, calc_latency=False):
     """
     Calculate f1 score for a score sequence
     """
     if calc_latency:
-        predict, latency = adjust_predicts(score, label, threshold, calc_latency=calc_latency)
+        predict, latency = adjust_predicts(
+            score, label, threshold, calc_latency=calc_latency
+        )
         t = list(calc_point2point(predict, label))
         t.append(latency)
         return t
@@ -32,7 +39,7 @@ def bf_search(score, label, start, end=None, step_num=1, display_freq=1, verbose
     if verbose:
         print("search range: ", search_lower_bound, search_lower_bound + search_range)
     threshold = search_lower_bound
-    m = (-1., -1., -1.)
+    m = (-1.0, -1.0, -1.0)
     m_t = 0.0
     for i in range(search_step):
         threshold += search_range / float(search_step)
@@ -65,7 +72,7 @@ def pot_eval(init_score, score, label, q=1e-5, expand_segments=False):
     """
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
         pred = np.zeros_like(label)
-        return pot_metrics(score, label, float('nan'), expand_segments), pred
+        return pot_metrics(score, label, float("nan"), expand_segments), pred
 
     level = constants.level
     pot_th = fit_pot_threshold(init_score, score, q, level)

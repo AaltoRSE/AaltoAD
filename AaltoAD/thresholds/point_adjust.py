@@ -30,10 +30,7 @@ def calc_point2point(predict, actual):
 
 
 # the below function is taken from OmniAnomaly code base directly
-def adjust_predicts(score, label,
-                    threshold=None,
-                    pred=None,
-                    calc_latency=False):
+def adjust_predicts(score, label, threshold=None, pred=None, calc_latency=False):
     """
     Calculate adjusted predict labels using given `score`, `threshold` (or given `pred`) and `label`.
     Args:
@@ -60,15 +57,15 @@ def adjust_predicts(score, label,
     anomaly_count = 0
     for i in range(len(score)):
         if actual[i] and predict[i] and not anomaly_state:
-                anomaly_state = True
-                anomaly_count += 1
-                for j in range(i, 0, -1):
-                    if not actual[j]:
-                        break
-                    else:
-                        if not predict[j]:
-                            predict[j] = True
-                            latency += 1
+            anomaly_state = True
+            anomaly_count += 1
+            for j in range(i, 0, -1):
+                if not actual[j]:
+                    break
+                else:
+                    if not predict[j]:
+                        predict[j] = True
+                        latency += 1
         elif not actual[i]:
             anomaly_state = False
         if anomaly_state:

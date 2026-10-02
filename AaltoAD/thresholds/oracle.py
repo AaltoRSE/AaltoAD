@@ -33,13 +33,16 @@ def oracle_metrics(scores, labels, threshold, expand_segments):
     fpr = fp / (fp + tn) if (fp + tn) else 0.0
     p_latency = segment_latency(pred, labels)
     return {
-        'threshold': float(threshold),
-        'f1': float(f1),
-        'precision': float(prec),
-        'recall': float(rec),
-        'fpr': float(fpr),
-        'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
-        'p_latency': p_latency,
+        "threshold": float(threshold),
+        "f1": float(f1),
+        "precision": float(prec),
+        "recall": float(rec),
+        "fpr": float(fpr),
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "tn": tn,
+        "p_latency": p_latency,
     }
 
 
@@ -74,7 +77,7 @@ def _raw_counts(scores, labels, candidates):
         return zeros, zeros
     # suffix_tp[i] = sum(l_asc[i:]), with suffix_tp[n] = 0
     suffix_tp = np.concatenate([np.cumsum(l_asc[::-1])[::-1], [0.0]])
-    idx = np.searchsorted(s_asc, candidates, side='left')
+    idx = np.searchsorted(s_asc, candidates, side="left")
     tp = suffix_tp[idx]
     total = n - idx
     fp = total - tp
@@ -110,7 +113,7 @@ def _expanded_counts(scores, labels, candidates):
         m_asc = seg_max[order]
         l_asc = seg_len[order]
         suffix_len = np.concatenate([np.cumsum(l_asc[::-1])[::-1], [0.0]])
-        idx = np.searchsorted(m_asc, candidates, side='left')
+        idx = np.searchsorted(m_asc, candidates, side="left")
         tp = suffix_len[idx]
     else:
         tp = np.zeros(len(candidates))
@@ -134,7 +137,9 @@ def shared_oracle_threshold(scores_list, labels_list, expand_segments):
     This function only searches; call ``oracle_metrics`` with the returned
     threshold for the exact, authoritative metrics.
     """
-    candidates = np.unique(np.concatenate([np.asarray(s, dtype=float) for s in scores_list]))
+    candidates = np.unique(
+        np.concatenate([np.asarray(s, dtype=float) for s in scores_list])
+    )
     total_tp = np.zeros(len(candidates))
     total_fp = np.zeros(len(candidates))
     total_fn = np.zeros(len(candidates))

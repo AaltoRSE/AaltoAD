@@ -2,7 +2,6 @@
 
 from AaltoAD import constants
 
-
 # Option strings for the CLI
 METHODS = ["pot", "oracle", "conformal"]
 

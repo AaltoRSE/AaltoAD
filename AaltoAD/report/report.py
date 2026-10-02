@@ -28,8 +28,12 @@ def _load_results(dataset, results_folder="results"):
     return by_model
 
 
-def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q,
-                             pool_baselines=cli.POOL_BASELINES):
+def _apply_shared_thresholds(
+    by_dataset,
+    results_folder,
+    conformal_q=constants.CONFORMAL_Q,
+    pool_baselines=cli.POOL_BASELINES,
+):
     """Attach conformal/pot/oracle blocks to every result, in place.
 
     With `pool_baselines`, one threshold per configuration is fit on the
@@ -47,7 +51,9 @@ def _apply_shared_thresholds(by_dataset, results_folder, conformal_q=constants.C
     _fit_threshold_blocks(by_dataset, results_folder, conformal_q)
 
 
-def _fit_threshold_blocks(by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q):
+def _fit_threshold_blocks(
+    by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q
+):
     """Fit and attach threshold blocks over the given datasets, pooling their calibration.
 
     Only configurations (model + hyperparameters) with a run in every dataset
@@ -65,9 +71,14 @@ def _fit_threshold_blocks(by_dataset, results_folder, conformal_q=constants.CONF
 
     datasets = list(by_dataset)
     groups = shared.group_configurations(
-        by_dataset, metrics._hp_key, lambda rs: metrics._best_result(rs, "calibration_loss"))
+        by_dataset,
+        metrics._hp_key,
+        lambda rs: metrics._best_result(rs, "calibration_loss"),
+    )
     complete = {k: v for k, v in groups.items() if set(v) == set(datasets)}
-    print(f"Fitting thresholds for {len(complete)} configurations on the calibration of {datasets}")
+    print(
+        f"Fitting thresholds for {len(complete)} configurations on the calibration of {datasets}"
+    )
 
     cache_file = shared.cache_path(results_folder, datasets)
     cache = shared.load_cache(cache_file)
@@ -76,11 +87,18 @@ def _fit_threshold_blocks(by_dataset, results_folder, conformal_q=constants.CONF
         if set(members) != set(datasets):
             skipped_count[model] = skipped_count.get(model, 0) + 1
 
-    for (model, hp_key), results_by_dataset in tqdm(complete.items(), desc="shared thresholds", unit="config"):
-        q = next(iter(results_by_dataset.values())).get("applied_hyperparameters", {}).get("q", 1e-5)
+    for (model, hp_key), results_by_dataset in tqdm(
+        complete.items(), desc="shared thresholds", unit="config"
+    ):
+        q = (
+            next(iter(results_by_dataset.values()))
+            .get("applied_hyperparameters", {})
+            .get("q", 1e-5)
+        )
         constants.initialize(datasets[0], model)
-        blocks = shared.shared_blocks_cached(cache, model, hp_key, results_by_dataset, q,
-                                             constants.level, conformal_q)
+        blocks = shared.shared_blocks_cached(
+            cache, model, hp_key, results_by_dataset, q, constants.level, conformal_q
+        )
         if blocks is None:
             skipped_count[model] = skipped_count.get(model, 0) + 1
             continue
@@ -89,8 +107,10 @@ def _fit_threshold_blocks(by_dataset, results_folder, conformal_q=constants.CONF
 
     shared.save_cache(cache_file, cache)
     for model in sorted(set(shared_count) | set(skipped_count)):
-        print(f"  {model}: {shared_count.get(model, 0)} configuration(s) shared, "
-              f"{skipped_count.get(model, 0)} skipped (missing runs or CSVs)")
+        print(
+            f"  {model}: {shared_count.get(model, 0)} configuration(s) shared, "
+            f"{skipped_count.get(model, 0)} skipped (missing runs or CSVs)"
+        )
 
 
 def generate_report(args, results_folder="results"):
@@ -133,7 +153,9 @@ def generate_report(args, results_folder="results"):
     """
     # One metric does both jobs unless the caller separates them.
     metric = cli.metric_list(args.metric)
-    model_order = metric if args.model_order is None else cli.metric_list(args.model_order)
+    model_order = (
+        metric if args.model_order is None else cli.metric_list(args.model_order)
+    )
     threshold_method = cli.method_name(args.threshold)
     n_plot_models = args.plot_models
     conformal_q = args.conformal_q
@@ -170,29 +192,56 @@ def generate_report(args, results_folder="results"):
     # `plot._plot_model_selection`). The combined report is a single pooled
     # ranking, so it gets the pooled top list, or its own hand-picked file.
     for ds in by_dataset:
-        _generate_dataset_report(ds, metric, selected[ds],
-                                 plot_models=plot._plot_model_selection(ds, selected[ds]),
-                                 shared_plots=len(by_dataset) > 1, n_plot_models=n_plot_models,
-                                 threshold_method=threshold_method, model_order=model_order,
-                                 downsample_mode=downsample_mode, downsample_window=downsample_window,
-                                 table_columns=table_columns, table_blocks=table_blocks)
+        _generate_dataset_report(
+            ds,
+            metric,
+            selected[ds],
+            plot_models=plot._plot_model_selection(ds, selected[ds]),
+            shared_plots=len(by_dataset) > 1,
+            n_plot_models=n_plot_models,
+            threshold_method=threshold_method,
+            model_order=model_order,
+            downsample_mode=downsample_mode,
+            downsample_window=downsample_window,
+            table_columns=table_columns,
+            table_blocks=table_blocks,
+        )
     if len(by_dataset) > 1:
-        tables._generate_overview_latex(selected, metric, "reports", threshold_method=threshold_method,
-                                 model_order=model_order)
+        tables._generate_overview_latex(
+            selected,
+            metric,
+            "reports",
+            threshold_method=threshold_method,
+            model_order=model_order,
+        )
         pooled = _pooled_by_model(selected)
         plot_models = plot._plot_model_selection("combined", pooled)
         if plot_models is None:
-            plot_models = _top_models(pooled, metric, n=n_plot_models,
-                                      threshold_method=threshold_method,
-                                      model_order=model_order)
-        _generate_dataset_report("combined", metric, pooled, plot_models=plot_models,
-                                 n_plot_models=n_plot_models, threshold_method=threshold_method,
-                                 model_order=model_order, downsample_mode=downsample_mode,
-                                 downsample_window=downsample_window, table_columns=table_columns,
-                                 table_blocks=table_blocks)
+            plot_models = _top_models(
+                pooled,
+                metric,
+                n=n_plot_models,
+                threshold_method=threshold_method,
+                model_order=model_order,
+            )
+        _generate_dataset_report(
+            "combined",
+            metric,
+            pooled,
+            plot_models=plot_models,
+            n_plot_models=n_plot_models,
+            threshold_method=threshold_method,
+            model_order=model_order,
+            downsample_mode=downsample_mode,
+            downsample_window=downsample_window,
+            table_columns=table_columns,
+            table_blocks=table_blocks,
+        )
 
 
-def _order_models(by_model, metric, threshold_method=cli.THRESHOLD_METHOD, model_order=None):
+def _order_models(
+    by_model, metric, threshold_method=cli.THRESHOLD_METHOD, model_order=None
+):
     """Model names in the report's display order, best first.
 
     `metric` selects each model's best run (its hyperparameters); the ranking
@@ -203,17 +252,33 @@ def _order_models(by_model, metric, threshold_method=cli.THRESHOLD_METHOD, model
     model_order = cli.metric_list(metric if model_order is None else model_order)
     return sorted(
         by_model,
-        key=lambda m: metrics._rank_key(metrics._best_result(by_model[m], metric, threshold_method), model_order, threshold_method),
+        key=lambda m: metrics._rank_key(
+            metrics._best_result(by_model[m], metric, threshold_method),
+            model_order,
+            threshold_method,
+        ),
     )
 
 
-def _order_rank(by_model, metric, threshold_method=cli.THRESHOLD_METHOD, model_order=None):
+def _order_rank(
+    by_model, metric, threshold_method=cli.THRESHOLD_METHOD, model_order=None
+):
     """``{model: position}`` in the display order, for sorting already-built table rows."""
-    return {m: i for i, m in enumerate(_order_models(by_model, metric, threshold_method, model_order))}
+    return {
+        m: i
+        for i, m in enumerate(
+            _order_models(by_model, metric, threshold_method, model_order)
+        )
+    }
 
 
-def _top_models(by_model, metric, n=plot.DEFAULT_PLOT_MODELS, threshold_method=cli.THRESHOLD_METHOD,
-                model_order=None):
+def _top_models(
+    by_model,
+    metric,
+    n=plot.DEFAULT_PLOT_MODELS,
+    threshold_method=cli.THRESHOLD_METHOD,
+    model_order=None,
+):
     """Names of the `n` models a plot should show, in `_order_models` order."""
     return _order_models(by_model, metric, threshold_method, model_order)[:n]
 
@@ -223,16 +288,29 @@ def _pooled_by_model(selected):
     models = {m for by_model in selected.values() for m in by_model}
     pooled = {}
     for model in sorted(models):
-        combined = pooled.pooled_result([r for by_model in selected.values() for r in by_model.get(model, [])], blocks_key="shared")
+        combined = pooled.pooled_result(
+            [r for by_model in selected.values() for r in by_model.get(model, [])],
+            blocks_key="shared",
+        )
         if combined:
             pooled[model] = [combined]
     return pooled
 
 
-def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared_plots=False,
-                             n_plot_models=plot.DEFAULT_PLOT_MODELS, threshold_method=cli.THRESHOLD_METHOD,
-                             model_order=None, downsample_mode=plot.DOWNSAMPLE, downsample_window=None,
-                             table_columns=cli.TABLE_COLUMNS, table_blocks=cli.TABLE_BLOCKS):
+def _generate_dataset_report(
+    dataset,
+    metric,
+    by_model,
+    plot_models=None,
+    shared_plots=False,
+    n_plot_models=plot.DEFAULT_PLOT_MODELS,
+    threshold_method=cli.THRESHOLD_METHOD,
+    model_order=None,
+    downsample_mode=plot.DOWNSAMPLE,
+    downsample_window=None,
+    table_columns=cli.TABLE_COLUMNS,
+    table_blocks=cli.TABLE_BLOCKS,
+):
     """Write all report files for one dataset from its (pre-selected) results.
 
     `plot_models` fixes the models shown in the overlay plot (see
@@ -265,28 +343,76 @@ def _generate_dataset_report(dataset, metric, by_model, plot_models=None, shared
 
     # One model order for every table and plot of this dataset. Unlabeled runs
     # have no detections to rank, so they keep their own metric sort.
-    order = None if unlabeled else _order_rank(by_model, metric, threshold_method, model_order)
+    order = (
+        None
+        if unlabeled
+        else _order_rank(by_model, metric, threshold_method, model_order)
+    )
 
-    tables._generate_html(dataset, metric, by_model, html_path, unlabeled=unlabeled, order=order)
-    tables._generate_pdf(dataset, metric, by_model, pdf_path, unlabeled=unlabeled, order=order)
-    tables._generate_csv(dataset, metric, by_model, csv_path, unlabeled=unlabeled, order=order)
+    tables._generate_html(
+        dataset, metric, by_model, html_path, unlabeled=unlabeled, order=order
+    )
+    tables._generate_pdf(
+        dataset, metric, by_model, pdf_path, unlabeled=unlabeled, order=order
+    )
+    tables._generate_csv(
+        dataset, metric, by_model, csv_path, unlabeled=unlabeled, order=order
+    )
     tables._generate_hp_markdown(dataset, metric, by_model, hp_path, order=order)
-    tables._generate_latex(dataset, metric, by_model, tex_path, unlabeled=unlabeled,
-                    threshold_method=threshold_method, order=order, columns=table_columns,
-                    blocks=table_blocks)
-    plot._generate_prediction_error_plot(dataset, metric, by_model, plot_path, models=plot_models,
-                                    n_models=n_plot_models, threshold_method=threshold_method,
-                                    model_order=model_order, downsample_mode=downsample_mode,
-                                    downsample_window=downsample_window)
-    plot._generate_model_plots(dataset, metric, by_model, plots_dir, threshold_method=threshold_method,
-                          downsample_mode=downsample_mode, downsample_window=downsample_window)
+    tables._generate_latex(
+        dataset,
+        metric,
+        by_model,
+        tex_path,
+        unlabeled=unlabeled,
+        threshold_method=threshold_method,
+        order=order,
+        columns=table_columns,
+        blocks=table_blocks,
+    )
+    plot._generate_prediction_error_plot(
+        dataset,
+        metric,
+        by_model,
+        plot_path,
+        models=plot_models,
+        n_models=n_plot_models,
+        threshold_method=threshold_method,
+        model_order=model_order,
+        downsample_mode=downsample_mode,
+        downsample_window=downsample_window,
+    )
+    plot._generate_model_plots(
+        dataset,
+        metric,
+        by_model,
+        plots_dir,
+        threshold_method=threshold_method,
+        downsample_mode=downsample_mode,
+        downsample_window=downsample_window,
+    )
     if shared_plots:
         shared_plot_path = os.path.join(dataset_dir, "prediction_errors_shared.png")
-        plot._generate_prediction_error_plot(dataset, metric, by_model, shared_plot_path, models=plot_models,
-                                        blocks_key="shared", n_models=n_plot_models,
-                                        threshold_method=threshold_method, model_order=model_order,
-                                        downsample_mode=downsample_mode,
-                                        downsample_window=downsample_window)
-        plot._generate_model_plots(dataset, metric, by_model, os.path.join(dataset_dir, "plots_shared"),
-                              blocks_key="shared", threshold_method=threshold_method,
-                              downsample_mode=downsample_mode, downsample_window=downsample_window)
+        plot._generate_prediction_error_plot(
+            dataset,
+            metric,
+            by_model,
+            shared_plot_path,
+            models=plot_models,
+            blocks_key="shared",
+            n_models=n_plot_models,
+            threshold_method=threshold_method,
+            model_order=model_order,
+            downsample_mode=downsample_mode,
+            downsample_window=downsample_window,
+        )
+        plot._generate_model_plots(
+            dataset,
+            metric,
+            by_model,
+            os.path.join(dataset_dir, "plots_shared"),
+            blocks_key="shared",
+            threshold_method=threshold_method,
+            downsample_mode=downsample_mode,
+            downsample_window=downsample_window,
+        )

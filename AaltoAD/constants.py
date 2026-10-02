@@ -20,7 +20,6 @@ POT_INIT = {
 }
 
 
-
 MERLIN_PERCENTILES = {
     "SMD": (98, 2000),
     "synthetic": (95, 10),
@@ -105,7 +104,9 @@ def initialize(dataset: str, model: str):
     if dataset in POT_INIT:
         tail_key = dataset
     else:
-        prefix_matches = [key for key in POT_INIT if key != "default" and dataset.startswith(key)]
+        prefix_matches = [
+            key for key in POT_INIT if key != "default" and dataset.startswith(key)
+        ]
         tail_key = max(prefix_matches, key=len) if prefix_matches else "default"
     level = POT_INIT[tail_key]
 

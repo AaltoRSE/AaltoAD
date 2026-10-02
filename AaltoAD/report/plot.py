@@ -15,7 +15,6 @@ from AaltoAD.report import cli, metrics
 from AaltoAD.report.report_figures import downsample, style
 from AaltoAD.thresholds import shared
 
-
 # How many models the prediction-error overlay shows. Kept small so the overlay
 # stays readable; --plot-models overrides it.
 DEFAULT_PLOT_MODELS = constants.PLOT_MODELS
@@ -88,10 +87,19 @@ def _clip_for_plot(values):
     return values.clip(upper=PLOT_VALUE_CLIP)
 
 
-def _generate_prediction_error_plot(dataset, metric, by_model, output_path, models=None, blocks_key=None,
-                                    n_models=DEFAULT_PLOT_MODELS, threshold_method=cli.THRESHOLD_METHOD,
-                                    model_order=None, downsample_mode=DOWNSAMPLE,
-                                    downsample_window=None):
+def _generate_prediction_error_plot(
+    dataset,
+    metric,
+    by_model,
+    output_path,
+    models=None,
+    blocks_key=None,
+    n_models=DEFAULT_PLOT_MODELS,
+    threshold_method=cli.THRESHOLD_METHOD,
+    model_order=None,
+    downsample_mode=DOWNSAMPLE,
+    downsample_window=None,
+):
     """Overlay each model's best-result prediction_error for a dataset.
 
     `models`, when given, fixes which models are plotted (and their order)
@@ -129,9 +137,13 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
             continue
         # Scale by the report's threshold, so it maps to 1 for every model.
         thr_source = shared.with_blocks(best, blocks_key) if blocks_key else best
-        threshold = _plot_threshold(thr_source, threshold_method) if thr_source else None
+        threshold = (
+            _plot_threshold(thr_source, threshold_method) if thr_source else None
+        )
         if not threshold:
-            print(f"No usable {threshold_method} threshold for {model}; skipping in plot.")
+            print(
+                f"No usable {threshold_method} threshold for {model}; skipping in plot."
+            )
             continue
         test_scores = df["prediction_error"].reset_index(drop=True) / threshold
         # Prepend calibration scores (negative steps) when the sidecar CSV
@@ -140,10 +152,12 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
         if os.path.exists(calib_path):
             try:
                 calib = pd.read_csv(calib_path)["prediction_error"] / threshold
-                test_scores = pd.concat([
-                    pd.Series(calib.values, index=range(-len(calib), 0)),
-                    test_scores,
-                ])
+                test_scores = pd.concat(
+                    [
+                        pd.Series(calib.values, index=range(-len(calib), 0)),
+                        test_scores,
+                    ]
+                )
             except (ValueError, OSError, KeyError):
                 pass
         series[model] = test_scores
@@ -165,7 +179,9 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
     elif len(series) > n_models:
         keep = sorted(
             series,
-            key=lambda m: metrics._rank_key(best_by_model[m], model_order, threshold_method),
+            key=lambda m: metrics._rank_key(
+                best_by_model[m], model_order, threshold_method
+            ),
         )[:n_models]
         series = {m: series[m] for m in keep}
 
@@ -194,9 +210,16 @@ def _generate_prediction_error_plot(dataset, metric, by_model, output_path, mode
     style.save_png(fig, output_path)
 
 
-def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None,
-                          threshold_method=cli.THRESHOLD_METHOD, downsample_mode=DOWNSAMPLE,
-                          downsample_window=None):
+def _generate_model_plots(
+    dataset,
+    metric,
+    by_model,
+    output_dir,
+    blocks_key=None,
+    threshold_method=cli.THRESHOLD_METHOD,
+    downsample_mode=DOWNSAMPLE,
+    downsample_window=None,
+):
     """Plot the best result per model as prediction error vs. threshold.
 
     For each model, take its best result (by `metric`), read the matching
@@ -244,10 +267,12 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
             try:
                 calib = pd.read_csv(calib_path)["prediction_error"] / threshold
                 n_calib = len(calib)
-                series = pd.concat([
-                    pd.Series(calib.values, index=range(-n_calib, 0)),
-                    series,
-                ])
+                series = pd.concat(
+                    [
+                        pd.Series(calib.values, index=range(-n_calib, 0)),
+                        series,
+                    ]
+                )
             except (ValueError, OSError, KeyError):
                 n_calib = 0
 
@@ -264,14 +289,18 @@ def _generate_model_plots(dataset, metric, by_model, output_dir, blocks_key=None
         # report is generated for is the red line the series is scaled by.
         for name, value in reference.items():
             color = "tab:red" if name == threshold_method else "grey"
-            style.draw_threshold_line(ax, value / threshold, f"{name} threshold", color=color)
+            style.draw_threshold_line(
+                ax, value / threshold, f"{name} threshold", color=color
+            )
         if "ground_truth" in df.columns:
             style.shade_anomalies(ax, df["ground_truth"])
         if n_calib:
             style.mark_calibration_end(ax)
         ax.set_xlabel("time step")
         ax.set_ylabel(f"prediction error / {threshold_method} threshold")
-        ax.set_title(f"{model} — {dataset}" + (" (shared threshold)" if blocks_key else ""))
+        ax.set_title(
+            f"{model} — {dataset}" + (" (shared threshold)" if blocks_key else "")
+        )
         style.legend_below(ax)
         out_path = os.path.join(output_dir, f"{model}.png")
         style.save_png(fig, out_path)
@@ -319,5 +348,7 @@ def _plot_model_selection(dataset, by_model):
         if name in by_model:
             kept.append(name)
         else:
-            print(f'Warning: model "{name}" in {_model_order_path(dataset)} has no results; skipping.')
+            print(
+                f'Warning: model "{name}" in {_model_order_path(dataset)} has no results; skipping.'
+            )
     return kept

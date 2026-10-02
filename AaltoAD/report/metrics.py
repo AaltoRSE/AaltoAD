@@ -5,11 +5,13 @@ import math
 
 from AaltoAD.report import cli
 
-
 LOWER_IS_BETTER = {"p_latency", "fpr", "threshold", "calibration_loss"}
 
 
-TOP_LEVEL_METRICS = {"calibration_loss", "eval_time"} # metrics that are not in the method block
+TOP_LEVEL_METRICS = {
+    "calibration_loss",
+    "eval_time",
+}  # metrics that are not in the method block
 
 
 SUMMARY_SORT_METRIC = "pot.f1"
@@ -37,7 +39,11 @@ def _no_detection(result, method):
 
 def _fmt_metric(result, path, method):
     """Format one metric cell, as an em dash for a latency that is really a non-detection."""
-    if isinstance(path, str) and path.endswith(".p_latency") and _no_detection(result, method):
+    if (
+        isinstance(path, str)
+        and path.endswith(".p_latency")
+        and _no_detection(result, method)
+    ):
         return "---"
     return _fmt(_col_value(result, path))
 
@@ -147,7 +153,9 @@ def _select_shared_best(by_dataset, metric, method=None):
         for model, results in by_model.items():
             for r in results:
                 slot = per_model.setdefault(model, {}).setdefault(_hp_key(r), {})
-                if ds not in slot or _rank_key(r, metric, method) < _rank_key(slot[ds], metric, method):
+                if ds not in slot or _rank_key(r, metric, method) < _rank_key(
+                    slot[ds], metric, method
+                ):
                     slot[ds] = r
 
     selected = {ds: {} for ds in datasets}
@@ -286,7 +294,6 @@ def _col_value(result, path_or_fn):
     if callable(path_or_fn):
         return path_or_fn(result)
     return _get(result, path_or_fn)
-
 
 
 def _table_sort_metric(metric):

@@ -387,7 +387,9 @@ def load_nettraffic(
     keep = train.max(axis=0) != train.min(axis=0)
     if not keep.all():
         constant_cols = [c for c, k in zip(canonical_cols, keep) if not k]
-        print(f"  zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}")
+        print(
+            f"  zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}"
+        )
         for part in (train, calib, test, valid):
             if part.size:
                 part[:, ~keep] = 0.0

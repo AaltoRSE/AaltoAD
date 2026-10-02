@@ -2,10 +2,21 @@
 
 import matplotlib.pyplot as plt
 
-PALETTE = [f"tab:{name}" for name in (
-    "blue", "orange", "green", "red", "purple",
-    "brown", "pink", "gray", "olive", "cyan",
-)]
+PALETTE = [
+    f"tab:{name}"
+    for name in (
+        "blue",
+        "orange",
+        "green",
+        "red",
+        "purple",
+        "brown",
+        "pink",
+        "gray",
+        "olive",
+        "cyan",
+    )
+]
 FIGSIZE = (14, 5.4)
 DPI = 300
 LINEWIDTH = 1.5
@@ -48,8 +59,17 @@ def plot_bands(ax, low, high):
         lo = low[name] if hasattr(low, "columns") else low
         hi = high[name] if hasattr(high, "columns") else high
         color = PALETTE[i % len(PALETTE)]
-        ax.fill_between(hi.index, lo.values, hi.values, color=color, alpha=0.3, linewidth=0)
-        ax.plot(hi.index, hi.values, color=color, linestyle="-", linewidth=LINEWIDTH, label=name)
+        ax.fill_between(
+            hi.index, lo.values, hi.values, color=color, alpha=0.3, linewidth=0
+        )
+        ax.plot(
+            hi.index,
+            hi.values,
+            color=color,
+            linestyle="-",
+            linewidth=LINEWIDTH,
+            label=name,
+        )
 
 
 def draw_threshold_line(ax, y, label, color="tab:red", linestyle="--"):

@@ -2,7 +2,14 @@
 
 import copy
 
-METHOD_BLOCKS = ("conformal", "conformal_expanded", "pot", "pot_expanded", "oracle", "oracle_expanded")
+METHOD_BLOCKS = (
+    "conformal",
+    "conformal_expanded",
+    "pot",
+    "pot_expanded",
+    "oracle",
+    "oracle_expanded",
+)
 
 
 def _count(block, name):
@@ -20,14 +27,19 @@ def _pooled_block(blocks):
     """
     first = blocks[0]
     upper = "TP" in first
-    tp, fp, fn, tn = (sum(_count(b, k) for b in blocks) for k in ("TP", "FP", "FN", "TN"))
+    tp, fp, fn, tn = (
+        sum(_count(b, k) for b in blocks) for k in ("TP", "FP", "FN", "TN")
+    )
     prec = tp / (tp + fp) if (tp + fp) else 0.0
     rec = tp / (tp + fn) if (tp + fn) else 0.0
     f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
     fpr = fp / (fp + tn) if (fp + tn) else 0.0
     latencies = [b["p_latency"] for b in blocks if b.get("p_latency") is not None]
     out = {
-        "f1": f1, "precision": prec, "recall": rec, "fpr": fpr,
+        "f1": f1,
+        "precision": prec,
+        "recall": rec,
+        "fpr": fpr,
         "threshold": first.get("threshold"),
         "p_latency": sum(latencies) / len(latencies) if latencies else None,
     }
@@ -55,17 +67,23 @@ def pooled_result(results, blocks_key=None):
         return None
     if blocks_key:
         from AaltoAD.thresholds.shared import with_blocks
+
         results = [with_blocks(r, blocks_key) or r for r in results]
     first = results[0]
     out = {
         "model": first.get("model"),
-        "applied_hyperparameters": copy.deepcopy(first.get("applied_hyperparameters", {})),
+        "applied_hyperparameters": copy.deepcopy(
+            first.get("applied_hyperparameters", {})
+        ),
         "dataset": "combined",
         "datasets": [r.get("dataset") for r in results],
         "experiment_id": [r.get("experiment_id") for r in results],
         "shared_threshold": all(r.get("shared_threshold", False) for r in results),
     }
-    for key, agg in (("calibration_loss", lambda v: sum(v) / len(v)), ("eval_time", sum)):
+    for key, agg in (
+        ("calibration_loss", lambda v: sum(v) / len(v)),
+        ("eval_time", sum),
+    ):
         values = [r[key] for r in results if isinstance(r.get(key), (int, float))]
         if values:
             out[key] = agg(values)
