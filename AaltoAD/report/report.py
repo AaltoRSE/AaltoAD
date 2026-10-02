@@ -1,116 +1,9 @@
 """Generate dataset reports (HTML, PDF, CSV, LaTeX) from sweep result JSON files,
 selecting and ordering each model's runs by metric."""
 
-import json
 import os
 
-from glob import glob
-from tqdm import tqdm
-
-from AaltoAD import constants
-from AaltoAD.report import cli, metrics, plot, tables
-from AaltoAD.thresholds import shared
-
-
-def _load_results(dataset, results_folder="results"):
-    """Load all result JSONs for a dataset, grouped by model."""
-    pattern = os.path.join(results_folder, dataset, "*_results.json")
-    files = glob(pattern)
-    by_model = {}
-    for path in files:
-        with open(path) as f:
-            data = json.load(f)
-        # Remember where this result came from so per-model plots can locate the
-        # matching *_labels.csv (same path with _results.json -> _labels.csv).
-        data["_source_path"] = path
-        model = data.get("model", "unknown")
-        by_model.setdefault(model, []).append(data)
-    return by_model
-
-
-def _apply_shared_thresholds(
-    by_dataset,
-    results_folder,
-    conformal_q=constants.CONFORMAL_Q,
-    pool_baselines=cli.POOL_BASELINES,
-):
-    """Attach conformal/pot/oracle blocks to every result, in place.
-
-    With `pool_baselines`, one threshold per configuration is fit on the
-    calibration data of every dataset pooled together — which assumes the
-    baselines are alike, and lets a contaminated one set the threshold for all
-    the rest. By default each dataset is fit on its own baseline instead, by
-    running the same machinery once per dataset; the blocks still land where
-    the pooled ones would, so the combined report and the shared plots keep
-    working on separately fitted thresholds.
-    """
-    if not pool_baselines and len(by_dataset) > 1:
-        for dataset, by_model in by_dataset.items():
-            _fit_threshold_blocks({dataset: by_model}, results_folder, conformal_q)
-        return
-    _fit_threshold_blocks(by_dataset, results_folder, conformal_q)
-
-
-def _fit_threshold_blocks(
-    by_dataset, results_folder, conformal_q=constants.CONFORMAL_Q
-):
-    """Fit and attach threshold blocks over the given datasets, pooling their calibration.
-
-    Only configurations (model + hyperparameters) with a run in every dataset
-    are processed; per dataset the lowest-``calibration_loss`` run represents
-    the configuration. Each processed result gets its shared blocks under
-    ``result["shared"]`` and ``shared_threshold = True``; the local pot/oracle
-    blocks stay untouched and remain what per-dataset tables show, while the
-    conformal blocks, which have no local counterpart, are written to the top
-    level as well (see ``shared.apply_blocks``). POT uses each configuration's
-    swept ``q``; the conformal threshold uses `conformal_q`. Fits are cached
-    under ``results_folder/_shared_thresholds/`` keyed by the CSV modification
-    times. With a single dataset the "pool" is that dataset's own calibration,
-    which is how `_apply_shared_thresholds` fits separate baselines.
-    """
-
-    datasets = list(by_dataset)
-    groups = shared.group_configurations(
-        by_dataset,
-        metrics._hp_key,
-        lambda rs: metrics._best_result(rs, "calibration_loss"),
-    )
-    complete = {k: v for k, v in groups.items() if set(v) == set(datasets)}
-    print(
-        f"Fitting thresholds for {len(complete)} configurations on the calibration of {datasets}"
-    )
-
-    cache_file = shared.cache_path(results_folder, datasets)
-    cache = shared.load_cache(cache_file)
-    shared_count, skipped_count = {}, {}
-    for (model, _), members in groups.items():
-        if set(members) != set(datasets):
-            skipped_count[model] = skipped_count.get(model, 0) + 1
-
-    for (model, hp_key), results_by_dataset in tqdm(
-        complete.items(), desc="shared thresholds", unit="config"
-    ):
-        q = (
-            next(iter(results_by_dataset.values()))
-            .get("applied_hyperparameters", {})
-            .get("q", 1e-5)
-        )
-        constants.initialize(datasets[0], model)
-        blocks = shared.shared_blocks_cached(
-            cache, model, hp_key, results_by_dataset, q, constants.level, conformal_q
-        )
-        if blocks is None:
-            skipped_count[model] = skipped_count.get(model, 0) + 1
-            continue
-        shared.apply_blocks(results_by_dataset, blocks)
-        shared_count[model] = shared_count.get(model, 0) + 1
-
-    shared.save_cache(cache_file, cache)
-    for model in sorted(set(shared_count) | set(skipped_count)):
-        print(
-            f"  {model}: {shared_count.get(model, 0)} configuration(s) shared, "
-            f"{skipped_count.get(model, 0)} skipped (missing runs or CSVs)"
-        )
+from AaltoAD.report import cli, load_results, metrics, plot, tables
 
 
 def generate_report(args, results_folder="results"):
@@ -124,7 +17,7 @@ def generate_report(args, results_folder="results"):
     by the best *sum* of `args.metric` over all of them, and each dataset's
     report shows that shared configuration with its local (per-dataset)
     thresholds. POT and oracle thresholds are also fit jointly across the
-    datasets (see `_apply_shared_thresholds`); those shared thresholds drive
+    datasets (fitted in `load_results.load_results`); those shared thresholds drive
     the reports/combined/ summary (confusion counts pooled over the datasets)
     and a second set of plots per dataset. Files are saved in
     reports/{dataset}/. `args.plot_models` is how many models each
@@ -170,20 +63,11 @@ def generate_report(args, results_folder="results"):
     else:
         datasets = list(args.dataset)
 
-    by_dataset = {}
-    for ds in datasets:
-        by_model = _load_results(ds, results_folder)
-        if not by_model:
-            print(f'No results found for dataset "{ds}" in {results_folder}/')
-            continue
-        by_dataset[ds] = by_model
+    by_dataset = load_results.load_results(
+        datasets, results_folder, conformal_q, pool_baselines
+    )
     if not by_dataset:
         return
-
-    # Always fit the shared thresholds: the conformal threshold is defined by
-    # the calibration sample it is fitted on, and this is where that fit happens
-    # (with one dataset listed, "shared across the datasets" is just that one).
-    _apply_shared_thresholds(by_dataset, results_folder, conformal_q, pool_baselines)
 
     selected = metrics._select_shared_best(by_dataset, metric, threshold_method)
     # Each dataset's overlay picks its own best `n_plot_models` (plot_models=None),
