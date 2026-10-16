@@ -1,8 +1,9 @@
-import os
+"""
+Functionality shared between multiple dataset preprocessing modules 
+"""
+
 import numpy as np
 from AaltoAD.constants import DEFAULT_OUTPUT_FOLDER
-
-
 
 
 def normalize(a, min_a=None, max_a=None, eps=1e-4, shared=False):
