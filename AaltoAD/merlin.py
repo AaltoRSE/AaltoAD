@@ -11,6 +11,7 @@ from AaltoAD import utils
 from AaltoAD import constants
 from AaltoAD import diagnosis
 from AaltoAD import pot
+from AaltoAD.thresholds import point_adjust
 
 maxint = 200000
 
@@ -132,7 +133,7 @@ def merlin(t, minL, maxL):
 
 
 def get_result(pred, labels):
-    p_t = pot.calc_point2point(pred, labels)
+    p_t = point_adjust.calc_point2point(pred, labels)
     result = {
         "f1": p_t[0],
         "precision": p_t[1],

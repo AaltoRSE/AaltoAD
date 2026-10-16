@@ -26,6 +26,7 @@ from AaltoAD import pot
 from AaltoAD import merlin
 from AaltoAD import diagnosis
 from AaltoAD import utils
+from AaltoAD.thresholds import point_adjust
 from AaltoAD.thresholds.utils import adjusted_predictions, prediction_metrics
 
 import tempfile
@@ -105,7 +106,7 @@ def oracle_f1(scores, labels, expand_segments=True):
         scores, labels, best_thr, segment_expansion=expand_segments
     )
     predictions = (scores >= best_thr).astype(int)
-    p_latency = pot.segment_latency(predictions, labels)
+    p_latency = point_adjust.segment_latency(predictions, labels)
     return {
         "threshold": best_thr,
         "f1": float(f1),

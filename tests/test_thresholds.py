@@ -404,7 +404,7 @@ def test_pool_baselines_fits_thresholds_over_all_result_files(tmp_path, monkeypa
     pooled_calib = np.concatenate([calib["ds_a"], calib["ds_b"]])
     pooled_scores = np.concatenate([scores["ds_a"], scores["ds_b"]])
     pooled_labels = np.concatenate([labels["ds_a"], labels["ds_b"]])
-    oracle_thr = shared_mod.shared_oracle_threshold(
+    oracle_thr = oracle_mod.shared_oracle_threshold(
         [pooled_scores], [pooled_labels], expand_segments=False
     )
 
@@ -496,7 +496,7 @@ def test_load_results_calculates_metric_block_when_missing(
         "conformal": conformal.conformal_threshold(
             calib, AaltoAD.constants.CONFORMAL_Q
         ),
-        "oracle": shared_mod.shared_oracle_threshold(
+        "oracle": oracle_mod.shared_oracle_threshold(
             [scores], [labels], expand_segments=False
         ),
     }[method]

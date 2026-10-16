@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import AaltoAD.pot as pot
-from AaltoAD.thresholds import pot_fit
+from AaltoAD.thresholds import point_adjust, pot_fit
 import AaltoAD.constants
 
 
@@ -15,7 +15,7 @@ def initialize_constants():
 def test_adjust_predicts_basic():
     score = np.array([0.1, 0.8, 0.2, 0.9])
     label = np.array([0, 1, 0, 1])
-    pred = pot.adjust_predicts(score, label, threshold=0.5)
+    pred = point_adjust.adjust_predicts(score, label, threshold=0.5)
     assert isinstance(pred, np.ndarray)
     assert pred.shape == label.shape
     # where score > 0.5 should be predicted True
