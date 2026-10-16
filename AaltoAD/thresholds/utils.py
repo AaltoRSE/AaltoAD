@@ -5,7 +5,7 @@ Public API: adjusted_predictions, prediction_metrics.
 
 import numpy as np
 
-from AaltoAD.thresholds.point_adjust import adjust_predicts
+from AaltoAD.thresholds import point_adjust
 
 
 def adjusted_predictions(scores, labels, threshold, expand_segments):
@@ -22,7 +22,7 @@ def adjusted_predictions(scores, labels, threshold, expand_segments):
     labels = np.asarray(labels, dtype=float)
     pred = (scores >= threshold).astype(int)
     if expand_segments:
-        adj = np.asarray(adjust_predicts(scores, labels, pred=pred.copy()))
+        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=pred.copy()))
     else:
         adj = pred
     return pred, adj

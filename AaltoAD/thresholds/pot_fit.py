@@ -7,11 +7,7 @@
 import numpy as np
 
 from AaltoAD.spot import SPOT
-from AaltoAD.thresholds.point_adjust import (
-    calc_point2point,
-    adjust_predicts,
-    segment_latency,
-)
+from AaltoAD.thresholds import point_adjust
 
 
 def fit_pot_threshold(init_score, score, q, level):
@@ -70,12 +66,12 @@ def pot_metrics(score, label, threshold, expand_segments):
         }
 
     raw_pred = score > threshold
-    p_latency = segment_latency(raw_pred, label)
+    p_latency = point_adjust.segment_latency(raw_pred, label)
     if expand_segments:
-        pred = adjust_predicts(score, label, threshold)
+        pred = point_adjust.adjust_predicts(score, label, threshold)
     else:
         pred = raw_pred
-    p_t = calc_point2point(pred, label)
+    p_t = point_adjust.calc_point2point(pred, label)
     fp, tn = float(p_t[5]), float(p_t[4])
     fpr = fp / (fp + tn) if (fp + tn) else 0.0
     return {

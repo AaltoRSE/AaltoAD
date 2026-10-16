@@ -1,12 +1,7 @@
 import numpy as np
 
 from AaltoAD import constants
-from AaltoAD.thresholds.point_adjust import (
-    calc_point2point,
-    adjust_predicts,
-    segment_latency,
-)
-from AaltoAD.thresholds.pot_fit import fit_pot_threshold, pot_metrics
+from AaltoAD.thresholds import point_adjust, pot_fit
 
 
 def calc_seq(score, label, threshold, calc_latency=False):
@@ -14,15 +9,17 @@ def calc_seq(score, label, threshold, calc_latency=False):
     Calculate f1 score for a score sequence
     """
     if calc_latency:
-        predict, latency = adjust_predicts(
+        predict, latency = point_adjust.adjust_predicts(
             score, label, threshold, calc_latency=calc_latency
         )
-        t = list(calc_point2point(predict, label))
+        t = list(point_adjust.calc_point2point(predict, label))
         t.append(latency)
         return t
     else:
-        predict = adjust_predicts(score, label, threshold, calc_latency=calc_latency)
-        return calc_point2point(predict, label)
+        predict = point_adjust.adjust_predicts(
+            score, label, threshold, calc_latency=calc_latency
+        )
+        return point_adjust.calc_point2point(predict, label)
 
 
 def bf_search(score, label, start, end=None, step_num=1, display_freq=1, verbose=True):
@@ -72,21 +69,21 @@ def pot_eval(init_score, score, label, q=1e-5, expand_segments=False):
     """
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
         pred = np.zeros_like(label)
-        return pot_metrics(score, label, float("nan"), expand_segments), pred
+        return pot_fit.pot_metrics(score, label, float("nan"), expand_segments), pred
 
     level = constants.level
-    pot_th = fit_pot_threshold(init_score, score, q, level)
+    pot_th = pot_fit.fit_pot_threshold(init_score, score, q, level)
     if np.isnan(pot_th):
         pred = np.zeros_like(label)
-        return pot_metrics(score, label, pot_th, expand_segments), pred
+        return pot_fit.pot_metrics(score, label, pot_th, expand_segments), pred
 
     # Threshold comes from the calibration data only: fit_pot_threshold fits
     # the GPD to the peaks of init_score and extrapolates the quantile at
     # risk q.
     raw_pred = score > pot_th
     if expand_segments:
-        pred = adjust_predicts(score, label, pot_th)
+        pred = point_adjust.adjust_predicts(score, label, pot_th)
     else:
         pred = raw_pred
-    result = pot_metrics(score, label, pot_th, expand_segments)
+    result = pot_fit.pot_metrics(score, label, pot_th, expand_segments)
     return result, np.array(pred)

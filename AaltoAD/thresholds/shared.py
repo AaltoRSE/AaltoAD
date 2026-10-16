@@ -5,10 +5,7 @@ import os
 
 import numpy as np
 
-from AaltoAD.thresholds.scores import load_run_scores
-from AaltoAD.thresholds.pot_fit import fit_pot_threshold, pot_metrics
-from AaltoAD.thresholds.conformal import conformal_metrics, conformal_threshold
-from AaltoAD.thresholds.oracle import oracle_metrics, shared_oracle_threshold
+from AaltoAD.thresholds import conformal, oracle, pot_fit, scores
 
 # Bumped whenever the contents of a blocks dict change, so cached entries
 # written by an older version are refitted instead of silently reused.
@@ -48,7 +45,7 @@ def shared_threshold_blocks(results_by_dataset, q, level, conformal_q=None):
     """
     per_dataset_scores = {}
     for ds, result in results_by_dataset.items():
-        loaded = load_run_scores(result)
+        loaded = scores.load_run_scores(result)
         if loaded is None:
             return None
         per_dataset_scores[ds] = loaded
@@ -57,29 +54,33 @@ def shared_threshold_blocks(results_by_dataset, q, level, conformal_q=None):
         [calib for calib, _, _ in per_dataset_scores.values()]
     )
     pooled_test = np.concatenate([test for _, test, _ in per_dataset_scores.values()])
-    pot_threshold = fit_pot_threshold(pooled_calib, pooled_test, q, level)
-    conformal_thr = conformal_threshold(
+    pot_threshold = pot_fit.fit_pot_threshold(pooled_calib, pooled_test, q, level)
+    conformal_thr = conformal.conformal_threshold(
         pooled_calib, q if conformal_q is None else conformal_q
     )
 
     test_list = [test for _, test, _ in per_dataset_scores.values()]
     label_list = [labels for _, _, labels in per_dataset_scores.values()]
-    oracle_threshold_raw = shared_oracle_threshold(
+    oracle_threshold_raw = oracle.shared_oracle_threshold(
         test_list, label_list, expand_segments=False
     )
-    oracle_threshold_expanded = shared_oracle_threshold(
+    oracle_threshold_expanded = oracle.shared_oracle_threshold(
         test_list, label_list, expand_segments=True
     )
 
     blocks = {}
     for ds, (_, test, labels) in per_dataset_scores.items():
         blocks[ds] = {
-            "conformal": conformal_metrics(test, labels, conformal_thr, False),
-            "conformal_expanded": conformal_metrics(test, labels, conformal_thr, True),
-            "pot": pot_metrics(test, labels, pot_threshold, False),
-            "pot_expanded": pot_metrics(test, labels, pot_threshold, True),
-            "oracle": oracle_metrics(test, labels, oracle_threshold_raw, False),
-            "oracle_expanded": oracle_metrics(
+            "conformal": conformal.conformal_metrics(
+                test, labels, conformal_thr, False
+            ),
+            "conformal_expanded": conformal.conformal_metrics(
+                test, labels, conformal_thr, True
+            ),
+            "pot": pot_fit.pot_metrics(test, labels, pot_threshold, False),
+            "pot_expanded": pot_fit.pot_metrics(test, labels, pot_threshold, True),
+            "oracle": oracle.oracle_metrics(test, labels, oracle_threshold_raw, False),
+            "oracle_expanded": oracle.oracle_metrics(
                 test, labels, oracle_threshold_expanded, True
             ),
         }
