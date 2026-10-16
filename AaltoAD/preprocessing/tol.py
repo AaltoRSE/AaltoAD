@@ -1,100 +1,10 @@
 import os
 import pandas as pd
 import numpy as np
-import re
 
 from AaltoAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing import traffic_csv
 from AaltoAD.preprocessing.utils import normalize
-
-
-def parse_timestamp_column(series):
-    """Parse a timestamp column and return integer unix-seconds (nullable Int64).
-
-    Rules:
-    - If values are numeric, detect scale (s, ms, us, ns) by magnitude and
-      normalize to seconds, floored to integers.
-    - If values are datetime strings, parse to datetimes and convert to integer seconds.
-    - Returns a pandas Series of dtype `Int64` with unix seconds or NA.
-    """
-    non_na = series.dropna()
-    if non_na.empty:
-        raise ValueError("Timestamp column contains only nulls")
-    first = non_na.iloc[0]
-    try:
-        is_numeric = isinstance(first, (int, float, np.integer, np.floating))
-        if not is_numeric:
-            fs = str(first).strip()
-            is_numeric = bool(re.match(r"^\d+(\.\d+)?$", fs))
-    except Exception:
-        is_numeric = False
-    if is_numeric:
-        numeric = pd.to_numeric(series, errors="coerce").astype(float)
-        if numeric.dropna().empty:
-            # produce nullable Int64 of NAs
-            numeric_seconds = pd.Series(
-                [pd.NA] * len(numeric), index=numeric.index, dtype="Int64"
-            )
-        else:
-            maxv = numeric.dropna().abs().max()
-            if maxv > 1e17:
-                div = 1e9
-            elif maxv > 1e14:
-                div = 1e6
-            elif maxv > 1e11:
-                div = 1e3
-            else:
-                div = 1.0
-            secs = np.floor(numeric / div)
-            numeric_seconds = (
-                pd.Series(secs, index=numeric.index)
-                .where(~pd.isna(secs))
-                .astype("Int64")
-            )
-    else:
-        dt = pd.to_datetime(series, errors="coerce")
-        if dt.isna().all():
-            raise ValueError("Unable to parse timestamps from column")
-        numeric_seconds = pd.Series(
-            (dt.view("int64") // 1_000_000_000), index=dt.index
-        ).astype("Int64")
-    print(
-        f"TT Timestamp parsed: original='{first}' -> parsed={numeric_seconds.iloc[0]}"
-    )
-    return numeric_seconds
-
-
-def find_timestamp_column(df, timestamp_candidates=None):
-    """Find the most likely timestamp column name in `df`.
-
-    Strategy:
-    - If any common candidate names are present (case-insensitive), return it.
-    - Otherwise, pick the column that yields the most non-null datetimes
-      when parsed with `pd.to_datetime`.
-    - Fallback: return the first column name.
-    """
-    if timestamp_candidates is None:
-        timestamp_candidates = ["timestamp", "time", "ts", "date", "datetime"]
-    # exact name match (case-insensitive)
-    for name in timestamp_candidates:
-        for c in df.columns:
-            if c.lower() == name:
-                return c
-    # otherwise, pick the column that best parses to datetimes
-    best_col = None
-    best_non_na = 0
-    for c in df.columns:
-        try:
-            ts_try = pd.to_datetime(df[c], errors="coerce")
-            non_na = ts_try.notna().sum()
-            if non_na > best_non_na:
-                best_non_na = non_na
-                best_col = c
-        except Exception:
-            continue
-    if best_col is not None and best_non_na > 0:
-        return best_col
-    # fallback to first column
-    return df.columns[0]
 
 
 def list_unique_ips(df, src_col="src_ip", dst_col="dst_ip"):
@@ -128,20 +38,6 @@ def count_unique_ips(df, src_col="src_ip", dst_col="dst_ip"):
     with the previous function name.
     """
     return len(list_unique_ips(df, src_col=src_col, dst_col=dst_col))
-
-
-def _detect_column(df, candidates):
-    """Return first column whose lower-cased name is in candidates, else None."""
-    for c in df.columns:
-        if c.lower() in candidates:
-            return c
-    return None
-
-
-def _shannon_entropy(series):
-    """Shannon entropy (bits) of a categorical Series."""
-    p = series.value_counts(normalize=True)
-    return -(p * np.log2(p + 1e-10)).sum()
 
 
 # Per-IP features expand to one column per IP key (sorted top_ips + 'Other').
@@ -205,79 +101,12 @@ DEFAULT_SEGMENTS = [
 ]
 
 
-def _validate_segments(segments):
-    """Check segments form a valid layout: each non-skip partition appears as one contiguous block.
-
-    'skip' segments are unrestricted — they consume seconds from the CSV but produce
-    no output, so multiple skip blocks in arbitrary positions are fine.
-    """
-    valid_partitions = {"train", "calib", "test", "valid", "skip"}
-    seen_blocks = {}  # partition -> (first_idx, last_idx)
-    for i, (partition, anomalous, seconds) in enumerate(segments):
-        if partition not in valid_partitions:
-            raise ValueError(
-                f"Unknown partition {partition!r}; must be one of {sorted(valid_partitions)}"
-            )
-        if not isinstance(anomalous, bool):
-            raise ValueError(
-                f"Anomalous flag for segment {i} must be bool, got {type(anomalous).__name__}"
-            )
-        if anomalous and partition == "skip":
-            raise ValueError(f"Segment {i}: 'skip' segments cannot be anomalous")
-        if not isinstance(seconds, int) or seconds <= 0:
-            raise ValueError(
-                f"Seconds for segment {i} must be a positive int, got {seconds!r}"
-            )
-        if partition == "skip":
-            continue  # skip is exempt from contiguity tracking
-        if partition in seen_blocks:
-            first, last = seen_blocks[partition]
-            if i != last + 1:
-                # Allow contiguity to be broken only by skip segments between blocks.
-                for j in range(last + 1, i):
-                    if segments[j][0] != "skip":
-                        raise ValueError(
-                            f"Partition {partition!r} is not contiguous: appears at index {first} and again at {i} "
-                            f"after a gap. Group all segments of the same partition together "
-                            f"(skip-only gaps allowed)."
-                        )
-                seen_blocks[partition] = (first, i)
-            else:
-                seen_blocks[partition] = (first, i)
-        else:
-            seen_blocks[partition] = (i, i)
-
-
-def _detect_ip_columns(df):
-    """Find src/dst IP columns in a TOL CSV, preferring IP columns over MAC columns."""
-    ip_src_names = ("src_ip", "ip.src", "ip_src")
-    ip_dst_names = ("dst_ip", "ip.dst", "ip_dst")
-    src_col = next((c for c in df.columns if c.lower() in ip_src_names), None)
-    dst_col = next((c for c in df.columns if c.lower() in ip_dst_names), None)
-    if src_col is None or dst_col is None:
-        for c in df.columns:
-            cl = c.lower()
-            if "eth" in cl or "mac" in cl:
-                continue
-            if src_col is None and "src" in cl:
-                src_col = c
-            if dst_col is None and "dst" in cl:
-                dst_col = c
-        if src_col is None or dst_col is None:
-            for c in df.columns:
-                if src_col is None and "ip" in c.lower():
-                    src_col = c
-                if dst_col is None and "ip" in c.lower():
-                    dst_col = c
-    return src_col, dst_col
-
-
 def _load_and_prepare(csv_path):
     """Read CSV, detect needed columns, parse timestamps. Returns a parsed-CSV record."""
     df = pd.read_csv(csv_path, on_bad_lines="warn")
-    timestamp_col = find_timestamp_column(df)
-    src_col, dst_col = _detect_ip_columns(df)
-    bytes_col = _detect_column(
+    timestamp_col = traffic_csv.find_timestamp_column(df)
+    src_col, dst_col = traffic_csv.detect_ip_columns(df)
+    bytes_col = traffic_csv.detect_column(
         df,
         [
             "bytes",
@@ -290,11 +119,11 @@ def _load_and_prepare(csv_path):
             "frame.len",
         ],
     )
-    src_port_col = _detect_column(
+    src_port_col = traffic_csv.detect_column(
         df,
         ["src_port", "sport", "source_port", "srcport", "tcp.srcport", "udp.srcport"],
     )
-    dst_port_col = _detect_column(
+    dst_port_col = traffic_csv.detect_column(
         df,
         [
             "dst_port",
@@ -320,7 +149,7 @@ def _load_and_prepare(csv_path):
             f"TOL: dropping {bad_rows.sum()} rows with shifted/non-numeric fields in {csv_path}"
         )
         df = df[~bad_rows]
-    df["ts_sec"] = parse_timestamp_column(df[timestamp_col])
+    df["ts_sec"] = traffic_csv.parse_timestamp_column(df[timestamp_col])
     df = df.dropna(subset=["ts_sec"])
     df["ts_sec"] = df["ts_sec"].astype(int)
     return {
@@ -332,25 +161,6 @@ def _load_and_prepare(csv_path):
         "port_col": src_port_col,
         "dst_port_col": dst_port_col,
     }
-
-
-def _baseline_mask(df, segments, interval_col="ts_sec"):
-    """Mask selecting rows whose ts_sec falls in any train segment of the segment list."""
-    ts_min = df[interval_col].min()
-    ranges = []
-    offset = 0
-    for partition, _, seconds in segments:
-        if partition == "train":
-            ranges.append((ts_min + offset, ts_min + offset + seconds))
-        offset += seconds
-    if not ranges:
-        # No train segments — caller (multi-CSV) may still want IP stats from this
-        # CSV if it's a pure-test source; return empty mask so it contributes nothing.
-        return pd.Series(False, index=df.index)
-    mask = pd.Series(False, index=df.index)
-    for lo, hi in ranges:
-        mask |= (df[interval_col] >= lo) & (df[interval_col] < hi)
-    return mask
 
 
 def _aggregate_csv(parsed, top_ips, features, window):
@@ -396,7 +206,9 @@ def _aggregate_csv(parsed, top_ips, features, window):
     if need_sent_bytes and bytes_col:
         out_cols["sent_bytes"] = out_grp[bytes_col].sum()
     if "sent_port_entropy" in features and src_port_col:
-        out_cols["sent_port_entropy"] = out_grp[src_port_col].apply(_shannon_entropy)
+        out_cols["sent_port_entropy"] = out_grp[src_port_col].apply(
+            traffic_csv.shannon_entropy
+        )
     if "num_dsts" in features:
         out_cols["num_dsts"] = out_grp[dst_col].nunique()
 
@@ -408,7 +220,7 @@ def _aggregate_csv(parsed, top_ips, features, window):
         in_cols["received_frameln"] = in_grp[bytes_col].sum()
     if "received_port_entropy" in features and received_port_col:
         in_cols["received_port_entropy"] = in_grp[received_port_col].apply(
-            _shannon_entropy
+            traffic_csv.shannon_entropy
         )
     if "num_srcs" in features:
         in_cols["num_srcs"] = in_grp[src_col].nunique()
@@ -543,7 +355,7 @@ def load_TOL(
             raise ValueError("Every group must contain at least one CSV path")
         if not segs:
             raise ValueError("Every group must contain at least one segment spec")
-        _validate_segments(segs)
+        traffic_csv.validate_segments(segs)
         for partition, anomalous, seconds in segs:
             if seconds % window != 0:
                 raise ValueError(
@@ -557,7 +369,7 @@ def load_TOL(
         for p in paths:
             parsed = _load_and_prepare(p)
             parsed_records.append((parsed, segs))
-            mask = _baseline_mask(parsed["df"], segs)
+            mask = traffic_csv.baseline_mask(parsed["df"], segs)
             if mask.any():
                 all_baseline_ips.append(
                     parsed["df"]

@@ -7,18 +7,8 @@ import numpy as np
 import pandas as pd
 
 from AaltoAD.constants import DEFAULT_DATA_FOLDER
+from AaltoAD.preprocessing import traffic_csv
 from AaltoAD.preprocessing.utils import normalize
-
-from .tol import (
-    _baseline_mask,
-    _canonical_columns,
-    _detect_column,
-    _detect_ip_columns,
-    _shannon_entropy,
-    _validate_segments,
-    find_timestamp_column,
-    parse_timestamp_column,
-)
 
 DEFAULT_SEGMENTS = [
     ("train", False, 300),
@@ -39,21 +29,21 @@ def _load_and_prepare(csv_path, interval=1):
             f"  Dropping {int(header_mask.sum())} embedded header row(s) in {csv_path}"
         )
         df = df[~header_mask].reset_index(drop=True)
-    timestamp_col = find_timestamp_column(df)
-    src_col, dst_col = _detect_ip_columns(df)
-    bytes_col = _detect_column(
+    timestamp_col = traffic_csv.find_timestamp_column(df)
+    src_col, dst_col = traffic_csv.detect_ip_columns(df)
+    bytes_col = traffic_csv.detect_column(
         df, ["bytes", "length", "len", "pkt_size", "size", "octets", "framelen"]
     )
     if bytes_col:
         df[bytes_col] = pd.to_numeric(df[bytes_col], errors="coerce").fillna(0)
-    src_port_col = _detect_column(df, ["src_port", "sport", "source_port"])
-    df["ts_sec"] = parse_timestamp_column(df[timestamp_col])
+    src_port_col = traffic_csv.detect_column(df, ["src_port", "sport", "source_port"])
+    df["ts_sec"] = traffic_csv.parse_timestamp_column(df[timestamp_col])
     df["interval"] = df["ts_sec"] // interval
     df = df.dropna(subset=["interval"])
     df["interval"] = df["interval"].astype(int)
     df.drop(columns=["ts_sec"], inplace=True)
     df.drop(columns=[timestamp_col], inplace=True)
-    temperature_col = _detect_column(df, ["temperature", "temp"])
+    temperature_col = traffic_csv.detect_column(df, ["temperature", "temp"])
     if temperature_col:
         df[temperature_col] = pd.to_numeric(df[temperature_col], errors="coerce")
     print(
@@ -156,7 +146,7 @@ def _aggregate_to_features(
     if bytes and bytes_col:
         out_agg["bytes_out"] = out_grp[bytes_col].sum()
     if port_entropy and port_col:
-        out_agg["port_entropy"] = out_grp[port_col].apply(_shannon_entropy)
+        out_agg["port_entropy"] = out_grp[port_col].apply(traffic_csv.shannon_entropy)
     if temperature and temp_col:
         out_agg["mean_temp"] = out_grp[temp_col].mean()
 
@@ -254,7 +244,7 @@ def load_nettraffic(
             raise ValueError("Each group must have at least one csv path")
         if not segs:
             raise ValueError("Each group must have at least one segment")
-        _validate_segments(segs)
+        traffic_csv.validate_segments(segs)
 
     # Load each csv, parse columns and timestamp. Collect baseline IPs.
     parsed_records = []
@@ -263,7 +253,7 @@ def load_nettraffic(
         for path in paths:
             parsed = _load_and_prepare(path, interval=interval)
             parsed_records.append((parsed, segs))
-            mask = _baseline_mask(parsed["df"], segs, interval_col="interval")
+            mask = traffic_csv.baseline_mask(parsed["df"], segs, interval_col="interval")
             if mask.any():
                 all_baseline_ips.append(
                     parsed["df"]
