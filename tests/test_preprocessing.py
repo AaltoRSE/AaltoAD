@@ -225,7 +225,7 @@ def test_load_MSL(tmp_path):
 
 def test_load_SMD(tmp_path, monkeypatch):
     """SMD's loader writes to a relative 'processed/SMD/...' path via
-    load_and_save's default-arg DEFAULT_OUTPUT_FOLDER. Run from tmp_path with
+    process_csv_file's default-arg DEFAULT_OUTPUT_FOLDER. Run from tmp_path with
     a symlink to the repo's data folder so output lands in the temp dir.
     """
     from AaltoAD.preprocessing.smd import load_SMD
