@@ -27,6 +27,7 @@ from AaltoAD import pot
 from AaltoAD import merlin
 from AaltoAD import diagnosis
 from AaltoAD import utils
+from AaltoAD.thresholds.utils import adjusted_predictions, prediction_metrics
 
 import tempfile
 import shutil
@@ -52,27 +53,16 @@ def loss_stats(name, x):
 
 
 def _adjusted_f1(scores, labels, threshold, segment_expansion=True):
-    """Apply pot.adjust_predicts on the time-ordered series, then compute precision/recall/F1.
+    """Compute segment-adjusted precision/recall/F1 at one threshold.
 
-    Matches what `pot.poteval_step` reports — segment-level point adjustment that
-    expands any in-segment detection across the whole ground-truth attack episode.
-    Caller must pass `scores` and `labels` in original time order; otherwise the
-    segment expansion in `adjust_predicts` operates on the wrong adjacencies.
+    Matches what `pot.poteval_step` reports — segment-level point adjustment
+    (via `thresholds.utils.adjusted_predictions`) that expands any in-segment
+    detection across the whole ground-truth attack episode. Caller must pass
+    `scores` and `labels` in original time order; otherwise the segment
+    expansion in `adjust_predicts` operates on the wrong adjacencies.
     """
-    pred = (scores >= threshold).astype(int)
-    if segment_expansion:
-        adj = np.asarray(pot.adjust_predicts(scores, labels, pred=pred))
-    else:
-        adj = pred
-    tp = int(np.sum(adj * labels))
-    fp = int(np.sum(adj * (1 - labels)))
-    fn = int(np.sum((1 - adj) * labels))
-    tn = int(np.sum((1 - adj) * (1 - labels)))
-    prec = tp / (tp + fp) if (tp + fp) else 0.0
-    rec = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
-    fpr = fp / (fp + tn) if (fp + tn) else 0.0
-    return f1, prec, rec, fpr, tp, fp, fn, tn
+    _, adj = adjusted_predictions(scores, labels, threshold, segment_expansion)
+    return prediction_metrics(adj, labels)
 
 
 def oracle_f1(scores, labels, expand_segments=True):

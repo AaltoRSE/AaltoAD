@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from AaltoAD.thresholds.point_adjust import adjust_predicts, segment_latency
+from AaltoAD.thresholds.point_adjust import segment_latency
+from AaltoAD.thresholds.utils import adjusted_predictions, prediction_metrics
 
 
 def oracle_metrics(scores, labels, threshold, expand_segments):
@@ -15,22 +16,9 @@ def oracle_metrics(scores, labels, threshold, expand_segments):
     *unexpanded* predictions. Returns a dict with keys ``threshold, f1,
     precision, recall, fpr, tp, fp, fn, tn, p_latency``.
     """
-    scores = np.asarray(scores, dtype=float)
     labels = np.asarray(labels, dtype=float)
-    pred = (scores >= threshold).astype(int)
-    if expand_segments:
-        # adjust_predicts mutates the array it is given; keep `pred` raw for p_latency.
-        adj = np.asarray(adjust_predicts(scores, labels, pred=pred.copy()))
-    else:
-        adj = pred
-    tp = int(np.sum(adj * labels))
-    fp = int(np.sum(adj * (1 - labels)))
-    fn = int(np.sum((1 - adj) * labels))
-    tn = int(np.sum((1 - adj) * (1 - labels)))
-    prec = tp / (tp + fp) if (tp + fp) else 0.0
-    rec = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
-    fpr = fp / (fp + tn) if (fp + tn) else 0.0
+    pred, adj = adjusted_predictions(scores, labels, threshold, expand_segments)
+    f1, prec, rec, fpr, tp, fp, fn, tn = prediction_metrics(adj, labels)
     p_latency = segment_latency(pred, labels)
     return {
         "threshold": float(threshold),
