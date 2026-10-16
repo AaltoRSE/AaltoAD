@@ -104,8 +104,8 @@ def _fit_threshold_blocks(
     datasets = list(by_dataset)
     groups = shared.group_configurations(
         by_dataset,
-        metrics._hp_key,
-        lambda rs: metrics._best_result(rs, "calibration_loss"),
+        metrics.hyperparameter_key,
+        lambda rs: metrics.best_result(rs, "calibration_loss"),
     )
     complete = {k: v for k, v in groups.items() if set(v) == set(datasets)}
     print(

@@ -69,7 +69,7 @@ def generate_report(args, results_folder="results"):
     if not by_dataset:
         return
 
-    selected = metrics._select_shared_best(by_dataset, metric, threshold_method)
+    selected = metrics.select_shared_best(by_dataset, metric, threshold_method)
     # Each dataset's overlay picks its own best `n_plot_models` (plot_models=None),
     # so a model that only wins on one case still shows up there — unless the
     # dataset's model-order.json hand-picks the plotted models (see
@@ -130,14 +130,14 @@ def _order_models(
 
     `metric` selects each model's best run (its hyperparameters); the ranking
     across models reads `model_order` from the `threshold_method` block, or
-    `metric` itself when no separate ordering is given (see `metrics._rank_key`). Every
+    `metric` itself when no separate ordering is given (see `metrics.rank_key`). Every
     table and plot in a report uses this one order.
     """
     model_order = cli.metric_list(metric if model_order is None else model_order)
     return sorted(
         by_model,
-        key=lambda m: metrics._rank_key(
-            metrics._best_result(by_model[m], metric, threshold_method),
+        key=lambda m: metrics.rank_key(
+            metrics.best_result(by_model[m], metric, threshold_method),
             model_order,
             threshold_method,
         ),
@@ -203,7 +203,7 @@ def _generate_dataset_report(
     (``prediction_errors_shared.png`` and ``plots_shared/``).
     """
     # Determine unlabeled flag: True when at least one result has a pot confusion
-    # matrix AND all results that have one satisfy metrics._is_unlabeled.
+    # matrix AND all results that have one satisfy metrics.is_unlabeled.
     results_with_pot = [
         r
         for results in by_model.values()
@@ -211,7 +211,7 @@ def _generate_dataset_report(
         if isinstance(r.get("pot"), dict) and r["pot"].get("TP") is not None
     ]
     unlabeled = bool(results_with_pot) and all(
-        metrics._is_unlabeled(r) for r in results_with_pot
+        metrics.is_unlabeled(r) for r in results_with_pot
     )
 
     dataset_dir = os.path.join("reports", dataset)

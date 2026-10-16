@@ -120,7 +120,7 @@ def _generate_prediction_error_plot(
     ground_truth = None
     best_by_model = {}
     for model, results in by_model.items():
-        best = metrics._best_result(results, metric)
+        best = metrics.best_result(results, metric)
         if not best:
             continue
         src = best.get("_source_path")
@@ -172,14 +172,14 @@ def _generate_prediction_error_plot(
         print(f"No prediction_error data found for {dataset}; skipping plot.")
         return
 
-    # Keep only the `n_models` best models (see `metrics._rank_key`) so the overlay
+    # Keep only the `n_models` best models (see `metrics.rank_key`) so the overlay
     # stays readable.
     if models is not None:
         series = {m: series[m] for m in models if m in series}
     elif len(series) > n_models:
         keep = sorted(
             series,
-            key=lambda m: metrics._rank_key(
+            key=lambda m: metrics.rank_key(
                 best_by_model[m], model_order, threshold_method
             ),
         )[:n_models]
@@ -231,7 +231,7 @@ def _generate_model_plots(
     """
     os.makedirs(output_dir, exist_ok=True)
     for model, results in by_model.items():
-        best = metrics._best_result(results, metric)
+        best = metrics.best_result(results, metric)
         if not best:
             continue
         src = best.get("_source_path")

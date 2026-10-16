@@ -649,9 +649,9 @@ def test_select_shared_best_pools_f1_and_averages_other_metrics():
         "A": {"M": [result(1, 5, 5, 0, 5, 90), result(2, 9, 5, 0, 5, 90)]},
         "B": {"M": [result(1, 9, 5, 0, 5, 90), result(2, 9, 5, 0, 5, 90)]},
     }
-    chosen = metrics._select_shared_best(by_dataset, "latency", "conformal")
+    chosen = metrics.select_shared_best(by_dataset, "latency", "conformal")
     assert chosen["A"]["M"][0]["applied_hyperparameters"] == {"n": 1}
 
     # By f1 the two configs tie on pooled counts, so the first stays.
-    chosen_f1 = metrics._select_shared_best(by_dataset, "f1", "conformal")
+    chosen_f1 = metrics.select_shared_best(by_dataset, "f1", "conformal")
     assert chosen_f1["A"]["M"][0]["applied_hyperparameters"] == {"n": 1}

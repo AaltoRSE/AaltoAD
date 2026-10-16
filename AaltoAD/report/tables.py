@@ -43,8 +43,8 @@ SLIDE_COLUMNS = [
 
 # Unlabeled mode: alternate slim column spec.
 UNLABELED_SLIDE_COLUMNS = [
-    ("Detected", metrics._detected),
-    ("Detection rate", metrics._detection_rate),
+    ("Detected", metrics.detected),
+    ("Detection rate", metrics.detection_rate),
     ("Threshold", "pot.threshold"),
     ("Eval time (s)", "eval_time"),
 ]
@@ -78,7 +78,7 @@ def _generate_latex(
     Designed to be ``\\input``-ed inside a user-provided ``table`` float —
     no float wrapper is emitted.
     """
-    sort_metric = metrics._table_sort_metric(metric)
+    sort_metric = metrics.table_sort_metric(metric)
     lower_is_better = sort_metric in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
@@ -91,16 +91,16 @@ def _generate_latex(
     # Slim metrics table (oracle-threshold metrics, see LATEX_COLUMNS).
     metric_rows = []
     for model, results in by_model.items():
-        best = metrics._best_result(results, metric)
+        best = metrics.best_result(results, metric)
         row = {"model": model}
         for label, path_or_fn in slide_cols:
             if best:
-                row[label] = metrics._fmt_metric(best, path_or_fn, threshold_method)
+                row[label] = metrics.format_metric(best, path_or_fn, threshold_method)
             else:
                 row[label] = "N/A"
         try:
             sort_val = (
-                float(metrics._get(best, sort_metric)) if best else missing_sort_val
+                float(metrics.value(best, sort_metric)) if best else missing_sort_val
             )
         except (TypeError, ValueError):
             sort_val = missing_sort_val
@@ -147,15 +147,15 @@ def _generate_overview_latex(
     for dataset, by_model in by_dataset.items():
         case = _case_id(dataset)
         for model, results in by_model.items():
-            result = metrics._best_result(results, metric)
+            result = metrics.best_result(results, metric)
             if result is not None:
                 best[(model, case)] = result
     models = {model for model, _ in best}
 
     def mean_rank_key(model):
-        """`metrics._rank_key` with each metric averaged over the cases the model ran on."""
+        """`metrics.rank_key` with each metric averaged over the cases the model ran on."""
         keys = [
-            metrics._rank_key(best[(model, case)], model_order, threshold_method)
+            metrics.rank_key(best[(model, case)], model_order, threshold_method)
             for case in cases
             if (model, case) in best
         ]
@@ -169,7 +169,7 @@ def _generate_overview_latex(
         result = best.get((model, case))
         if result is None:
             return "N/A"
-        return metrics._fmt_metric(
+        return metrics.format_metric(
             result, f"{threshold_method}.{name}", threshold_method
         )
 
@@ -282,7 +282,7 @@ def _latex_escape(s):
 
 def _generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
     """One line per model listing its best-result hyperparameters."""
-    sort_metric = metrics._table_sort_metric(metric)
+    sort_metric = metrics.table_sort_metric(metric)
     lower_is_better = sort_metric in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
@@ -293,17 +293,17 @@ def _generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
     ]
     entries = []
     for model, results in by_model.items():
-        best = metrics._best_result(results, metric)
+        best = metrics.best_result(results, metric)
         hp = best.get("applied_hyperparameters", {}) if best else {}
         try:
             sort_val = (
-                float(metrics._get(best, sort_metric)) if best else missing_sort_val
+                float(metrics.value(best, sort_metric)) if best else missing_sort_val
             )
         except (TypeError, ValueError):
             sort_val = missing_sort_val
         if sort_val != sort_val:
             sort_val = missing_sort_val
-        parts = ", ".join(f"{k}={metrics._fmt(v)}" for k, v in sorted(hp.items()))
+        parts = ", ".join(f"{k}={metrics.format_number(v)}" for k, v in sorted(hp.items()))
         entries.append(
             (
                 sort_val,
@@ -322,23 +322,23 @@ def _generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
 def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     """One row per model, slim metric set; selected and ordered by `metric`
     (falling back to F1 ordering for non-comparable metrics)."""
-    sort_metric = metrics._table_sort_metric(metric)
+    sort_metric = metrics.table_sort_metric(metric)
     lower_is_better = sort_metric in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
     slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
     rows = []
     for model, results in by_model.items():
-        best = metrics._best_result(results, metric)
+        best = metrics.best_result(results, metric)
         row = {"model": model}
         for label, path_or_fn in slide_cols:
             if best:
-                row[label] = metrics._fmt(metrics._col_value(best, path_or_fn))
+                row[label] = metrics.format_number(metrics.column_value(best, path_or_fn))
             else:
                 row[label] = "N/A"
         try:
             sort_val = (
-                float(metrics._get(best, sort_metric)) if best else missing_sort_val
+                float(metrics.value(best, sort_metric)) if best else missing_sort_val
             )
         except (TypeError, ValueError):
             sort_val = missing_sort_val
@@ -424,7 +424,7 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
 
     # Single fallback metric for the unlabeled path, which has no detections to
     # rank by; everywhere else `order` decides.
-    sort_metric = _table_sort_metric(metric)
+    sort_metric = metrics.table_sort_metric(metric)
     lower_is_better = sort_metric in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
@@ -438,22 +438,22 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
         ]
         grouped = []
         for model, results in by_model.items():
-            best = metrics._best_result(results, metric)
+            best = metrics.best_result(results, metric)
             row = {"row": model}
             if best:
-                row["detected"] = metrics._fmt(_detected(best))
-                row["detection rate"] = metrics._fmt(_detection_rate(best))
-                row["threshold"] = metrics._fmt(metrics._get(best, "pot.threshold"))
-                row["calibration_loss"] = metrics._fmt(
-                    metrics._get(best, "calibration_loss")
+                row["detected"] = metrics.format_number(metrics.detected(best))
+                row["detection rate"] = metrics.format_number(metrics.detection_rate(best))
+                row["threshold"] = metrics.format_number(metrics.value(best, "pot.threshold"))
+                row["calibration_loss"] = metrics.format_number(
+                    metrics.value(best, "calibration_loss")
                 )
-                row["eval_time"] = metrics._fmt(metrics._get(best, "eval_time"))
+                row["eval_time"] = metrics.format_number(metrics.value(best, "eval_time"))
             else:
                 for c in display_columns:
                     row[c] = "N/A"
             try:
                 sort_val = (
-                    float(metrics._get(best, sort_metric)) if best else missing_sort_val
+                    float(metrics.value(best, sort_metric)) if best else missing_sort_val
                 )
                 if math.isnan(sort_val):
                     sort_val = missing_sort_val
@@ -462,7 +462,7 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
             h_row = {"row": model}
             hp = best.get("applied_hyperparameters", {}) if best else {}
             for k in all_hp_keys:
-                h_row[k] = metrics._fmt(hp[k]) if k in hp else ""
+                h_row[k] = metrics.format_number(hp[k]) if k in hp else ""
             grouped.append((sort_val, [row], h_row))
         _sort_grouped(grouped, order, lower_is_better)
         for _, rows, h_row in grouped:
@@ -475,32 +475,32 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
 
     # Order by the selection metric when comparable across models (dotted
     # metrics like oracle.f1); otherwise fall back to SUMMARY_SORT_METRIC.
-    table_sort = _table_sort_metric(metric)
+    table_sort = metrics.table_sort_metric(metric)
     lower_is_better = table_sort in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
     sort_method, sort_sep, sort_metric = table_sort.partition(".")
 
     grouped = []  # list of (sort_value, [method_rows], hp_row)
     for model, results in by_model.items():
-        best = metrics._best_result(results, metric)
+        best = metrics.best_result(results, metric)
         method_rows = []
         sort_val = missing_sort_val
         for method in cli.METHODS:
             row = {"row": f"{model} / {method}"}
             for m in cli.METHOD_METRICS:
                 row[m] = (
-                    metrics._fmt(metrics._get(best, f"{method}.{m}")) if best else "N/A"
+                    metrics.format_number(metrics.value(best, f"{method}.{m}")) if best else "N/A"
                 )
                 row[f"{m} (PA)"] = (
-                    metrics._fmt(metrics._get(best, f"{method}_expanded.{m}"))
+                    metrics.format_number(metrics.value(best, f"{method}_expanded.{m}"))
                     if best
                     else "N/A"
                 )
             row["eval_time"] = (
-                metrics._fmt(metrics._get(best, "eval_time")) if best else "N/A"
+                metrics.format_number(metrics.value(best, "eval_time")) if best else "N/A"
             )
             row["calibration_loss"] = (
-                metrics._fmt(metrics._get(best, "calibration_loss")) if best else "N/A"
+                metrics.format_number(metrics.value(best, "calibration_loss")) if best else "N/A"
             )
             if sort_sep and method == sort_method:
                 try:
@@ -519,8 +519,8 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
         if not sort_sep and best:
             try:
                 sv = (
-                    float(metrics._get(best, sort_metric))
-                    if metrics._get(best, sort_metric) is not None
+                    float(metrics.value(best, sort_metric))
+                    if metrics.value(best, sort_metric) is not None
                     else missing_sort_val
                 )
                 if math.isnan(sv):
@@ -531,7 +531,7 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
         h_row = {"row": model}
         hp = best.get("applied_hyperparameters", {}) if best else {}
         for k in all_hp_keys:
-            h_row[k] = metrics._fmt(hp[k]) if k in hp else ""
+            h_row[k] = metrics.format_number(hp[k]) if k in hp else ""
         grouped.append((sort_val, method_rows, h_row))
 
     _sort_grouped(grouped, order, lower_is_better)

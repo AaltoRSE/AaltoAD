@@ -34,32 +34,32 @@ def test_plot_rank_key_follows_the_given_order():
     fast_but_poor = {"pot": {"p_latency": 5, "fpr": 0.1, "f1": 0.1}}
     by_latency = ("p_latency", "fpr", "f1")
     by_f1 = ("f1",)
-    assert metrics._rank_key(fast_but_poor, by_latency, "pot") < \
-        metrics._rank_key(slow_but_accurate, by_latency, "pot")
-    assert metrics._rank_key(slow_but_accurate, by_f1, "pot") < \
-        metrics._rank_key(fast_but_poor, by_f1, "pot")
+    assert metrics.rank_key(fast_but_poor, by_latency, "pot") < \
+        metrics.rank_key(slow_but_accurate, by_latency, "pot")
+    assert metrics.rank_key(slow_but_accurate, by_f1, "pot") < \
+        metrics.rank_key(fast_but_poor, by_f1, "pot")
 
 
 def test_plot_rank_key_prefers_latency_then_fpr_then_f1():
     fast = {"pot": {"p_latency": 5, "fpr": 0.1, "f1": 0.1}}
     slow = {"pot": {"p_latency": 50, "fpr": 0.0, "f1": 0.9}}
-    assert metrics._rank_key(fast, ("p_latency", "fpr", "f1"), "pot") < metrics._rank_key(slow, ("p_latency", "fpr", "f1"), "pot")
+    assert metrics.rank_key(fast, ("p_latency", "fpr", "f1"), "pot") < metrics.rank_key(slow, ("p_latency", "fpr", "f1"), "pot")
 
 
     clean = {"pot": {"p_latency": 5, "fpr": 0.01, "f1": 0.1}}
     noisy = {"pot": {"p_latency": 5, "fpr": 0.2, "f1": 0.9}}
-    assert metrics._rank_key(clean, ("p_latency", "fpr", "f1"), "pot") < metrics._rank_key(noisy, ("p_latency", "fpr", "f1"), "pot")
+    assert metrics.rank_key(clean, ("p_latency", "fpr", "f1"), "pot") < metrics.rank_key(noisy, ("p_latency", "fpr", "f1"), "pot")
 
     good = {"pot": {"p_latency": 5, "fpr": 0.01, "f1": 0.9}}
     poor = {"pot": {"p_latency": 5, "fpr": 0.01, "f1": 0.2}}
-    assert metrics._rank_key(good, ("p_latency", "fpr", "f1"), "pot") < metrics._rank_key(poor, ("p_latency", "fpr", "f1"), "pot")
+    assert metrics.rank_key(good, ("p_latency", "fpr", "f1"), "pot") < metrics.rank_key(poor, ("p_latency", "fpr", "f1"), "pot")
 
 
 def test_plot_rank_key_sorts_missing_values_last():
     present = {"pot": {"p_latency": 1000, "fpr": 0.9, "f1": 0.0}}
     missing = {"pot": {}}
-    assert metrics._rank_key(present, ("p_latency", "fpr", "f1"), "pot") < metrics._rank_key(missing, ("p_latency", "fpr", "f1"), "pot")
-    assert metrics._rank_key(None, ("p_latency", "fpr", "f1"), "pot") == metrics._rank_key(missing, ("p_latency", "fpr", "f1"), "pot")
+    assert metrics.rank_key(present, ("p_latency", "fpr", "f1"), "pot") < metrics.rank_key(missing, ("p_latency", "fpr", "f1"), "pot")
+    assert metrics.rank_key(None, ("p_latency", "fpr", "f1"), "pot") == metrics.rank_key(missing, ("p_latency", "fpr", "f1"), "pot")
 
 
 def test_top_models_ranks_by_latency_then_fpr_then_f1():
@@ -164,7 +164,7 @@ def test_rank_key_ignores_the_latency_of_a_model_that_never_fired():
     detected = {"conformal": {"p_latency": 1790, "fpr": 0.0, "f1": 0.01, "TP": 5, "FP": 0, "FN": 10}}
     never = {"conformal": {"p_latency": 1734, "fpr": 0.0, "f1": 0.0, "TP": 0, "FP": 0, "FN": 1734}}
     order = ("p_latency", "fpr", "f1")
-    assert metrics._rank_key(detected, order, "conformal") < metrics._rank_key(never, order, "conformal")
+    assert metrics.rank_key(detected, order, "conformal") < metrics.rank_key(never, order, "conformal")
 
 
 def _write_model_order(tmp_path, dataset, names):
@@ -220,7 +220,7 @@ def test_no_detection_and_its_dash():
     detected = {"conformal": {"p_latency": 12, "fpr": 0.0, "TP": 5, "FP": 0, "FN": 1}}
     assert metrics._no_detection(never, "conformal")
     assert not metrics._no_detection(detected, "conformal")
-    assert metrics._fmt_metric(never, "conformal.p_latency", "conformal") == "---"
-    assert metrics._fmt_metric(detected, "conformal.p_latency", "conformal") == "12"
+    assert metrics.format_metric(never, "conformal.p_latency", "conformal") == "---"
+    assert metrics.format_metric(detected, "conformal.p_latency", "conformal") == "12"
     # Other columns are unaffected by a non-detection.
-    assert metrics._fmt_metric(never, "conformal.fpr", "conformal") == "0"
+    assert metrics.format_metric(never, "conformal.fpr", "conformal") == "0"

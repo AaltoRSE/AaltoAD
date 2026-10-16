@@ -1,4 +1,9 @@
-"""Metric lookup, formatting, and comparison for sweep results."""
+"""Metric lookup, formatting, and comparison for sweep results.
+
+Public API: hyperparameter_key, best_result, rank_key, select_shared_best,
+value, column_value, is_unlabeled, detected, detection_rate, format_metric,
+format_number, table_sort_metric. Underscore-prefixed helpers are internal.
+"""
 
 import json
 import math
@@ -37,7 +42,7 @@ def _no_detection(result, method):
     return counts is not None and counts[0] == 0
 
 
-def _fmt_metric(result, path, method):
+def format_metric(result, path, method):
     """Format one metric cell, as an em dash for a latency that is really a non-detection."""
     if (
         isinstance(path, str)
@@ -45,10 +50,10 @@ def _fmt_metric(result, path, method):
         and _no_detection(result, method)
     ):
         return "---"
-    return _fmt(_col_value(result, path))
+    return format_number(column_value(result, path))
 
 
-def _rank_key(result, metric, method):
+def rank_key(result, metric, method):
     """Sort key ranking one result by `metric`, best first.
 
     `metric` is a tuple of bare names (see `cli.metric_list`) read from the `method`
@@ -68,7 +73,7 @@ def _rank_key(result, metric, method):
     return tuple(key)
 
 
-def _get(d, dotted_key):
+def value(d, dotted_key):
     """Look up a possibly-dotted key like 'pot.f1' in a nested dict, returning None if absent."""
     cur = d
     for part in dotted_key.split("."):
@@ -81,13 +86,13 @@ def _get(d, dotted_key):
 def _metric_value(result, metric):
     """Return the metric as a float, or None if absent/non-numeric/NaN."""
     try:
-        v = float(_get(result, metric))
+        v = float(value(result, metric))
     except (TypeError, ValueError):
         return None
     return None if math.isnan(v) else v
 
 
-def _hp_key(result):
+def hyperparameter_key(result):
     """Canonical key identifying a hyperparameter configuration."""
     return json.dumps(result.get("applied_hyperparameters", {}), sort_keys=True)
 
@@ -129,7 +134,7 @@ def _pooled_f1(results, method):
     return 0.0 if denom == 0 else 2 * tp / denom
 
 
-def _select_shared_best(by_dataset, metric, method=None):
+def select_shared_best(by_dataset, metric, method=None):
     """Select one hyperparameter set per model across all datasets.
 
     For each model, group results by hyperparameter configuration (keeping the
@@ -152,8 +157,8 @@ def _select_shared_best(by_dataset, metric, method=None):
     for ds, by_model in by_dataset.items():
         for model, results in by_model.items():
             for r in results:
-                slot = per_model.setdefault(model, {}).setdefault(_hp_key(r), {})
-                if ds not in slot or _rank_key(r, metric, method) < _rank_key(
+                slot = per_model.setdefault(model, {}).setdefault(hyperparameter_key(r), {})
+                if ds not in slot or rank_key(r, metric, method) < rank_key(
                     slot[ds], metric, method
                 ):
                     slot[ds] = r
@@ -202,10 +207,10 @@ def _select_shared_best(by_dataset, metric, method=None):
     return selected
 
 
-def _best_result(results, metric, method=None):
+def best_result(results, metric, method=None):
     """Return the best of `results` by `metric`, read from the `method` block.
 
-    Ranking is `_rank_key`, so a multi-part metric such as ('p_latency', 'fpr',
+    Ranking is `rank_key`, so a multi-part metric such as ('p_latency', 'fpr',
     'f1') is resolved term by term. A result missing every term ranks last but
     is still returned when it is all there is, so its other columns render
     instead of blanking the row to N/A.
@@ -213,10 +218,10 @@ def _best_result(results, metric, method=None):
     if not results:
         return None
     method = method or cli.THRESHOLD_METHOD
-    return min(results, key=lambda r: _rank_key(r, metric, method))
+    return min(results, key=lambda r: rank_key(r, metric, method))
 
 
-def _fmt(value):
+def format_number(value):
     """Format a numeric value for display (scientific notation below 1e-3)."""
     if value is None:
         return "N/A"
@@ -233,7 +238,7 @@ def _fmt(value):
         return str(value)
 
 
-def _is_unlabeled(result):
+def is_unlabeled(result):
     """Return True when a result has no positive labels (pot.TP + pot.FN == 0).
 
     Returns False if the pot section or the required keys are absent.
@@ -251,7 +256,7 @@ def _is_unlabeled(result):
         return False
 
 
-def _detected(result):
+def detected(result):
     """Return detected count (pot.TP + pot.FP), or None if keys absent."""
     pot = result.get("pot")
     if not isinstance(pot, dict):
@@ -266,7 +271,7 @@ def _detected(result):
         return None
 
 
-def _detection_rate(result):
+def detection_rate(result):
     """Return detected / total (TP+FP+TN+FN), or None if keys absent or denominator zero."""
     pot = result.get("pot")
     if not isinstance(pot, dict):
@@ -286,17 +291,17 @@ def _detection_rate(result):
         return None
 
 
-def _col_value(result, path_or_fn):
+def column_value(result, path_or_fn):
     """Return a column value from a result dict.
 
     `path_or_fn` may be a dotted path string or a callable taking the result dict.
     """
     if callable(path_or_fn):
         return path_or_fn(result)
-    return _get(result, path_or_fn)
+    return value(result, path_or_fn)
 
 
-def _table_sort_metric(metric):
+def table_sort_metric(metric):
     """Fallback single metric for the unlabeled tables, which cannot rank by detections."""
     metric = metric if isinstance(metric, str) else ",".join(metric)
     return metric if "." in metric else SUMMARY_SORT_METRIC
