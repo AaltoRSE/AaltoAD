@@ -5,7 +5,6 @@ This module contains functions for running individual and multiple experiments.
 """
 
 import os
-import hashlib
 import pandas as pd
 import csv
 import json
@@ -156,52 +155,6 @@ def _safe_write_json(path, data):
                 pass
 
 
-POT_ONLY_KEYS = {"q"}
-
-
-def _hyperparams_hash(hyperparams: dict) -> str:
-    """Return a short hash (first 8 chars of SHA256) of the model-affecting hyperparams.
-
-    POT-only keys (like `q`) are stripped before hashing so that a sweep over
-    those values reuses the same trained checkpoint.
-
-    Args:
-            hyperparams (dict): Hyperparameter dictionary to hash.
-
-    Returns:
-            str: 8-character hex string, or "default" if the model-affecting subset is empty.
-    """
-    model_only = {
-        k: v for k, v in (hyperparams or {}).items() if k not in POT_ONLY_KEYS
-    }
-    if not model_only:
-        return "default"
-    serialized = json.dumps(model_only, sort_keys=True)
-    return hashlib.sha256(serialized.encode()).hexdigest()[:8]
-
-
-def _data_hash(dataset_name: str) -> str:
-    """Return a short hash (first 8 chars of SHA256) of the dataset's training data file.
-
-    Hashes the raw bytes of `train.npy` in the processed dataset folder so that
-    regenerating the data invalidates cached model checkpoints.
-
-    Args:
-            dataset_name (str): Name of the dataset (processed folder name).
-
-    Returns:
-            str: 8-character hex string, or "nodata" if train.npy does not exist.
-    """
-    path = os.path.join(constants.output_folder, dataset_name, "train.npy")
-    if not os.path.exists(path):
-        return "nodata"
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()[:8]
-
-
 def save_model(
     model,
     optimizer,
@@ -232,8 +185,8 @@ def save_model(
             None. Saves checkpoint to checkpoints/{model_name}_{dataset_name}/{hp_hash}_{data_hash}/model.ckpt
             with hyperparams.json and metadata.json alongside it.
     """
-    hp_hash = _hyperparams_hash(hyperparams)
-    data_hash = _data_hash(dataset_name)
+    hp_hash = utils.hyperparams_hash(hyperparams)
+    data_hash = utils.data_hash(dataset_name)
     folder = (
         f"{root_path}checkpoints/{model_name}_{dataset_name}/{hp_hash}_{data_hash}/"
     )
@@ -295,13 +248,13 @@ def load_model(
     # accepts `epochs` as a normal kwarg so no other special-casing is needed.
     # `seed` is not a constructor argument but stays in the hyperparameter hash.
     model_kwargs = {
-        k: v for k, v in hyperparams.items() if k not in POT_ONLY_KEYS and k != "seed"
+        k: v for k, v in hyperparams.items() if k not in utils.POT_ONLY_KEYS and k != "seed"
     }
     torch.manual_seed(hyperparams.get("seed", 1))
     model = model_class(dims, **model_kwargs).double()
     applied_hyperparams = hyperparams
-    hp_hash = _hyperparams_hash(applied_hyperparams)
-    data_hash = _data_hash(dataset_name)
+    hp_hash = utils.hyperparams_hash(applied_hyperparams)
+    data_hash = utils.data_hash(dataset_name)
 
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=model.lr, weight_decay=model.weight_decay

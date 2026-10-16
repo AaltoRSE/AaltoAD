@@ -4,6 +4,7 @@ Utility functions for running experiments.
 
 import os
 import json
+import hashlib
 from unittest import loader
 import torch
 import numpy as np
@@ -12,6 +13,10 @@ from typing import Dict, Tuple
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
+from AaltoAD import constants
+
+# Hyperparameter keys that only affect thresholding, not the trained model.
+POT_ONLY_KEYS = {"q"}
 
 
 class color:
@@ -117,6 +122,49 @@ def load_hyperparams_from_string(hyperparams_str: str) -> Dict:
     raise ValueError(
         f"Could not parse hyperparameters: not valid JSON and not an existing file path: {hyperparams_str!r}"
     )
+
+
+def hyperparams_hash(hyperparams: dict) -> str:
+    """Return a short hash (first 8 chars of SHA256) of the model-affecting hyperparams.
+
+    POT-only keys (like `q`) are stripped before hashing so that a sweep over
+    those values reuses the same trained checkpoint.
+
+    Args:
+            hyperparams (dict): Hyperparameter dictionary to hash.
+
+    Returns:
+            str: 8-character hex string, or "default" if the model-affecting subset is empty.
+    """
+    model_only = {
+        k: v for k, v in (hyperparams or {}).items() if k not in POT_ONLY_KEYS
+    }
+    if not model_only:
+        return "default"
+    serialized = json.dumps(model_only, sort_keys=True)
+    return hashlib.sha256(serialized.encode()).hexdigest()[:8]
+
+
+def data_hash(dataset_name: str) -> str:
+    """Return a short hash (first 8 chars of SHA256) of the dataset's training data file.
+
+    Hashes the raw bytes of `train.npy` in the processed dataset folder so that
+    regenerating the data invalidates cached model checkpoints.
+
+    Args:
+            dataset_name (str): Name of the dataset (processed folder name).
+
+    Returns:
+            str: 8-character hex string, or "nodata" if train.npy does not exist.
+    """
+    path = os.path.join(constants.output_folder, dataset_name, "train.npy")
+    if not os.path.exists(path):
+        return "nodata"
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:8]
 
 
 def convert_to_windows(data: torch.Tensor, model_obj) -> torch.Tensor:

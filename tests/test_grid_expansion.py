@@ -11,7 +11,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from main import (
+from AaltoAD.experiments import (
     generate_parameter_grid,
     expand_experiment_to_subexperiments,
     collect_all_subexperiments,
