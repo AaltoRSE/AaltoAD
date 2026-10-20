@@ -10,7 +10,7 @@ def load_run_scores(result):
     ``prediction_error``) and ``<...>_calib_scores.csv`` (column
     ``prediction_error``), located next to ``result["_source_path"]`` by
     replacing the ``_results.json`` suffix (same convention as
-    ``report.py``'s ``_generate_prediction_error_plot``).
+    ``report.py``'s ``generate_prediction_error_plot``).
 
     Returns ``(calib, test, labels)`` as float numpy arrays (via
     ``pandas.Series.to_numpy``), or ``None`` if the source path is missing,

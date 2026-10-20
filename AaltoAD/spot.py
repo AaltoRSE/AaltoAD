@@ -61,7 +61,7 @@ class SPOT:
 
         Parameters
         ----------
-        q
+        
             Detection level (risk)
 
         Returns

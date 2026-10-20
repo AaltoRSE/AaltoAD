@@ -179,16 +179,16 @@ def test_plot_model_selection_reads_each_datasets_own_file(tmp_path, monkeypatch
     _write_model_order(tmp_path, "ds2", ["A"])
     by_model = {"A": ["rA"], "B": ["rB"], "C": ["rC"]}
     # Exactly the named models, in the file's order, per dataset.
-    assert plot._plot_model_selection("ds1", by_model) == ["B", "A"]
-    assert plot._plot_model_selection("ds2", by_model) == ["A"]
+    assert plot.plot_model_selection("ds1", by_model) == ["B", "A"]
+    assert plot.plot_model_selection("ds2", by_model) == ["A"]
     # No file: None, which leaves the plot to its usual top-n ranking.
-    assert plot._plot_model_selection("ds3", by_model) is None
+    assert plot.plot_model_selection("ds3", by_model) is None
 
 
 def test_plot_model_selection_warns_about_and_skips_an_unknown_name(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     _write_model_order(tmp_path, "ds1", ["B", "Missing", "A"])
-    kept = plot._plot_model_selection("ds1", {"A": ["rA"], "B": ["rB"]})
+    kept = plot.plot_model_selection("ds1", {"A": ["rA"], "B": ["rB"]})
     assert kept == ["B", "A"]
     out = capsys.readouterr().out
     assert '"Missing"' in out and "no results" in out

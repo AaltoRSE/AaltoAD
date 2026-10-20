@@ -8,7 +8,7 @@ from AaltoAD.thresholds import point_adjust, utils
 def oracle_metrics(scores, labels, threshold, expand_segments):
     """Compute oracle-style detection metrics for a given (already chosen) threshold.
 
-    Reproduces ``run_experiment._adjusted_f1`` (point predictions are
+    Reproduces ``run_experiment.adjusted_f1`` (point predictions are
     ``scores >= threshold``, expanded with ``adjust_predicts`` when
     ``expand_segments`` is true) plus the ``p_latency`` field from
     ``run_experiment.oracle_f1``, which is always computed on the

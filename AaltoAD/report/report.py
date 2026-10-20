@@ -27,9 +27,9 @@ def generate_report(args, results_folder="results"):
     the combined report reads ``reports/combined/model-order.json``), in which
     case the overlay shows exactly those models in that order, a name with no
     results skipped with a warning; tables and orderings are unaffected by the
-    file (see `plot._plot_model_selection`). A multi-dataset run also writes the
+    file (see `plot.plot_model_selection`). A multi-dataset run also writes the
     cross-case overview tables to reports/overview_*.tex (see
-    `_generate_overview_latex`).
+    `generate_overview_latex`).
 
     `args.threshold` names the threshold method every table quotes and every
     plot is scaled by (normalized with `cli.method_name`). `args.metric` is a
@@ -73,14 +73,14 @@ def generate_report(args, results_folder="results"):
     # Each dataset's overlay picks its own best `n_plot_models` (plot_models=None),
     # so a model that only wins on one case still shows up there — unless the
     # dataset's model-order.json hand-picks the plotted models (see
-    # `plot._plot_model_selection`). The combined report is a single pooled
+    # `plot.plot_model_selection`). The combined report is a single pooled
     # ranking, so it gets the pooled top list, or its own hand-picked file.
     for ds in by_dataset:
         _generate_dataset_report(
             ds,
             metric,
             selected[ds],
-            plot_models=plot._plot_model_selection(ds, selected[ds]),
+            plot_models=plot.plot_model_selection(ds, selected[ds]),
             shared_plots=len(by_dataset) > 1,
             n_plot_models=n_plot_models,
             threshold_method=threshold_method,
@@ -91,7 +91,7 @@ def generate_report(args, results_folder="results"):
             table_blocks=table_blocks,
         )
     if len(by_dataset) > 1:
-        tables._generate_overview_latex(
+        tables.generate_overview_latex(
             selected,
             metric,
             "reports",
@@ -99,7 +99,7 @@ def generate_report(args, results_folder="results"):
             model_order=model_order,
         )
         pooled = _pooled_by_model(selected)
-        plot_models = plot._plot_model_selection("combined", pooled)
+        plot_models = plot.plot_model_selection("combined", pooled)
         if plot_models is None:
             plot_models = _top_models(
                 pooled,
@@ -198,7 +198,7 @@ def _generate_dataset_report(
     """Write all report files for one dataset from its (pre-selected) results.
 
     `plot_models` fixes the models shown in the overlay plot (see
-    `plot._generate_prediction_error_plot`). With `shared_plots`, a second set of
+    `plot.generate_prediction_error_plot`). With `shared_plots`, a second set of
     plots scaled by the shared thresholds is written next to the local ones
     (``prediction_errors_shared.png`` and ``plots_shared/``).
     """
@@ -233,17 +233,17 @@ def _generate_dataset_report(
         else _order_rank(by_model, metric, threshold_method, model_order)
     )
 
-    tables._generate_html(
+    tables.generate_html(
         dataset, metric, by_model, html_path, unlabeled=unlabeled, order=order
     )
-    tables._generate_pdf(
+    tables.generate_pdf(
         dataset, metric, by_model, pdf_path, unlabeled=unlabeled, order=order
     )
-    tables._generate_csv(
+    tables.generate_csv(
         dataset, metric, by_model, csv_path, unlabeled=unlabeled, order=order
     )
-    tables._generate_hp_markdown(dataset, metric, by_model, hp_path, order=order)
-    tables._generate_latex(
+    tables.generate_hp_markdown(dataset, metric, by_model, hp_path, order=order)
+    tables.generate_latex(
         dataset,
         metric,
         by_model,
@@ -254,7 +254,7 @@ def _generate_dataset_report(
         columns=table_columns,
         blocks=table_blocks,
     )
-    plot._generate_prediction_error_plot(
+    plot.generate_prediction_error_plot(
         dataset,
         metric,
         by_model,
@@ -266,7 +266,7 @@ def _generate_dataset_report(
         downsample_mode=downsample_mode,
         downsample_window=downsample_window,
     )
-    plot._generate_model_plots(
+    plot.generate_model_plots(
         dataset,
         metric,
         by_model,
@@ -277,7 +277,7 @@ def _generate_dataset_report(
     )
     if shared_plots:
         shared_plot_path = os.path.join(dataset_dir, "prediction_errors_shared.png")
-        plot._generate_prediction_error_plot(
+        plot.generate_prediction_error_plot(
             dataset,
             metric,
             by_model,
@@ -290,7 +290,7 @@ def _generate_dataset_report(
             downsample_mode=downsample_mode,
             downsample_window=downsample_window,
         )
-        plot._generate_model_plots(
+        plot.generate_model_plots(
             dataset,
             metric,
             by_model,

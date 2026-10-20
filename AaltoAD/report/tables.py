@@ -59,7 +59,7 @@ OVERVIEW_TABLES = [
 ]
 
 
-def _generate_latex(
+def generate_latex(
     dataset,
     metric,
     by_model,
@@ -122,7 +122,7 @@ def _generate_latex(
     print(f"LaTeX summary written to {output_path}")
 
 
-def _generate_overview_latex(
+def generate_overview_latex(
     by_dataset,
     metric,
     output_dir,
@@ -280,7 +280,7 @@ def _latex_escape(s):
     return "".join(out)
 
 
-def _generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
+def generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
     """One line per model listing its best-result hyperparameters."""
     sort_metric = metrics.table_sort_metric(metric)
     lower_is_better = sort_metric in metrics.LOWER_IS_BETTER
@@ -319,7 +319,7 @@ def _generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
     print(f"Hyperparameter summary written to {output_path}")
 
 
-def _generate_csv(dataset, metric, by_model, output_path, unlabeled=False, order=None):
+def generate_csv(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     """One row per model, slim metric set; selected and ordered by `metric`
     (falling back to F1 ordering for non-comparable metrics)."""
     sort_metric = metrics.table_sort_metric(metric)
@@ -542,7 +542,7 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
     return metric_rows, hp_rows, all_hp_keys, display_columns
 
 
-def _generate_html(dataset, metric, by_model, output_path, unlabeled=False, order=None):
+def generate_html(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     metric_rows, hp_rows, hp_keys, display_columns = _build_summary(
         by_model, metric, unlabeled=unlabeled, order=order
     )
@@ -592,7 +592,7 @@ def _draw_table_page(pdf, title, columns, rows):
     plt.close(fig)
 
 
-def _generate_pdf(dataset, metric, by_model, output_path, unlabeled=False, order=None):
+def generate_pdf(dataset, metric, by_model, output_path, unlabeled=False, order=None):
     metric_rows, hp_rows, hp_keys, display_columns = _build_summary(
         by_model, metric, unlabeled=unlabeled, order=order
     )

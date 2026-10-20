@@ -87,7 +87,7 @@ def _clip_for_plot(values):
     return values.clip(upper=PLOT_VALUE_CLIP)
 
 
-def _generate_prediction_error_plot(
+def generate_prediction_error_plot(
     dataset,
     metric,
     by_model,
@@ -210,7 +210,7 @@ def _generate_prediction_error_plot(
     style.save_png(fig, output_path)
 
 
-def _generate_model_plots(
+def generate_model_plots(
     dataset,
     metric,
     by_model,
@@ -328,7 +328,7 @@ def _read_model_order_file(path):
     return names
 
 
-def _plot_model_selection(dataset, by_model):
+def plot_model_selection(dataset, by_model):
     """Hand-picked models for `dataset`'s overlay plots, or None to rank as usual.
 
     Reads ``reports/<dataset>/model-order.json`` (see `_read_model_order_file`);
