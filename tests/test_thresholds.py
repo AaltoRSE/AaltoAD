@@ -16,7 +16,6 @@ from AaltoAD.thresholds import pot_fit
 from AaltoAD.thresholds import scores as scores_mod
 from AaltoAD.thresholds import shared as shared_mod
 
-import generate_data
 
 
 @pytest.fixture(autouse=True)
@@ -137,9 +136,9 @@ def _brute_force_pooled_threshold(scores_list, labels_list, expand_segments):
 
 
 @pytest.mark.parametrize("expand_segments", [False, True])
-def test_shared_oracle_threshold_matches_brute_force_sweep(expand_segments):
-    scores_a, labels_a = generate_data._make_series(1)
-    scores_b, labels_b = generate_data._make_series(2)
+def test_shared_oracle_threshold_matches_brute_force_sweep(expand_segments, synthetic_series):
+    scores_a, labels_a = synthetic_series(1)
+    scores_b, labels_b = synthetic_series(2)
     scores_list = [scores_a, scores_b]
     labels_list = [labels_a, labels_b]
 
@@ -162,11 +161,11 @@ def test_shared_oracle_threshold_matches_brute_force_sweep(expand_segments):
     assert got_thr == pytest.approx(expected_thr)
 
 
-def test_shared_oracle_threshold_single_dataset_matches_oracle_f1():
+def test_shared_oracle_threshold_single_dataset_matches_oracle_f1(synthetic_series):
     torch = pytest.importorskip('torch')
     from AaltoAD import run_experiment
 
-    scores, labels = generate_data._make_series(3)
+    scores, labels = synthetic_series(3)
 
     for expand in (False, True):
         oracle_result, _ = run_experiment.oracle_f1(scores, labels, expand_segments=expand)
@@ -182,11 +181,11 @@ def test_shared_oracle_threshold_single_dataset_matches_oracle_f1():
 # 4. shared_threshold_blocks
 # ---------------------------------------------------------------------------
 
-def test_shared_threshold_blocks_identical_thresholds_and_summed_counts(tmp_path, monkeypatch):
+def test_shared_threshold_blocks_identical_thresholds_and_summed_counts(tmp_path, monkeypatch, synthetic_dataset):
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
-    result_a, scores_a, labels_a, calib_a = generate_data._write_dataset(tmp_path, "ds_a", seed=1)
-    result_b, scores_b, labels_b, calib_b = generate_data._write_dataset(tmp_path, "ds_b", seed=2)
+    result_a, scores_a, labels_a, calib_a = synthetic_dataset("ds_a", seed=1)
+    result_b, scores_b, labels_b, calib_b = synthetic_dataset("ds_b", seed=2)
 
     results_by_dataset = {"ds_a": result_a, "ds_b": result_b}
     blocks = shared_mod.shared_threshold_blocks(results_by_dataset, q=1e-5, level=AaltoAD.constants.level)
@@ -219,11 +218,11 @@ def test_shared_threshold_blocks_identical_thresholds_and_summed_counts(tmp_path
         assert sum_fn == pytest.approx(pooled_metrics[fn_key])
 
 
-def test_shared_threshold_blocks_returns_none_when_csv_missing(tmp_path, monkeypatch):
+def test_shared_threshold_blocks_returns_none_when_csv_missing(tmp_path, monkeypatch, synthetic_dataset):
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
-    result_a, *_ = generate_data._write_dataset(tmp_path, "ds_a", seed=1)
-    result_b, *_ = generate_data._write_dataset(tmp_path, "ds_b", seed=2)
+    result_a, *_ = synthetic_dataset("ds_a", seed=1)
+    result_b, *_ = synthetic_dataset("ds_b", seed=2)
 
     # remove one of ds_b's CSVs
     os.remove(str(tmp_path / "ds_b" / "M_exp1.0_calib_scores.csv"))
@@ -261,13 +260,13 @@ def test_load_cache_missing_path_returns_empty_dict(tmp_path):
 # 6. load_results.load_results — threshold application
 # ---------------------------------------------------------------------------
 
-def test_pooled_baselines_share_one_threshold_and_leave_incomplete_untouched(tmp_path, monkeypatch):
+def test_pooled_baselines_share_one_threshold_and_leave_incomplete_untouched(tmp_path, monkeypatch, synthetic_dataset):
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
     # POT_INIT resolves by prefix, so "synthetic_a"/"synthetic_b" match "synthetic".
     ds_a_name, ds_b_name = "synthetic_a", "synthetic_b"
-    result_a, *_ = generate_data._write_dataset(tmp_path, ds_a_name, seed=1)
-    result_b, *_ = generate_data._write_dataset(tmp_path, ds_b_name, seed=2)
+    result_a, *_ = synthetic_dataset(ds_a_name, seed=1)
+    result_b, *_ = synthetic_dataset(ds_b_name, seed=2)
 
     # A second configuration present only in ds_a (incomplete across datasets).
     ds_a_dir = tmp_path / ds_a_name
@@ -296,12 +295,12 @@ def test_pooled_baselines_share_one_threshold_and_leave_incomplete_untouched(tmp
     assert "shared_threshold" not in incomplete_a
 
 
-def test_separate_baselines_fit_each_dataset_on_its_own_calibration(tmp_path, monkeypatch):
+def test_separate_baselines_fit_each_dataset_on_its_own_calibration(tmp_path, monkeypatch, synthetic_dataset):
     """The default: every dataset is thresholded on its own baseline."""
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
     ds_a_name, ds_b_name = "synthetic_a", "synthetic_b"
-    generate_data._write_dataset(tmp_path, ds_a_name, seed=1)
-    generate_data._write_dataset(tmp_path, ds_b_name, seed=2)
+    synthetic_dataset(ds_a_name, seed=1)
+    synthetic_dataset(ds_b_name, seed=2)
     by_dataset = load_results.load_results(
         [ds_a_name, ds_b_name], results_folder=str(tmp_path)
     )
@@ -321,14 +320,14 @@ def test_separate_baselines_fit_each_dataset_on_its_own_calibration(tmp_path, mo
         assert r["conformal"]["threshold"] == pytest.approx(expected)
 
 
-def test_load_results_second_call_hits_cache(tmp_path, monkeypatch):
+def test_load_results_second_call_hits_cache(tmp_path, monkeypatch, synthetic_dataset):
     from AaltoAD.thresholds import shared as shared_module
 
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
     ds_a_name, ds_b_name = "synthetic_a", "synthetic_b"
-    generate_data._write_dataset(tmp_path, ds_a_name, seed=1)
-    generate_data._write_dataset(tmp_path, ds_b_name, seed=2)
+    synthetic_dataset(ds_a_name, seed=1)
+    synthetic_dataset(ds_b_name, seed=2)
 
     load_results.load_results([ds_a_name, ds_b_name], results_folder=str(tmp_path))
 
@@ -346,7 +345,7 @@ def test_load_results_second_call_hits_cache(tmp_path, monkeypatch):
     assert call_count["n"] == 0
 
 
-def test_pool_baselines_fits_thresholds_over_all_result_files(tmp_path, monkeypatch):
+def test_pool_baselines_fits_thresholds_over_all_result_files(tmp_path, monkeypatch, synthetic_dataset):
     """pool_baselines=True: one POT/conformal/oracle threshold fitted over ALL
     result files' pooled calibration and test series, shared by every dataset.
 
@@ -356,7 +355,7 @@ def test_pool_baselines_fits_thresholds_over_all_result_files(tmp_path, monkeypa
 
     scores, labels, calib = {}, {}, {}
     for ds, seed in (("ds_a", 1), ("ds_b", 2)):
-        scores[ds], labels[ds], calib[ds] = generate_data._write_dataset(tmp_path, ds, seed)[1:]
+        scores[ds], labels[ds], calib[ds] = synthetic_dataset(ds, seed)[1:]
     by_dataset = load_results.load_results(
         ["ds_a", "ds_b"], results_folder=str(tmp_path), pool_baselines=True
     )
@@ -402,11 +401,11 @@ def test_pool_baselines_fits_thresholds_over_all_result_files(tmp_path, monkeypa
     ],
 )
 def test_load_results_returns_metric_block_from_file_when_present(
-    tmp_path, monkeypatch, method
+    tmp_path, monkeypatch, method, synthetic_dataset
 ):
     """A metric block already present in the result file is returned as-is."""
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
-    generate_data._write_dataset(tmp_path, "ds_a", seed=1)
+    synthetic_dataset("ds_a", seed=1)
     path = tmp_path / "ds_a" / "M_exp1.0_results.json"
     data = json.loads(path.read_text())
     block = {"threshold": 42.0, "f1": 0.123}
@@ -441,12 +440,12 @@ def test_load_results_returns_metric_block_from_file_when_present(
     ],
 )
 def test_load_results_calculates_metric_block_when_missing(
-    tmp_path, monkeypatch, method
+    tmp_path, monkeypatch, method, synthetic_dataset
 ):
     """A metric block absent from the result file is calculated from the
     prediction errors, the threshold fitted from the calibration scores."""
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
-    _, scores, labels, calib = generate_data._write_dataset(tmp_path, "ds_a", seed=1)
+    _, scores, labels, calib = synthetic_dataset("ds_a", seed=1)
 
     by_dataset = load_results.load_results(["ds_a"], results_folder=str(tmp_path))
     result = by_dataset["ds_a"]["M"][0]
@@ -477,8 +476,8 @@ def test_group_configurations_groups_by_model_and_key_and_picks_best():
     assert groups[("M", key(r3))] == {"d2": r3}
 
 
-def test_source_mtimes_reads_csv_mtimes_and_none_when_missing(tmp_path):
-    result_a, *_ = generate_data._write_dataset(tmp_path, "synthetic_a", seed=1)
+def test_source_mtimes_reads_csv_mtimes_and_none_when_missing(tmp_path, synthetic_dataset):
+    result_a, *_ = synthetic_dataset("synthetic_a", seed=1)
     sources = shared_mod.source_mtimes({"synthetic_a": result_a})
     labels_path = result_a["_source_path"].replace("_results.json", "_labels.csv")
     assert sources["synthetic_a"][0] == os.path.getmtime(labels_path)
@@ -486,10 +485,10 @@ def test_source_mtimes_reads_csv_mtimes_and_none_when_missing(tmp_path):
     assert shared_mod.source_mtimes({"x": {}}) is None
 
 
-def test_shared_blocks_cached_fits_once_and_reuses_cache(tmp_path, monkeypatch):
+def test_shared_blocks_cached_fits_once_and_reuses_cache(tmp_path, monkeypatch, synthetic_dataset):
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
-    result_a, *_ = generate_data._write_dataset(tmp_path, "synthetic_a", seed=1)
-    result_b, *_ = generate_data._write_dataset(tmp_path, "synthetic_b", seed=2)
+    result_a, *_ = synthetic_dataset("synthetic_a", seed=1)
+    result_b, *_ = synthetic_dataset("synthetic_b", seed=2)
     members = {"synthetic_a": result_a, "synthetic_b": result_b}
     calls = []
     real = shared_mod.shared_threshold_blocks

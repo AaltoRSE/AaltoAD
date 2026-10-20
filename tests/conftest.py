@@ -1,13 +1,16 @@
-"""Synthetic labelled prediction errors for tests.
+"""Shared test fixtures: synthetic labelled prediction errors.
 
-Random score series with contiguous anomaly segments, and on-disk run results
-(results JSON, labels CSV, calibration CSV) built from them.
+`synthetic_series` gives random score series with contiguous anomaly segments;
+`synthetic_dataset` gives a dataset on disk (results JSON, labels CSV,
+calibration CSV) built from them under the test's `tmp_path`. Both are
+factory fixtures: the test calls the returned function with its own seeds.
 """
 
 import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
 
 def _make_series(seed, n=60):
@@ -24,6 +27,11 @@ def _make_series(seed, n=60):
 
 
 def _write_dataset(tmp_path, name, seed, hp_suffix="M_exp1.0"):
+    """Write one run's results JSON, labels CSV and calibration CSV under `tmp_path/name`.
+
+    Returns ``(result, scores, labels, calib)``, with ``result["_source_path"]``
+    pointing at the results JSON.
+    """
     ds_dir = tmp_path / name
     ds_dir.mkdir()
 
@@ -50,3 +58,17 @@ def _write_dataset(tmp_path, name, seed, hp_suffix="M_exp1.0"):
         result = json.load(f)
     result["_source_path"] = str(results_path)
     return result, scores, labels, calib
+
+
+@pytest.fixture
+def synthetic_series():
+    """Factory: ``synthetic_series(seed, n=60)`` -> ``(scores, labels)``."""
+    return _make_series
+
+
+@pytest.fixture
+def synthetic_dataset(tmp_path):
+    """Factory: ``synthetic_dataset(name, seed, hp_suffix="M_exp1.0")`` writes under `tmp_path`."""
+    def write(name, seed, hp_suffix="M_exp1.0"):
+        return _write_dataset(tmp_path, name, seed, hp_suffix)
+    return write
