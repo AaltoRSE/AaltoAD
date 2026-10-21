@@ -15,8 +15,14 @@ def oracle_metrics(scores, labels, threshold, expand_segments):
     *unexpanded* predictions. Returns a dict with keys ``threshold, f1,
     precision, recall, fpr, tp, fp, fn, tn, p_latency``.
     """
+    scores = np.asarray(scores, dtype=float)
     labels = np.asarray(labels, dtype=float)
-    pred, adj = utils.adjusted_predictions(scores, labels, threshold, expand_segments)
+    pred = (scores >= threshold).astype(int)
+    if expand_segments:
+        # adjust_predicts mutates `pred`; keep the raw predictions for p_latency.
+        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=pred.copy()))
+    else:
+        adj = pred
     f1, prec, rec, fpr, tp, fp, fn, tn = utils.prediction_metrics(adj, labels)
     p_latency = point_adjust.segment_latency(pred, labels)
     return {

@@ -1,31 +1,9 @@
 """Shared helpers for threshold-based detection metrics.
 
-Public API: adjusted_predictions, prediction_metrics.
+Public API: prediction_metrics.
 """
 
 import numpy as np
-
-from AaltoAD.thresholds import point_adjust
-
-
-def adjusted_predictions(scores, labels, threshold, expand_segments):
-    """Point predictions at `threshold` and their segment-adjusted version.
-
-    Returns a tuple `(pred, adj)`: `pred` is the raw point prediction
-    (`scores >= threshold`); `adj` is `pred` expanded along labelled segments
-    with `adjust_predicts` when `expand_segments` is true, else `pred` itself.
-    `adjust_predicts` mutates the array passed as `pred`, so the raw
-    predictions are copied before adjustment — both returned arrays are safe
-    to use independently (e.g. latency on raw `pred`, metrics on `adj`).
-    """
-    scores = np.asarray(scores, dtype=float)
-    labels = np.asarray(labels, dtype=float)
-    pred = (scores >= threshold).astype(int)
-    if expand_segments:
-        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=pred.copy()))
-    else:
-        adj = pred
-    return pred, adj
 
 
 def prediction_metrics(pred, labels):

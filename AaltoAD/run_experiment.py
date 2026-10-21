@@ -27,7 +27,7 @@ from AaltoAD import merlin
 from AaltoAD import diagnosis
 from AaltoAD import utils
 from AaltoAD.thresholds import point_adjust
-from AaltoAD.thresholds.utils import adjusted_predictions, prediction_metrics
+from AaltoAD.thresholds.utils import prediction_metrics
 
 import tempfile
 import shutil
@@ -52,19 +52,6 @@ def loss_stats(name, x):
     )
 
 
-def _adjusted_f1(scores, labels, threshold, segment_expansion=True):
-    """Compute segment-adjusted precision/recall/F1 at one threshold.
-
-    Matches what `pot.poteval_step` reports — segment-level point adjustment
-    (via `thresholds.utils.adjusted_predictions`) that expands any in-segment
-    detection across the whole ground-truth attack episode. Caller must pass
-    `scores` and `labels` in original time order; otherwise the segment
-    expansion in `adjust_predicts` operates on the wrong adjacencies.
-    """
-    _, adj = adjusted_predictions(scores, labels, threshold, segment_expansion)
-    return prediction_metrics(adj, labels)
-
-
 def oracle_f1(scores, labels, expand_segments=True):
     """Find the adjusted-F1-optimal threshold on the full time-ordered test series.
 
@@ -84,8 +71,10 @@ def oracle_f1(scores, labels, expand_segments=True):
             counts. Returns None if precision_recall_curve produced no thresholds.
       - a numpy array of predictions corresponding to the optimal threshold.
     """
-    scores = np.asarray(scores)
-    labels = np.asarray(labels)
+    # Segment expansion in adjust_predicts relies on scores and labels being
+    # in original time order.
+    scores = np.asarray(scores, dtype=float)
+    labels = np.asarray(labels, dtype=float)
 
     # Use precision_recall_curve only to enumerate candidate thresholds.
     _, _, thresholds = precision_recall_curve(labels, scores)
@@ -95,17 +84,19 @@ def oracle_f1(scores, labels, expand_segments=True):
     best_thr = float(thresholds[0])
     best_f1 = -1.0
     for thr in thresholds:
-        f1_thr, *_ = _adjusted_f1(
-            scores, labels, float(thr), segment_expansion=expand_segments
-        )
+        adj = (scores >= float(thr)).astype(int)
+        if expand_segments:
+            adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=adj))
+        f1_thr, *_ = prediction_metrics(adj, labels)
         if f1_thr > best_f1:
             best_f1 = f1_thr
             best_thr = float(thr)
 
-    f1, prec, rec, fpr, tp, fp, fn, tn = _adjusted_f1(
-        scores, labels, best_thr, segment_expansion=expand_segments
-    )
     predictions = (scores >= best_thr).astype(int)
+    adj = predictions.copy()
+    if expand_segments:
+        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=adj))
+    f1, prec, rec, fpr, tp, fp, fn, tn = prediction_metrics(adj, labels)
     p_latency = point_adjust.segment_latency(predictions, labels)
     return {
         "threshold": best_thr,
