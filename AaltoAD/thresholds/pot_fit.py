@@ -7,7 +7,7 @@
 import numpy as np
 
 from AaltoAD.spot import SPOT
-from AaltoAD.thresholds.point_adjust import calc_point2point, adjust_predicts, segment_latency
+from AaltoAD.thresholds import point_adjust
 
 
 def fit_pot_threshold(init_score, score, q, level):
@@ -20,7 +20,7 @@ def fit_pot_threshold(init_score, score, q, level):
     keeps failing after all retries.
     """
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
-        return float('nan')
+        return float("nan")
 
     retries = 0
     while True:
@@ -31,8 +31,8 @@ def fit_pot_threshold(init_score, score, q, level):
         except Exception as e:
             retries += 1
             if retries > 100:
-                print(f'SPOT: giving up after {retries} retries: {e}')
-                return float('nan')
+                print(f"SPOT: giving up after {retries} retries: {e}")
+                return float("nan")
             level = level * 0.95
         else:
             break
@@ -52,30 +52,38 @@ def pot_metrics(score, label, threshold, expand_segments):
     """
     if threshold is None or np.isnan(threshold):
         return {
-            'f1': np.nan, 'precision': np.nan, 'recall': np.nan, 'fpr': np.nan,
-            'TP': np.nan, 'TN': np.nan, 'FP': np.nan, 'FN': np.nan,
-            'ROC/AUC': np.nan, 'threshold': np.nan, 'p_latency': None,
+            "f1": np.nan,
+            "precision": np.nan,
+            "recall": np.nan,
+            "fpr": np.nan,
+            "TP": np.nan,
+            "TN": np.nan,
+            "FP": np.nan,
+            "FN": np.nan,
+            "ROC/AUC": np.nan,
+            "threshold": np.nan,
+            "p_latency": None,
         }
 
     raw_pred = score > threshold
-    p_latency = segment_latency(raw_pred, label)
+    p_latency = point_adjust.segment_latency(raw_pred, label)
     if expand_segments:
-        pred = adjust_predicts(score, label, threshold)
+        pred = point_adjust.adjust_predicts(score, label, threshold)
     else:
         pred = raw_pred
-    p_t = calc_point2point(pred, label)
+    p_t = point_adjust.calc_point2point(pred, label)
     fp, tn = float(p_t[5]), float(p_t[4])
     fpr = fp / (fp + tn) if (fp + tn) else 0.0
     return {
-        'f1': p_t[0],
-        'precision': p_t[1],
-        'recall': p_t[2],
-        'fpr': fpr,
-        'TP': p_t[3],
-        'TN': p_t[4],
-        'FP': p_t[5],
-        'FN': p_t[6],
-        'ROC/AUC': p_t[7],
-        'threshold': threshold,
-        'p_latency': p_latency,
+        "f1": p_t[0],
+        "precision": p_t[1],
+        "recall": p_t[2],
+        "fpr": fpr,
+        "TP": p_t[3],
+        "TN": p_t[4],
+        "FP": p_t[5],
+        "FN": p_t[6],
+        "ROC/AUC": p_t[7],
+        "threshold": threshold,
+        "p_latency": p_latency,
     }

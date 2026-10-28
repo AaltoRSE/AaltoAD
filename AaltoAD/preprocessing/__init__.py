@@ -8,5 +8,9 @@ from AaltoAD.preprocessing.synthetic import load_synthetic
 from AaltoAD.preprocessing.tol import load_TOL
 from AaltoAD.preprocessing.ucr import load_UCR
 from AaltoAD.preprocessing.wadi import load_WADI
-from AaltoAD.preprocessing.swat_physical import load_SWaT_physical, load_SWaT_netflow, load_SWaT_payload_netflow
+from AaltoAD.preprocessing.swat_physical import (
+    load_SWaT_physical,
+    load_SWaT_netflow,
+    load_SWaT_payload_netflow,
+)
 from AaltoAD.preprocessing.nettraffic import load_nettraffic

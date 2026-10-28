@@ -5,6 +5,7 @@ import json
 from unittest.mock import Mock, patch
 from types import SimpleNamespace
 import numpy as np
+import pandas as pd
 
 
 def test_save_and_load_model(tmp_path):
@@ -161,7 +162,8 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 
     # Setup mocks
     mock_git_hash.return_value = 'abc123'
-    mock_load_timestamps.return_value = np.arange(50)
+    # run_experiment trims timestamps by n_window and calls reset_index, so return a Series
+    mock_load_timestamps.return_value = pd.Series(np.arange(50))
 
     # Create mock model
     mock_model = Mock(spec=['name', 'lr', 'batch', 'n_window', 'eval', 'eval_step', 'epochs', 'weight_decay'])
@@ -181,20 +183,24 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 
     mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
-    # Mock convert_to_windows to return data as-is (simplified)
-    mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
+    # Mock convert_to_windows faithfully: the real function drops the first
+    # n_window positions of each split (no padding), so 50 -> 40, 100 -> 90 rows.
+    mock_convert_to_windows.side_effect = lambda data, model, *args: (
+        torch.from_numpy(data[model.n_window:]) if isinstance(data, np.ndarray) else data
+    )
 
     # Mock eval_step to return loss and predictions
-    # Since test=True, no training calls, only testing and train loss
+    # Since test=True, no training calls, only testing and train loss.
+    # Shapes match the windowed data: 50-10=40 test rows, 100-10=90 train rows.
     mock_model.eval_step = Mock(side_effect=[
-        (np.random.rand(50, 5), np.random.rand(50, 5)),   # test
-        (np.random.rand(100, 5), np.random.rand(100, 5)), # train loss
-        (np.random.rand(100, 5), np.random.rand(100, 5)), # calib loss
+        (np.random.rand(40, 5), np.random.rand(40, 5)),   # test
+        (np.random.rand(90, 5), np.random.rand(90, 5)),   # train loss
+        (np.random.rand(90, 5), np.random.rand(90, 5)),   # calib loss (unused: no calib set)
     ])
 
     # Mock pot_eval to return result and predictions (per-feature loop + 2 final calls)
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
-    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
+    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(40))
 
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
@@ -236,7 +242,8 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
 
     # Setup mocks
     mock_git_hash.return_value = 'def456'
-    mock_load_timestamps.return_value = np.arange(50)
+    # run_experiment trims timestamps by n_window and calls reset_index, so return a Series
+    mock_load_timestamps.return_value = pd.Series(np.arange(50))
 
     mock_model = Mock(spec=['name', 'lr', 'n_window', 'train_step', 'eval', 'eval_step', 'epochs', 'weight_decay'])
     mock_model.name = 'USAD'
@@ -255,20 +262,24 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
 
     mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
-    # Mock convert_to_windows to return data as-is (simplified)
-    mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
+    # Mock convert_to_windows faithfully: the real function drops the first
+    # n_window positions of each split (no padding), so 50 -> 40, 100 -> 90 rows.
+    mock_convert_to_windows.side_effect = lambda data, model, *args: (
+        torch.from_numpy(data[model.n_window:]) if isinstance(data, np.ndarray) else data
+    )
 
-    # Mock train_step for training (5 epochs) and eval_step for testing + train loss
+    # Mock train_step for training (5 epochs) and eval_step for testing + train loss.
+    # eval_step shapes match the windowed data: 50-10=40 test, 100-10=90 train rows.
     training_returns = [(0.5 - i*0.1, 0.001 - i*0.0001) for i in range(5)]
     mock_model.train_step = Mock(side_effect=training_returns)
     mock_model.eval_step = Mock(side_effect=[
-        (np.random.rand(50, 5), np.random.rand(50, 5)),   # test
-        (np.random.rand(100, 5), np.random.rand(100, 5)), # train loss
-        (np.random.rand(100, 5), np.random.rand(100, 5)), # calib loss
+        (np.random.rand(40, 5), np.random.rand(40, 5)),   # test
+        (np.random.rand(90, 5), np.random.rand(90, 5)),   # train loss
+        (np.random.rand(90, 5), np.random.rand(90, 5)),   # calib loss (unused: no calib set)
     ])
 
     mock_pot_result = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
-    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
+    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(40))
 
     mock_hit_att.return_value = {'hit_rate': 0.85}
     mock_ndcg.return_value = {'ndcg': 0.78}
@@ -334,24 +345,29 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
     mock_model.name = 'AaltoAD'
     mock_model.n_window = 10
     mock_load_model.return_value = (mock_model, Mock(), Mock(), -1, [], {}, 'default')
-    mock_load_timestamps.return_value = np.arange(50)
+    # run_experiment trims timestamps by n_window and calls reset_index, so return a Series
+    mock_load_timestamps.return_value = pd.Series(np.arange(50))
 
     train_data = torch.randn(100, 5).numpy()
     test_data = torch.randn(50, 5).numpy()
     labels = np.random.randint(0, 2, (50, 5))
     mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
-    # Mock convert_to_windows to return data as-is (simplified)
-    mock_convert_to_windows.side_effect = lambda data, *args: torch.from_numpy(data) if isinstance(data, np.ndarray) else data
+    # Mock convert_to_windows faithfully: the real function drops the first
+    # n_window positions of each split (no padding), so 50 -> 40, 100 -> 90 rows.
+    mock_convert_to_windows.side_effect = lambda data, model, *args: (
+        torch.from_numpy(data[model.n_window:]) if isinstance(data, np.ndarray) else data
+    )
 
+    # eval_step shapes match the windowed data: 50-10=40 test, 100-10=90 train rows.
     mock_model.eval_step = Mock(side_effect=[
-        (np.random.rand(50, 5), np.random.rand(50, 5)),
-        (np.random.rand(100, 5), np.random.rand(100, 5)),
-        (np.random.rand(100, 5), np.random.rand(100, 5)),
+        (np.random.rand(40, 5), np.random.rand(40, 5)),
+        (np.random.rand(90, 5), np.random.rand(90, 5)),
+        (np.random.rand(90, 5), np.random.rand(90, 5)),
     ])
 
     mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
-    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(50))
+    mock_pot_eval.return_value = (mock_pot_result, np.random.rand(40))
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
 

@@ -2,13 +2,13 @@
 
 import numpy as np
 
-from AaltoAD.thresholds.point_adjust import adjust_predicts, segment_latency
+from AaltoAD.thresholds import point_adjust, utils
 
 
 def oracle_metrics(scores, labels, threshold, expand_segments):
     """Compute oracle-style detection metrics for a given (already chosen) threshold.
 
-    Reproduces ``run_experiment._adjusted_f1`` (point predictions are
+    Reproduces ``run_experiment.adjusted_f1`` (point predictions are
     ``scores >= threshold``, expanded with ``adjust_predicts`` when
     ``expand_segments`` is true) plus the ``p_latency`` field from
     ``run_experiment.oracle_f1``, which is always computed on the
@@ -19,27 +19,23 @@ def oracle_metrics(scores, labels, threshold, expand_segments):
     labels = np.asarray(labels, dtype=float)
     pred = (scores >= threshold).astype(int)
     if expand_segments:
-        # adjust_predicts mutates the array it is given; keep `pred` raw for p_latency.
-        adj = np.asarray(adjust_predicts(scores, labels, pred=pred.copy()))
+        # adjust_predicts mutates `pred`; keep the raw predictions for p_latency.
+        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=pred.copy()))
     else:
         adj = pred
-    tp = int(np.sum(adj * labels))
-    fp = int(np.sum(adj * (1 - labels)))
-    fn = int(np.sum((1 - adj) * labels))
-    tn = int(np.sum((1 - adj) * (1 - labels)))
-    prec = tp / (tp + fp) if (tp + fp) else 0.0
-    rec = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
-    fpr = fp / (fp + tn) if (fp + tn) else 0.0
-    p_latency = segment_latency(pred, labels)
+    f1, prec, rec, fpr, tp, fp, fn, tn = utils.prediction_metrics(adj, labels)
+    p_latency = point_adjust.segment_latency(pred, labels)
     return {
-        'threshold': float(threshold),
-        'f1': float(f1),
-        'precision': float(prec),
-        'recall': float(rec),
-        'fpr': float(fpr),
-        'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
-        'p_latency': p_latency,
+        "threshold": float(threshold),
+        "f1": float(f1),
+        "precision": float(prec),
+        "recall": float(rec),
+        "fpr": float(fpr),
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "tn": tn,
+        "p_latency": p_latency,
     }
 
 
@@ -74,7 +70,7 @@ def _raw_counts(scores, labels, candidates):
         return zeros, zeros
     # suffix_tp[i] = sum(l_asc[i:]), with suffix_tp[n] = 0
     suffix_tp = np.concatenate([np.cumsum(l_asc[::-1])[::-1], [0.0]])
-    idx = np.searchsorted(s_asc, candidates, side='left')
+    idx = np.searchsorted(s_asc, candidates, side="left")
     tp = suffix_tp[idx]
     total = n - idx
     fp = total - tp
@@ -110,7 +106,7 @@ def _expanded_counts(scores, labels, candidates):
         m_asc = seg_max[order]
         l_asc = seg_len[order]
         suffix_len = np.concatenate([np.cumsum(l_asc[::-1])[::-1], [0.0]])
-        idx = np.searchsorted(m_asc, candidates, side='left')
+        idx = np.searchsorted(m_asc, candidates, side="left")
         tp = suffix_len[idx]
     else:
         tp = np.zeros(len(candidates))
@@ -134,7 +130,9 @@ def shared_oracle_threshold(scores_list, labels_list, expand_segments):
     This function only searches; call ``oracle_metrics`` with the returned
     threshold for the exact, authoritative metrics.
     """
-    candidates = np.unique(np.concatenate([np.asarray(s, dtype=float) for s in scores_list]))
+    candidates = np.unique(
+        np.concatenate([np.asarray(s, dtype=float) for s in scores_list])
+    )
     total_tp = np.zeros(len(candidates))
     total_fp = np.zeros(len(candidates))
     total_fn = np.zeros(len(candidates))

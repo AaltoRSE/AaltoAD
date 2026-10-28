@@ -46,7 +46,7 @@ The `load_dataset()` function in main.py expects:
 - **normalize()** - Symmetric scaling around 0.5, range ~[0.25, 0.75]
 - **normalize2()** - Global min-max, range [0, 1], returns (normalized, min, max)
 - **normalize3()** - Per-feature min-max, range [0, 1], preserves per-feature scaling
-- **convertNumpy()** - Downsample by 10x and normalize (for large datasets)
+
 
 ---
 

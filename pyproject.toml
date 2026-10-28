@@ -13,10 +13,15 @@ dependencies = [
     "SciencePlots",
     "scikit-learn",
     "openpyxl",
-    "pytest",
     "torch",
     "scienceplots",
 ]
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+]
+
 
 [tool.setuptools]
 packages = ["AaltoAD"]

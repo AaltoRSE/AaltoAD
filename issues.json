@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "title": "Keep training data as a list of segments instead of concatenating",
+    "description": "Partitions are stitched by concatenating segment arrays, which creates artificial boundaries between non-contiguous segments (e.g. train blocks before and after a test/anomaly period, or train data from several days). Store each partition as a list of segments and have training iterate over them in a loop.",
+    "refs": ["AaltoAD/preprocessing/nettraffic.py:355", "AaltoAD/preprocessing/nettraffic.py:359"]
+  },
+  {
+    "id": 2,
+    "title": "Multi-day nettraffic datasets",
+    "description": "8 one-day sets, each with one anomaly. Training data must not contain anomalies but can be stitched from clean segments of many days. Tests should cover several different anomalies, so keep a few days in reserve as test days.",
+    "refs": []
+  },
+  {
+    "id": 3,
+    "title": "Allow choosing the output folder / dataset name in preprocess.py",
+    "description": "Output always goes to processed/<dataset>; output_folder is not exposed on the CLI. Only names in the datasets list or starting with 'TOL' are accepted, so e.g. 'nettraffic_day1' is skipped even though load_data would dispatch it. Currently worked around by renaming the output folder by hand.",
+    "refs": ["preprocess.py:68", "preprocess.py:167", "preprocess.py:170"]
+  },
+  {
+    "id": 4,
+    "title": "Unify TOL --window and nettraffic --interval",
+    "description": "Both aggregate time into rows, but TOL uses --window (segment lengths in seconds, divisible by the window) while nettraffic uses --interval (segment lengths count intervals). --window is not passed to nettraffic. The --segment help says SECONDS, which is wrong for nettraffic. Defaults differ: CLI --interval is 10, load_nettraffic defaults to interval=1.",
+    "refs": ["preprocess.py:81", "preprocess.py:88", "preprocess.py:144", "preprocess.py:147", "AaltoAD/preprocessing/nettraffic.py:200"]
+  },
+  {
+    "id": 5,
+    "title": "General preprocessing method / common dataset format",
+    "description": "Datasets are formatted differently from each other and the nettraffic format has changed. Design a more general preprocessing method instead of per-dataset loaders.",
+    "refs": ["AaltoAD/preprocessing/"]
+  },
+  {
+    "id": 6,
+    "title": "Anomalous device can fall outside top-k IPs",
+    "description": "In the 2026-10-03 test (--top-k 10), 10.78.1.129 got its own columns but 10.78.1.126 (also anomalous, doubletemp) did not, so its temperature is averaged into other_internal_mean_temp. Top-k by packet frequency may drop devices whose signal is in temperature.",
+    "refs": ["AaltoAD/preprocessing/nettraffic.py:285", "anomalies.csv"]
+  },
+  {
+    "id": 7,
+    "title": "ipykernel not declared in project dependencies",
+    "description": "ipykernel was pip-installed into the AaltoAD env so VS Code can use it as a Jupyter kernel, but it is not in requirements.txt or pyproject.toml.",
+    "refs": ["requirements.txt", "pyproject.toml"]
+  },
+  {
+    "id": 8,
+    "title": "load_data reads global args for nettraffic options",
+    "description": "The nettraffic branch of load_data uses args.port_entropy, args.bytes and args.temperature from the module-level args set in __main__, instead of function parameters. Calling load_data from anywhere else (imports, tests) raises NameError.",
+    "refs": ["preprocess.py:90"]
+  },
+  {
+    "id": 9,
+    "title": "Fill in authors in pyproject.toml",
+    "description": "Update authors in pyproject.toml to use local team names and revise later if needed. The authors list is currently empty. Moved from TODO.md, which also had a stray trailing line 'TranAD Contributors' (likely a leftover author entry).",
+    "refs": ["pyproject.toml:5"]
+  },
+  {
+    "id": 10,
+    "title": "Create a CITATIONS file",
+    "description": "Create a CITATIONS file to document references and citations for the project. Moved from TODO.md.",
+    "refs": []
+  }
+]

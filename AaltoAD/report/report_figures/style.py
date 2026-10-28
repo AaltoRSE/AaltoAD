@@ -2,10 +2,21 @@
 
 import matplotlib.pyplot as plt
 
-PALETTE = [f"tab:{name}" for name in (
-    "blue", "orange", "green", "red", "purple",
-    "brown", "pink", "gray", "olive", "cyan",
-)]
+PALETTE = [
+    f"tab:{name}"
+    for name in (
+        "blue",
+        "orange",
+        "green",
+        "red",
+        "purple",
+        "brown",
+        "pink",
+        "gray",
+        "olive",
+        "cyan",
+    )
+]
 FIGSIZE = (14, 5.4)
 DPI = 300
 LINEWIDTH = 1.5
@@ -30,6 +41,31 @@ def plot_series(ax, data):
             values.index,
             values.values,
             color=PALETTE[i % len(PALETTE)],
+            linestyle="-",
+            linewidth=LINEWIDTH,
+            label=name,
+        )
+
+
+def plot_bands(ax, low, high):
+    """Draw each column of `low`/`high` as a filled min-max band with its maximum on top.
+
+    The band shows the whole range each window covers; the solid line is the
+    window maximum, so a threshold crossing is always visible as a line and not
+    only as the edge of a translucent fill.
+    """
+    columns = list(high.columns) if hasattr(high, "columns") else [high.name]
+    for i, name in enumerate(columns):
+        lo = low[name] if hasattr(low, "columns") else low
+        hi = high[name] if hasattr(high, "columns") else high
+        color = PALETTE[i % len(PALETTE)]
+        ax.fill_between(
+            hi.index, lo.values, hi.values, color=color, alpha=0.3, linewidth=0
+        )
+        ax.plot(
+            hi.index,
+            hi.values,
+            color=color,
             linestyle="-",
             linewidth=LINEWIDTH,
             label=name,

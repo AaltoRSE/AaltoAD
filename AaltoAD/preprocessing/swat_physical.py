@@ -12,9 +12,13 @@ def _zero_baseline_constant_cols(df_train, dftest):
     test-time variation in such columns by 1/eps (~10000x), drowning out signal
     from the well-behaved features.
     """
-    constant_cols = [c for c in df_train.columns if df_train[c].nunique(dropna=True) <= 1]
+    constant_cols = [
+        c for c in df_train.columns if df_train[c].nunique(dropna=True) <= 1
+    ]
     if constant_cols:
-        print(f'zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}')
+        print(
+            f"zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}"
+        )
     for c in constant_cols:
         df_train[c] = 0.0
         dftest[c] = 0.0
@@ -22,23 +26,27 @@ def _zero_baseline_constant_cols(df_train, dftest):
 
 
 def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
-    dataset_folder = os.path.join(data_folder, 'SWaT_payload_netflow')
-    baseline_file = os.path.join(dataset_folder, 'NetflowPayload-Baseline-10s.csv')
-    attack_file = os.path.join(dataset_folder, 'NetflowPayload-Attack-10s.csv')
+    dataset_folder = os.path.join(data_folder, "SWaT_payload_netflow")
+    baseline_file = os.path.join(dataset_folder, "NetflowPayload-Baseline-10s.csv")
+    attack_file = os.path.join(dataset_folder, "NetflowPayload-Attack-10s.csv")
 
     df_baseline = pd.read_csv(baseline_file)
     df_attack = pd.read_csv(attack_file)
 
-    n_test_baseline = int(test_size*len(df_baseline))
+    n_test_baseline = int(test_size * len(df_baseline))
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
-    test_timestamps = df_test['Timestamp']
+    test_timestamps = df_test["Timestamp"]
 
-    labels = df_test['Tag']
+    labels = df_test["Tag"]
     labels = pd.to_numeric(labels, errors="coerce").ne(0).astype(int).to_numpy()
-    df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
-    df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
+    df_train = df_train.drop(
+        columns=["Normal/Attack", "Timestamp", "tag", "Tag"], errors="ignore"
+    )
+    df_test = df_test.drop(
+        columns=["Normal/Attack", "Timestamp", "tag", "Tag"], errors="ignore"
+    )
 
     constant_cols = _zero_baseline_constant_cols(df_train, df_test)
 
@@ -53,30 +61,38 @@ def load_SWaT_payload_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size
     train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
-    for file in ['train', 'test', 'labels']:
-        np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+    for file in ["train", "test", "labels"]:
+        np.save(os.path.join(folder, f"{file}.npy"), eval(file))
 
-    pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
+    pd.DataFrame(test_timestamps).to_csv(
+        os.path.join(folder, "timestamps.csv"), index=False, header=False
+    )
 
 
 def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
-    dataset_folder = os.path.join(data_folder, 'SWaT_netflow')
-    baseline_file = os.path.join(dataset_folder, 'SWat2015-JUST-NETFLOW-Baseline-10s.csv')
-    attack_file = os.path.join(dataset_folder, 'SWat2015-JUST-NETFLOW-Attack-10s.csv')
+    dataset_folder = os.path.join(data_folder, "SWaT_netflow")
+    baseline_file = os.path.join(
+        dataset_folder, "SWat2015-JUST-NETFLOW-Baseline-10s.csv"
+    )
+    attack_file = os.path.join(dataset_folder, "SWat2015-JUST-NETFLOW-Attack-10s.csv")
 
     df_baseline = pd.read_csv(baseline_file)
     df_attack = pd.read_csv(attack_file)
 
-    n_test_baseline = int(test_size*len(df_baseline))
+    n_test_baseline = int(test_size * len(df_baseline))
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
-    test_timestamps = df_test['Timestamp']
+    test_timestamps = df_test["Timestamp"]
 
-    labels = df_test['Tag']
+    labels = df_test["Tag"]
     labels = pd.to_numeric(labels, errors="coerce").ne(0).astype(int).to_numpy()
-    df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
-    df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
+    df_train = df_train.drop(
+        columns=["Normal/Attack", "Timestamp", "tag", "Tag"], errors="ignore"
+    )
+    df_test = df_test.drop(
+        columns=["Normal/Attack", "Timestamp", "tag", "Tag"], errors="ignore"
+    )
 
     constant_cols = _zero_baseline_constant_cols(df_train, df_test)
 
@@ -91,30 +107,38 @@ def load_SWaT_netflow(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
-    for file in ['train', 'test', 'labels']:
-        np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+    for file in ["train", "test", "labels"]:
+        np.save(os.path.join(folder, f"{file}.npy"), eval(file))
 
-    pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
+    pd.DataFrame(test_timestamps).to_csv(
+        os.path.join(folder, "timestamps.csv"), index=False, header=False
+    )
 
 
 def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
-    dataset_folder = os.path.join(data_folder, 'SWaT_physical')
-    baseline_file = os.path.join(dataset_folder, 'SWaT-PHYSICAL-BASELINE2015.csv')
-    attack_file = os.path.join(dataset_folder, 'SWaT-PHYSICAL-ATTACK2015.csv')
+    dataset_folder = os.path.join(data_folder, "SWaT_physical")
+    baseline_file = os.path.join(dataset_folder, "SWaT-PHYSICAL-BASELINE2015.csv")
+    attack_file = os.path.join(dataset_folder, "SWaT-PHYSICAL-ATTACK2015.csv")
 
     df_baseline = pd.read_csv(baseline_file)
     df_attack = pd.read_csv(attack_file)
 
-    n_test_baseline = int(test_size*len(df_baseline))
+    n_test_baseline = int(test_size * len(df_baseline))
     df_train_len = int(len(df_baseline)) - n_test_baseline
     df_train = df_baseline[:df_train_len]
     df_test = pd.concat([df_baseline[df_train_len:], df_attack], ignore_index=True)
 
-    labels = df_test['Normal/Attack']
-    labels = labels.astype(str).str.strip().str.lower().ne("normal").astype(int).to_numpy()
-    test_timestamps = df_test['Timestamp']
-    df_train = df_train.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
-    df_test = df_test.drop(columns=['Normal/Attack', 'Timestamp', 'tag', 'Tag'], errors='ignore')
+    labels = df_test["Normal/Attack"]
+    labels = (
+        labels.astype(str).str.strip().str.lower().ne("normal").astype(int).to_numpy()
+    )
+    test_timestamps = df_test["Timestamp"]
+    df_train = df_train.drop(
+        columns=["Normal/Attack", "Timestamp", "tag", "Tag"], errors="ignore"
+    )
+    df_test = df_test.drop(
+        columns=["Normal/Attack", "Timestamp", "tag", "Tag"], errors="ignore"
+    )
 
     constant_cols = _zero_baseline_constant_cols(df_train, df_test)
 
@@ -133,8 +157,9 @@ def load_SWaT_physical(folder, data_folder=DEFAULT_DATA_FOLDER, test_size=0):
     train = df_train.values
     test = df_test.values
     labels = np.repeat(labels.reshape(-1, 1), test.shape[1], axis=1)
-    for file in ['train', 'test', 'labels']:
-        np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+    for file in ["train", "test", "labels"]:
+        np.save(os.path.join(folder, f"{file}.npy"), eval(file))
 
-    pd.DataFrame(test_timestamps).to_csv(os.path.join(folder, 'timestamps.csv'), index=False, header=False)
-
+    pd.DataFrame(test_timestamps).to_csv(
+        os.path.join(folder, "timestamps.csv"), index=False, header=False
+    )

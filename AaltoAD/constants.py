@@ -20,7 +20,6 @@ POT_INIT = {
 }
 
 
-
 MERLIN_PERCENTILES = {
     "SMD": (98, 2000),
     "synthetic": (95, 10),
@@ -33,6 +32,53 @@ MERLIN_PERCENTILES = {
     "NAB": (98, 2),
     "MBA": (99, 2),
 }
+
+# How many models the report's prediction-error overlay plots show (best first).
+PLOT_MODELS = 3
+
+# Threshold method the report quotes in tables and scales plots by
+# (--threshold-method).
+THRESHOLD_METHOD = "conformal"
+
+# How plotted series are reduced from 7200 points to something drawable
+# (--downsample): "min", "max" or "mean" of each window, "range" for a min-max
+# band, or "nth" to keep every Nth step. A range shows both extremes, so it
+# affords a wider window.
+DOWNSAMPLE = "range"
+DOWNSAMPLE_WINDOWS = {"nth": 10, "min": 10, "max": 10, "mean": 10, "range": 20}
+
+# Columns of the per-case LaTeX summary table (--table-columns). Names resolve
+# inside the threshold method's block, except the top-level ones.
+TABLE_COLUMNS = ("f1", "fpr", "latency")
+
+# Models per row in the per-case LaTeX summary table (--table-blocks): with few
+# columns the table is narrow enough to set two side by side.
+TABLE_BLOCKS = 2
+
+# Whether one threshold is fit on the calibration data of every dataset in a
+# report pooled together (--pool-baselines), or each dataset is thresholded on
+# its own baseline. Pooling assumes the baselines are alike; when one of them
+# is contaminated it sets the threshold for all the others.
+POOL_BASELINES = False
+
+# Whether one threshold is fit on the calibration data of every dataset in a
+# report pooled together (--pool-baselines), or each dataset is thresholded on
+# its own baseline. Pooling assumes the baselines are alike; when one of them
+# is contaminated it sets the threshold for all the others.
+POOL_BASELINES = False
+
+# Target false alarm rate for the conformal threshold (--conformal-q): at most
+# this fraction of the calibration scores sit above it. A reporting choice, not
+# a swept hyperparameter, so it is set here rather than read from a run.
+CONFORMAL_Q = 1e-3
+
+# The report's metric (--metric): metric names inside the threshold method's
+# block, most significant first. It selects each model's hyperparameters and
+# orders the models in every table and plot, unless --model-order gives the
+# ordering its own metric. Each name is ranked in its natural direction, so
+# this reads "fastest detection first, then fewest false positives, then best
+# F1 to break a tie".
+METRIC = ("p_latency", "fpr", "f1")
 
 # These will be initialized by main.py after parsing arguments
 level = None
@@ -58,7 +104,9 @@ def initialize(dataset: str, model: str):
     if dataset in POT_INIT:
         tail_key = dataset
     else:
-        prefix_matches = [key for key in POT_INIT if key != "default" and dataset.startswith(key)]
+        prefix_matches = [
+            key for key in POT_INIT if key != "default" and dataset.startswith(key)
+        ]
         tail_key = max(prefix_matches, key=len) if prefix_matches else "default"
     level = POT_INIT[tail_key]
 
