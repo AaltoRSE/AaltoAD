@@ -67,13 +67,10 @@ def parse_timestamp_column(series):
 
 
 def find_timestamp_column(df, timestamp_candidates=None):
-    """Find the most likely timestamp column name in `df`.
+    """Find the timestamp column name in `df`.
 
-    Strategy:
-    - If any common candidate names are present (case-insensitive), return it.
-    - Otherwise, pick the column that yields the most non-null datetimes
-      when parsed with `pd.to_datetime`.
-    - Fallback: return the first column name.
+    Returns the first column whose name matches a candidate (case-insensitive).
+    Raises ValueError if none matches; the column is never guessed.
     """
     if timestamp_candidates is None:
         timestamp_candidates = ["timestamp", "time", "ts", "date", "datetime"]
@@ -82,22 +79,10 @@ def find_timestamp_column(df, timestamp_candidates=None):
         for c in df.columns:
             if c.lower() == name:
                 return c
-    # otherwise, pick the column that best parses to datetimes
-    best_col = None
-    best_non_na = 0
-    for c in df.columns:
-        try:
-            ts_try = pd.to_datetime(df[c], errors="coerce")
-            non_na = ts_try.notna().sum()
-            if non_na > best_non_na:
-                best_non_na = non_na
-                best_col = c
-        except Exception:
-            continue
-    if best_col is not None and best_non_na > 0:
-        return best_col
-    # fallback to first column
-    return df.columns[0]
+    raise ValueError(
+        f"No timestamp column found: expected one of {timestamp_candidates}, "
+        f"got columns {list(df.columns)}. Rename the column in the CSV."
+    )
 
 
 def detect_column(df, candidates):

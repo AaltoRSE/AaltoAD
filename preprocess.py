@@ -33,6 +33,14 @@ def parse_segment(spec):
 	return (partition, anomalous, seconds)
 
 
+def parse_column_spec(spec):
+	"""Parse a single column spec 'PURPOSE:COLUMN_NAME' into (purpose, column_name)."""
+	purpose, sep, name = spec.partition(':')
+	if not sep or not purpose or not name:
+		raise argparse.ArgumentTypeError(f"Column must look like PURPOSE:COLUMN_NAME, got {spec!r}")
+	return (purpose, name)
+
+
 class _GroupBuilder(argparse.Action):
 	"""Pair interleaved --csv and --segment flags into ordered (csvs, segments) groups.
 
@@ -89,6 +97,7 @@ def load_data(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
 			top_k=top_k, interval=interval, port_entropy=args.port_entropy,
 			bytes=args.bytes, temperature=args.temperature,
+			columns=dict(args.columns) if args.columns else None,
 		)
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
@@ -159,6 +168,10 @@ if __name__ == '__main__':
 	parser.add_argument('--port-entropy', action='store_true', help='[nettraffic] Include port entropy features', default=False)
 	parser.add_argument('--bytes', action='store_true', help='[nettraffic] Include byte count features', default=False)
 	parser.add_argument('--temperature', action='store_true', help='[nettraffic] Include temperature features', default=False)
+	parser.add_argument(
+		'--columns', nargs='+', type=parse_column_spec, default=None,
+		help='[nettraffic] Column map PURPOSE:COLUMN_NAME; each CSV column COLUMN_NAME is renamed to PURPOSE after loading (e.g. timestamp:epoch_time).',
+	)
 	args = parser.parse_args()
 	csv_groups = getattr(args, 'csv_groups', None)
 

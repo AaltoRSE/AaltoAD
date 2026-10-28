@@ -16,8 +16,12 @@ DEFAULT_SEGMENTS = [
 ]
 
 
-def _load_and_prepare(csv_path, interval=1):
-    """Read CSV, detect needed columns, parse timestamps. Returns a     parsed-CSV record."""
+def _load_and_prepare(csv_path, interval=1, columns=None):
+    """Read CSV, detect needed columns, parse timestamps. Returns a     parsed-CSV record.
+
+    'columns' maps purpose -> CSV column name; each mapped column is renamed
+    to its purpose before detection.
+    """
     df = pd.read_csv(csv_path, on_bad_lines="warn")
     # Drop embedded header rows. These appear when several CSVs are concatenated
     # (e.g. `cat a.csv b.csv > combined.csv`), repeating the header line as data.
@@ -29,6 +33,13 @@ def _load_and_prepare(csv_path, interval=1):
             f"  Dropping {int(header_mask.sum())} embedded header row(s) in {csv_path}"
         )
         df = df[~header_mask].reset_index(drop=True)
+    if columns:
+        missing = [name for name in columns.values() if name not in df.columns]
+        if missing:
+            raise ValueError(
+                f"Mapped column(s) {missing} not found in {csv_path}; got columns {list(df.columns)}"
+            )
+        df = df.rename(columns={name: purpose for purpose, name in columns.items()})
     timestamp_col = traffic_csv.find_timestamp_column(df)
     src_col, dst_col = traffic_csv.detect_ip_columns(df)
     bytes_col = traffic_csv.detect_column(
@@ -201,6 +212,7 @@ def load_nettraffic(
     bytes=False,
     port_entropy=False,
     temperature=False,
+    columns=None,
 ):
     """Load and preprocess one or more CSV files containing network
     traffic data and temperature readings.
@@ -224,6 +236,9 @@ def load_nettraffic(
      - has_temp: Boolean indicating if a temperature reading is present
      - temperature: The temperature reading associated with the record
 
+    'columns' maps purpose -> CSV column name (e.g. {"timestamp": "epoch_time"});
+    each mapped column is renamed to its purpose after loading. A mapped column
+    missing from a CSV raises ValueError.
 
     Data is aggregated into time intervals specified by interval (in seconds). The features are counts of unique src/dst IPs for each top_K IP address, port entropy and mean temperature.
     """
@@ -245,13 +260,24 @@ def load_nettraffic(
         if not segs:
             raise ValueError("Each group must have at least one segment")
         traffic_csv.validate_segments(segs)
+        for _, _, seconds in segs:
+            if seconds % interval:
+                raise ValueError(
+                    f"Segment length {seconds}s is not divisible by interval {interval}s"
+                )
+
+    # Convert segment lengths from seconds to aggregated rows.
+    csv_groups = [
+        (paths, [(p, a, seconds // interval) for p, a, seconds in segs])
+        for paths, segs in csv_groups
+    ]
 
     # Load each csv, parse columns and timestamp. Collect baseline IPs.
     parsed_records = []
     all_baseline_ips = []
     for paths, segs in csv_groups:
         for path in paths:
-            parsed = _load_and_prepare(path, interval=interval)
+            parsed = _load_and_prepare(path, interval=interval, columns=columns)
             parsed_records.append((parsed, segs))
             mask = traffic_csv.baseline_mask(parsed["df"], segs, interval_col="interval")
             if mask.any():
