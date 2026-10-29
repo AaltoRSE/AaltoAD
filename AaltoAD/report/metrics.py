@@ -10,7 +10,7 @@ import math
 
 from AaltoAD.report import cli
 
-LOWER_IS_BETTER = {"p_latency", "fpr", "threshold", "calibration_loss"}
+LOWER_IS_BETTER = {"P_latency", "FPR", "threshold", "calibration_loss"}
 
 
 TOP_LEVEL_METRICS = {
@@ -19,11 +19,11 @@ TOP_LEVEL_METRICS = {
 }  # metrics that are not in the method block
 
 
-SUMMARY_SORT_METRIC = "pot.f1"
+SUMMARY_SORT_METRIC = "pot.F1"
 
 
 def _metric_path(name, method):
-    """Full lookup path for a bare metric name: 'f1' -> '<method>.f1'."""
+    """Full lookup path for a bare metric name: 'F1' -> '<method>.F1'."""
     if "." in name or name in TOP_LEVEL_METRICS:
         return name
     return f"{method}.{name}"
@@ -46,7 +46,7 @@ def format_metric(result, path, method):
     """Format one metric cell, as an em dash for a latency that is really a non-detection."""
     if (
         isinstance(path, str)
-        and path.endswith(".p_latency")
+        and path.endswith(".P_latency")
         and _no_detection(result, method)
     ):
         return "---"
@@ -64,7 +64,7 @@ def rank_key(result, metric, method):
     key = []
     for name in cli.metric_list(metric):
         value = _metric_value(result, _metric_path(name, method)) if result else None
-        if name == "p_latency" and _no_detection(result, method):
+        if name == "P_latency" and _no_detection(result, method):
             value = None
         if value is None:
             key.append(float("inf"))
@@ -74,7 +74,7 @@ def rank_key(result, metric, method):
 
 
 def value(d, dotted_key):
-    """Look up a possibly-dotted key like 'pot.f1' in a nested dict, returning None if absent."""
+    """Look up a possibly-dotted key like 'pot.F1' in a nested dict, returning None if absent."""
     cur = d
     for part in dotted_key.split("."):
         if not isinstance(cur, dict) or part not in cur:
@@ -178,7 +178,7 @@ def select_shared_best(by_dataset, metric, method=None):
             results = list(pool[key].values())
             score = []
             for name in metric:
-                if name == "f1":
+                if name == "F1":
                     # An average of F1 values is not meaningful; recompute it
                     # from the confusion counts pooled over the datasets.
                     pooled = _pooled_f1(results, method)
@@ -210,8 +210,8 @@ def select_shared_best(by_dataset, metric, method=None):
 def best_result(results, metric, method=None):
     """Return the best of `results` by `metric`, read from the `method` block.
 
-    Ranking is `rank_key`, so a multi-part metric such as ('p_latency', 'fpr',
-    'f1') is resolved term by term. A result missing every term ranks last but
+    Ranking is `rank_key`, so a multi-part metric such as ('P_latency', 'FPR',
+    'F1') is resolved term by term. A result missing every term ranks last but
     is still returned when it is all there is, so its other columns render
     instead of blanking the row to N/A.
     """

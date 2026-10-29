@@ -26,8 +26,7 @@ from AaltoAD import pot
 from AaltoAD import merlin
 from AaltoAD import diagnosis
 from AaltoAD import utils
-from AaltoAD.thresholds import point_adjust
-from AaltoAD.thresholds.utils import prediction_metrics
+from AaltoAD.metrics.base import common_metrics, f1_metrics
 
 import tempfile
 import shutil
@@ -67,7 +66,7 @@ def oracle_f1(scores, labels, expand_segments=True):
     attacks cluster in time. The simpler in-sample upper bound is what we want.
 
     Returns a tuple of
-      - a dict with threshold, f1, precision, recall, fpr, and confusion-matrix
+      - a dict with threshold, f1, precision, recall, fpr, ROC/AUC, and confusion-matrix
             counts. Returns None if precision_recall_curve produced no thresholds.
       - a numpy array of predictions corresponding to the optimal threshold.
     """
@@ -84,32 +83,13 @@ def oracle_f1(scores, labels, expand_segments=True):
     best_thr = float(thresholds[0])
     best_f1 = -1.0
     for thr in thresholds:
-        adj = (scores >= float(thr)).astype(int)
-        if expand_segments:
-            adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=adj))
-        f1_thr, *_ = prediction_metrics(adj, labels)
+        f1_thr = f1_metrics(scores, labels, float(thr), expand_segments)["F1"]
         if f1_thr > best_f1:
             best_f1 = f1_thr
             best_thr = float(thr)
 
-    predictions = (scores >= best_thr).astype(int)
-    adj = predictions.copy()
-    if expand_segments:
-        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=adj))
-    f1, prec, rec, fpr, tp, fp, fn, tn = prediction_metrics(adj, labels)
-    p_latency = point_adjust.segment_latency(predictions, labels)
-    return {
-        "threshold": best_thr,
-        "f1": float(f1),
-        "precision": float(prec),
-        "recall": float(rec),
-        "fpr": float(fpr),
-        "tp": tp,
-        "fp": fp,
-        "fn": fn,
-        "tn": tn,
-        "p_latency": p_latency,
-    }, predictions
+    predictions = (scores > best_thr).astype(int)
+    return common_metrics(scores, labels, best_thr, expand_segments), predictions
 
 
 def _convert_json_types(obj):
@@ -323,10 +303,10 @@ def append_benchmark_row(
                     pot.get("precision"),
                     pot.get("recall"),
                     pot.get("ROC/AUC"),
-                    pot.get("f1"),
+                    pot.get("F1"),
                     oracle.get("precision"),
                     oracle.get("recall"),
-                    oracle.get("f1"),
+                    oracle.get("F1"),
                     oracle.get("threshold"),
                 ]
             )
@@ -723,7 +703,7 @@ def run_all(models_list=None, datasets_list=None, args_obj=None):
                     "precision": r.get("precision"),
                     "recall": r.get("recall"),
                     "AUC": r.get("ROC/AUC"),
-                    "F1": r.get("f1"),
+                    "F1": r.get("F1"),
                 }
             )
         else:

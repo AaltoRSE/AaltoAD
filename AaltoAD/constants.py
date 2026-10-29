@@ -78,7 +78,7 @@ CONFORMAL_Q = 1e-3
 # ordering its own metric. Each name is ranked in its natural direction, so
 # this reads "fastest detection first, then fewest false positives, then best
 # F1 to break a tie".
-METRIC = ("p_latency", "fpr", "f1")
+METRIC = ("P_latency", "FPR", "F1")
 
 # These will be initialized by main.py after parsing arguments
 level = None

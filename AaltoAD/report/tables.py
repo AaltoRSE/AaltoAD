@@ -33,11 +33,11 @@ for _m in cli.METHOD_METRICS:
 
 # Slim metric set for presentation tables. Each entry is (column_label, dotted_path_or_callable).
 SLIDE_COLUMNS = [
-    ("POT F1", "pot.f1"),
-    ("POT F1 (PA)", "pot_expanded.f1"),
-    ("POT FPR", "pot.fpr"),
-    ("POT latency", "pot.p_latency"),
-    ("Oracle F1", "oracle.f1"),
+    ("POT F1", "pot.F1"),
+    ("POT F1 (PA)", "pot_expanded.F1"),
+    ("POT FPR", "pot.FPR"),
+    ("POT latency", "pot.P_latency"),
+    ("Oracle F1", "oracle.F1"),
     ("Eval time (s)", "eval_time"),
 ]
 
@@ -53,9 +53,9 @@ UNLABELED_SLIDE_COLUMNS = [
 # metric name under cli.THRESHOLD_METHOD). Split by metric because a single table of
 # model x case x three metrics is unreadable at this width.
 OVERVIEW_TABLES = [
-    ("f1", "F1", "f1"),
-    ("fpr", "false positive rate", "fpr"),
-    ("latency", "detection latency in time steps", "p_latency"),
+    ("f1", "F1", "F1"),
+    ("fpr", "false positive rate", "FPR"),
+    ("latency", "detection latency in time steps", "P_latency"),
 ]
 
 
@@ -474,7 +474,7 @@ def _build_summary(by_model, metric, unlabeled=False, order=None):
     display_columns = DISPLAY_COLUMNS
 
     # Order by the selection metric when comparable across models (dotted
-    # metrics like oracle.f1); otherwise fall back to SUMMARY_SORT_METRIC.
+    # metrics like oracle.F1); otherwise fall back to SUMMARY_SORT_METRIC.
     table_sort = metrics.table_sort_metric(metric)
     lower_is_better = table_sort in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")

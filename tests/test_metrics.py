@@ -64,15 +64,15 @@ def _reference_metrics(scores, labels, threshold, expand_segments):
     recall = tp / (tp + fn + EPSILON)
     return {
         "threshold": threshold,
-        "f1": 2 * precision * recall / (precision + recall + EPSILON),
+        "F1": 2 * precision * recall / (precision + recall + EPSILON),
         "precision": precision,
         "recall": recall,
-        "fpr": fp / (fp + tn + EPSILON),
-        "tp": tp,
-        "fp": fp,
-        "fn": fn,
-        "tn": tn,
-        "p_latency": float(np.mean(latencies)),
+        "FPR": fp / (fp + tn + EPSILON),
+        "TP": tp,
+        "FP": fp,
+        "FN": fn,
+        "TN": tn,
+        "P_latency": float(np.mean(latencies)),
         "ROC/AUC": (tp / (tp + fn) + tn / (tn + fp)) / 2,
     }
 

@@ -17,9 +17,7 @@ import math
 
 import numpy as np
 
-# Metrics at a given threshold are method-agnostic: predictions are score >
-# threshold either way, so the POT block's implementation is reused verbatim.
-from AaltoAD.thresholds.pot_fit import pot_metrics as threshold_metrics
+from AaltoAD.metrics import common_metrics
 
 
 def conformal_threshold(calib, q):
@@ -40,4 +38,4 @@ def conformal_threshold(calib, q):
 
 def conformal_metrics(scores, labels, threshold, expand_segments):
     """Detection metrics at a conformal `threshold`, in the same shape as the POT blocks."""
-    return threshold_metrics(scores, labels, threshold, expand_segments)
+    return common_metrics(scores, labels, threshold, expand_segments)

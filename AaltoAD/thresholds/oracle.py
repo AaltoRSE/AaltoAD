@@ -2,41 +2,8 @@
 
 import numpy as np
 
-from AaltoAD.thresholds import point_adjust, utils
+from AaltoAD.metrics.base import common_metrics
 
-
-def oracle_metrics(scores, labels, threshold, expand_segments):
-    """Compute oracle-style detection metrics for a given (already chosen) threshold.
-
-    Reproduces ``run_experiment.adjusted_f1`` (point predictions are
-    ``scores >= threshold``, expanded with ``adjust_predicts`` when
-    ``expand_segments`` is true) plus the ``p_latency`` field from
-    ``run_experiment.oracle_f1``, which is always computed on the
-    *unexpanded* predictions. Returns a dict with keys ``threshold, f1,
-    precision, recall, fpr, tp, fp, fn, tn, p_latency``.
-    """
-    scores = np.asarray(scores, dtype=float)
-    labels = np.asarray(labels, dtype=float)
-    pred = (scores >= threshold).astype(int)
-    if expand_segments:
-        # adjust_predicts mutates `pred`; keep the raw predictions for p_latency.
-        adj = np.asarray(point_adjust.adjust_predicts(scores, labels, pred=pred.copy()))
-    else:
-        adj = pred
-    f1, prec, rec, fpr, tp, fp, fn, tn = utils.prediction_metrics(adj, labels)
-    p_latency = point_adjust.segment_latency(pred, labels)
-    return {
-        "threshold": float(threshold),
-        "f1": float(f1),
-        "precision": float(prec),
-        "recall": float(rec),
-        "fpr": float(fpr),
-        "tp": tp,
-        "fp": fp,
-        "fn": fn,
-        "tn": tn,
-        "p_latency": p_latency,
-    }
 
 
 def _label_segments(labels):
@@ -56,7 +23,7 @@ def _raw_counts(scores, labels, candidates):
     """Vectorised (tp, fp) point-level counts for every threshold in `candidates`.
 
     ``tp``/``fp`` at index i are the counts of label==1/label==0 points with
-    ``score >= candidates[i]``, computed via a sorted cumulative-sum trick
+    ``score > candidates[i]``, computed via a sorted cumulative-sum trick
     (no explicit sweep over thresholds).
     """
     scores = np.asarray(scores, dtype=float)
@@ -70,7 +37,7 @@ def _raw_counts(scores, labels, candidates):
         return zeros, zeros
     # suffix_tp[i] = sum(l_asc[i:]), with suffix_tp[n] = 0
     suffix_tp = np.concatenate([np.cumsum(l_asc[::-1])[::-1], [0.0]])
-    idx = np.searchsorted(s_asc, candidates, side="left")
+    idx = np.searchsorted(s_asc, candidates, side="right")
     tp = suffix_tp[idx]
     total = n - idx
     fp = total - tp
@@ -82,7 +49,7 @@ def _expanded_counts(scores, labels, candidates):
 
     A ground-truth segment (contiguous run of ``label==1``) counts as fully
     detected, contributing its whole length to ``tp``, iff the maximum score
-    inside it is ``>= threshold``; otherwise its whole length counts toward
+    inside it is ``> threshold``; otherwise its whole length counts toward
     ``fn``. This approximates the true segment-expansion behaviour of
     ``adjust_predicts`` for the purpose of *searching* a threshold: it
     ignores the exact bidirectional expansion around the first detected
@@ -93,7 +60,7 @@ def _expanded_counts(scores, labels, candidates):
     point-wise on ``label==0`` points exactly as in the raw (unexpanded)
     case, since expansion never turns a true negative into a positive
     prediction outside a labelled segment. The final, authoritative metrics
-    for the chosen threshold are always recomputed with ``oracle_metrics``.
+    for the chosen threshold are always recomputed with ``common_metrics``.
     """
     scores = np.asarray(scores, dtype=float)
     labels = np.asarray(labels, dtype=float)
@@ -106,7 +73,7 @@ def _expanded_counts(scores, labels, candidates):
         m_asc = seg_max[order]
         l_asc = seg_len[order]
         suffix_len = np.concatenate([np.cumsum(l_asc[::-1])[::-1], [0.0]])
-        idx = np.searchsorted(m_asc, candidates, side="left")
+        idx = np.searchsorted(m_asc, candidates, side="right")
         tp = suffix_len[idx]
     else:
         tp = np.zeros(len(candidates))
@@ -122,12 +89,12 @@ def shared_oracle_threshold(scores_list, labels_list, expand_segments):
     concatenated across datasets. For each candidate, per-dataset confusion
     counts are computed vectorised (raw case: point-wise via sorted
     cumulative sums; expanded case: per-segment, a labelled segment counts
-    as detected iff its max score is >= threshold — see ``_expanded_counts``
+    as detected iff its max score is > threshold — see ``_expanded_counts``
     for the approximation this implies relative to exact
     ``adjust_predicts`` semantics) and summed over datasets (no segment
     crosses a dataset boundary). The threshold with the highest pooled F1 is
     returned; ties are broken toward the *higher* threshold (fewer alarms).
-    This function only searches; call ``oracle_metrics`` with the returned
+    This function only searches; call ``common_metrics`` with the returned
     threshold for the exact, authoritative metrics.
     """
     candidates = np.unique(

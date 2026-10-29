@@ -1,6 +1,7 @@
 import numpy as np
 
 from AaltoAD import constants
+from AaltoAD.metrics import common_metrics
 from AaltoAD.thresholds import point_adjust, pot_fit
 
 
@@ -69,13 +70,13 @@ def pot_eval(init_score, score, label, q=1e-5, expand_segments=False):
     """
     if np.any(np.isnan(init_score)) or np.any(np.isnan(score)):
         pred = np.zeros_like(label)
-        return pot_fit.pot_metrics(score, label, float("nan"), expand_segments), pred
+        return common_metrics(score, label, float("nan"), expand_segments), pred
 
     level = constants.level
     pot_th = pot_fit.fit_pot_threshold(init_score, score, q, level)
     if np.isnan(pot_th):
         pred = np.zeros_like(label)
-        return pot_fit.pot_metrics(score, label, pot_th, expand_segments), pred
+        return common_metrics(score, label, pot_th, expand_segments), pred
 
     # Threshold comes from the calibration data only: fit_pot_threshold fits
     # the GPD to the peaks of init_score and extrapolates the quantile at
@@ -85,5 +86,5 @@ def pot_eval(init_score, score, label, q=1e-5, expand_segments=False):
         pred = point_adjust.adjust_predicts(score, label, pot_th)
     else:
         pred = raw_pred
-    result = pot_fit.pot_metrics(score, label, pot_th, expand_segments)
+    result = common_metrics(score, label, pot_th, expand_segments)
     return result, np.array(pred)
