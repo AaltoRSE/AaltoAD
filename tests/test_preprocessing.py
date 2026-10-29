@@ -242,3 +242,31 @@ def test_load_SMD(tmp_path, monkeypatch):
         a = np.load(f)
         assert not np.isnan(a).any()
         assert not np.isinf(a).any()
+
+
+# ---------------------------------------------------------------------------
+# nettraffic column map
+# ---------------------------------------------------------------------------
+
+def _write_nettraffic_csv(path):
+    path.write_text(
+        "epoch_time,src_ip,dst_ip\n"
+        "1790974422.5,10.0.0.1,10.0.0.2\n"
+        "1790974433.5,10.0.0.2,10.0.0.1\n"
+    )
+
+
+def test_nettraffic_column_map_renames_timestamp(tmp_path):
+    from AaltoAD.preprocessing.nettraffic import _load_and_prepare
+    csv = tmp_path / "traffic.csv"
+    _write_nettraffic_csv(csv)
+    parsed = _load_and_prepare(str(csv), interval=10, columns={"timestamp": "epoch_time"})
+    assert list(parsed["df"]["interval"]) == [179097442, 179097443]
+
+
+def test_nettraffic_column_map_missing_column_raises(tmp_path):
+    from AaltoAD.preprocessing.nettraffic import _load_and_prepare
+    csv = tmp_path / "traffic.csv"
+    _write_nettraffic_csv(csv)
+    with pytest.raises(ValueError, match="not_a_column"):
+        _load_and_prepare(str(csv), interval=10, columns={"timestamp": "not_a_column"})
