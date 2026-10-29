@@ -322,15 +322,15 @@ def load_nettraffic(
         sum(len(s) for s in all_baseline_ips) // 2
     )  # we appended src + dst
     print(
-        f"TOL: unique IPs across all baselines: {len(counts)} "
+        f"nettraffic: unique IPs across all baselines: {len(counts)} "
         f"(total baseline rows aggregated: {total_baseline_rows})"
     )
     if not use_all_ips:
         print(
-            f"TOL: most common IP {most_common_ips} => internal prefix {internal_prefix}"
+            f"nettraffic: most common IP {most_common_ips} => internal prefix {internal_prefix}"
         )
         print(
-            f"TOL: selecting top_{top_k} IPs from combined baseline (keeps {len(top_ips)})"
+            f"nettraffic: selecting top_{top_k} IPs from combined baseline (keeps {len(top_ips)})"
         )
 
     # Determine canonical column names.
@@ -374,13 +374,13 @@ def load_nettraffic(
                 f"  Warning: CSV {parsed['path']} has fewer rows than total segments. Last segment will be truncated to fit available data."
             )
         offset = 0
-        for partition, anomalous, seconds in segs:
+        for partition, anomalous, rows in segs:
             if partition == "skip":
-                offset += seconds
+                offset += rows
                 continue
-            partitions[partition].append(features[offset : offset + seconds])
-            label_seqs[partition].append((seconds, anomalous))
-            offset += seconds
+            partitions[partition].append(features[offset : offset + rows])
+            label_seqs[partition].append((rows, anomalous))
+            offset += rows
 
     # Concatenate per partition.
     n_feat = len(canonical_cols)
@@ -421,17 +421,17 @@ def load_nettraffic(
     def _build_labels(arr, name):
         out = np.zeros_like(arr)
         row = 0
-        for seconds, anomalous in label_seqs.get(name, []):
+        for rows, anomalous in label_seqs.get(name, []):
             if anomalous:
-                out[row : row + seconds] = 1
-            row += seconds
+                out[row : row + rows] = 1
+            row += rows
         return out
 
     labels = _build_labels(test, "test")
     valid_labels = _build_labels(valid, "valid")
     print(
-        "   Anomaly lables: {int(labels.sum() / n_feat_lbl) if labels.size else 0}/{labels.shape[0]} test rows, "
-        f"{int(valid_labels.sum() / n_feat_lbl) if valid_labels.size else 0}/{valid_labels.shape[0]} valid rows"
+        f"   Anomaly labels: {int(labels.sum() / n_feat) if labels.size else 0}/{labels.shape[0]} test rows, "
+        f"{int(valid_labels.sum() / n_feat) if valid_labels.size else 0}/{valid_labels.shape[0]} valid rows"
     )
     print(f"  Feature columns ({len(canonical_cols)}): {canonical_cols}")
 
@@ -448,7 +448,7 @@ def load_nettraffic(
             np.ascontiguousarray(arr.astype("float64")),
         )
     all_paths = [p for paths, _ in csv_groups for p in paths]
-    print(f"Processed {len(all_paths)} CSV(s) as TOL -> {folder}/")
+    print(f"Processed {len(all_paths)} CSV(s) as nettraffic -> {folder}/")
     print(
         f"  train.npy: {train.shape}, test.npy: {test.shape}, calib.npy: {calib.shape}, valid.npy: {valid.shape}, labels.npy: {labels.shape}"
     )
