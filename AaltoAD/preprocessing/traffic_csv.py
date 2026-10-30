@@ -124,13 +124,12 @@ def shannon_entropy(series):
 
 
 def validate_segments(segments):
-    """Check segments form a valid layout: each non-skip partition appears as one contiguous block.
+    """Check each segment has a known partition, a bool anomalous flag and positive seconds.
 
-    'skip' segments are unrestricted — they consume seconds from the CSV but produce
-    no output, so multiple skip blocks in arbitrary positions are fine.
+    Segments of a partition may appear in any order. 'skip' segments consume seconds
+    from the CSV but produce no output.
     """
     valid_partitions = {"train", "calib", "test", "valid", "skip"}
-    seen_blocks = {}  # partition -> (first_idx, last_idx)
     for i, (partition, anomalous, seconds) in enumerate(segments):
         if partition not in valid_partitions:
             raise ValueError(
@@ -146,24 +145,6 @@ def validate_segments(segments):
             raise ValueError(
                 f"Seconds for segment {i} must be a positive int, got {seconds!r}"
             )
-        if partition == "skip":
-            continue  # skip is exempt from contiguity tracking
-        if partition in seen_blocks:
-            first, last = seen_blocks[partition]
-            if i != last + 1:
-                # Allow contiguity to be broken only by skip segments between blocks.
-                for j in range(last + 1, i):
-                    if segments[j][0] != "skip":
-                        raise ValueError(
-                            f"Partition {partition!r} is not contiguous: appears at index {first} and again at {i} "
-                            f"after a gap. Group all segments of the same partition together "
-                            f"(skip-only gaps allowed)."
-                        )
-                seen_blocks[partition] = (first, i)
-            else:
-                seen_blocks[partition] = (first, i)
-        else:
-            seen_blocks[partition] = (i, i)
 
 
 def baseline_mask(df, segments, interval_col="ts_sec"):
