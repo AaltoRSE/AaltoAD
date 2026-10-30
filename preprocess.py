@@ -41,6 +41,18 @@ def parse_column_spec(spec):
 	return (purpose, name)
 
 
+def parse_anomaly(spec):
+	"""Parse a single anomaly spec 'START:DURATION' in seconds into (start, duration)."""
+	start_part, sep, duration_part = spec.partition(':')
+	try:
+		start, duration = int(start_part), int(duration_part)
+	except ValueError:
+		raise argparse.ArgumentTypeError(f"Anomaly must look like START:DURATION in integer seconds, got {spec!r}")
+	if not sep or start < 0 or duration <= 0:
+		raise argparse.ArgumentTypeError(f"Anomaly needs START >= 0 and DURATION > 0, got {spec!r}")
+	return (start, duration)
+
+
 class _GroupBuilder(argparse.Action):
 	"""Pair interleaved --csv and --segment flags into ordered (csvs, segments) groups.
 
@@ -98,6 +110,7 @@ def load_data(
 			top_k=top_k, interval=interval, port_entropy=args.port_entropy,
 			bytes=args.bytes, temperature=args.temperature,
 			columns=dict(args.columns) if args.columns else None,
+			anomalies=args.anomaly,
 		)
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
@@ -171,6 +184,10 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'--columns', nargs='+', type=parse_column_spec, default=None,
 		help='[nettraffic] Column map PURPOSE:COLUMN_NAME; each CSV column COLUMN_NAME is renamed to PURPOSE after loading (e.g. timestamp:epoch_time).',
+	)
+	parser.add_argument(
+		'--anomaly', nargs='+', type=parse_anomaly, default=None,
+		help='[nettraffic] Anomaly spec(s) START:DURATION in seconds from the start of each CSV, applied to every CSV (e.g. 47160:3660). Matching rows are labeled anomalous in test and valid.',
 	)
 	args = parser.parse_args()
 	csv_groups = getattr(args, 'csv_groups', None)
