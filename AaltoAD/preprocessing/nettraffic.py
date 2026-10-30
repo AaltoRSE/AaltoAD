@@ -213,6 +213,7 @@ def load_nettraffic(
     port_entropy=False,
     temperature=False,
     columns=None,
+    anomalies=None,
 ):
     """Load and preprocess one or more CSV files containing network
     traffic data and temperature readings.
@@ -239,6 +240,10 @@ def load_nettraffic(
     'columns' maps purpose -> CSV column name (e.g. {"timestamp": "epoch_time"});
     each mapped column is renamed to its purpose after loading. A mapped column
     missing from a CSV raises ValueError.
+
+    'anomalies' lists (start, duration) pairs in seconds from the start of each
+    CSV, applied to every CSV. Overlapping test and valid rows are labeled
+    anomalous.
 
     Data is aggregated into time intervals specified by interval (in seconds). The features are counts of unique src/dst IPs for each top_K IP address, port entropy and mean temperature.
     """
@@ -271,6 +276,15 @@ def load_nettraffic(
         (paths, [(p, a, seconds // interval) for p, a, seconds in segs])
         for paths, segs in csv_groups
     ]
+
+    # Convert anomaly ranges from seconds to aggregated rows.
+    anomaly_rows = []
+    for start, duration in anomalies or []:
+        if start % interval or duration % interval:
+            raise ValueError(
+                f"Anomaly {start}:{duration} is not divisible by interval {interval}s"
+            )
+        anomaly_rows.append((start // interval, (start + duration) // interval))
 
     # Load each csv, parse columns and timestamp. Collect baseline IPs.
     parsed_records = []
@@ -374,12 +388,17 @@ def load_nettraffic(
                 f"  Warning: CSV {parsed['path']} has fewer rows than total segments. Last segment will be truncated to fit available data."
             )
         offset = 0
-        for partition, anomalous, rows in segs:
+        for partition, _, rows in segs:
             if partition == "skip":
                 offset += rows
                 continue
             partitions[partition].append(features[offset : offset + rows])
-            label_seqs[partition].append((rows, anomalous))
+            # Anomaly ranges relative to this segment's first row.
+            ranges = [
+                (max(start - offset, 0), min(end - offset, rows))
+                for start, end in anomaly_rows
+            ]
+            label_seqs[partition].append((rows, ranges))
             offset += rows
 
     # Concatenate per partition.
@@ -421,9 +440,10 @@ def load_nettraffic(
     def _build_labels(arr, name):
         out = np.zeros_like(arr)
         row = 0
-        for rows, anomalous in label_seqs.get(name, []):
-            if anomalous:
-                out[row : row + rows] = 1
+        for rows, ranges in label_seqs.get(name, []):
+            for start, end in ranges:
+                if start < end:
+                    out[row + start : row + end] = 1
             row += rows
         return out
 
@@ -446,6 +466,12 @@ def load_nettraffic(
         np.save(
             os.path.join(folder, f"{name}.npy"),
             np.ascontiguousarray(arr.astype("float64")),
+        )
+    # Row count of each segment, to split the concatenated partition arrays.
+    for name, parts in partitions.items():
+        np.save(
+            os.path.join(folder, f"{name}_lengths.npy"),
+            np.array([len(part) for part in parts], dtype=int),
         )
     all_paths = [p for paths, _ in csv_groups for p in paths]
     print(f"Processed {len(all_paths)} CSV(s) as nettraffic -> {folder}/")

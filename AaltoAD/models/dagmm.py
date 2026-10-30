@@ -83,7 +83,6 @@ class DAGMM(BaseModel):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        scheduler.step()
         tqdm.write(f"Epoch {epoch},\tL1 = {np.mean(l1s)},\tL2 = {np.mean(l2s)}")
         return np.mean(l1s) + np.mean(l2s), optimizer.param_groups[0]["lr"]
 

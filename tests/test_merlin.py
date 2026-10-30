@@ -37,7 +37,7 @@ def test_get_result_simple():
     labels = np.array([0, 1, 0, 0])
     res = merlin_mod.get_result(pred, labels)
     assert isinstance(res, dict)
-    for k in ('f1', 'precision', 'recall', 'TP', 'TN', 'FP', 'FN', 'ROC/AUC'):
+    for k in ('F1', 'precision', 'recall', 'TP', 'TN', 'FP', 'FN', 'ROC/AUC'):
         assert k in res
 
 

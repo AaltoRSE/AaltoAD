@@ -49,7 +49,7 @@ def test_pot_eval_with_dummy_spot(monkeypatch):
     res, preds = pot.pot_eval(init_score, score, label)
     assert isinstance(res, dict)
     # expected keys
-    for k in ("f1", "precision", "recall", "TP", "TN", "FP", "FN", "ROC/AUC", "threshold"):
+    for k in ("F1", "precision", "recall", "TP", "TN", "FP", "FN", "ROC/AUC", "threshold"):
         assert k in res
     assert isinstance(preds, np.ndarray)
     assert preds.shape == score.shape

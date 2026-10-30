@@ -5,6 +5,7 @@ import os
 
 import numpy as np
 
+from AaltoAD.metrics import common_metrics
 from AaltoAD.thresholds import conformal, oracle, pot_fit, scores
 
 # Bumped whenever the contents of a blocks dict change, so cached entries
@@ -77,10 +78,10 @@ def shared_threshold_blocks(results_by_dataset, q, level, conformal_q=None):
             "conformal_expanded": conformal.conformal_metrics(
                 test, labels, conformal_thr, True
             ),
-            "pot": pot_fit.pot_metrics(test, labels, pot_threshold, False),
-            "pot_expanded": pot_fit.pot_metrics(test, labels, pot_threshold, True),
-            "oracle": oracle.oracle_metrics(test, labels, oracle_threshold_raw, False),
-            "oracle_expanded": oracle.oracle_metrics(
+            "pot": common_metrics(test, labels, pot_threshold, False),
+            "pot_expanded": common_metrics(test, labels, pot_threshold, True),
+            "oracle": common_metrics(test, labels, oracle_threshold_raw, False),
+            "oracle_expanded": common_metrics(
                 test, labels, oracle_threshold_expanded, True
             ),
         }

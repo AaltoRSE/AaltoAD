@@ -9,6 +9,7 @@ import pytest
 import AaltoAD.constants
 import AaltoAD.pot as pot
 import AaltoAD.report.report as report
+from AaltoAD.metrics import common_metrics
 from AaltoAD.report import load_results, metrics
 from AaltoAD.thresholds import conformal
 from AaltoAD.thresholds import oracle as oracle_mod
@@ -40,7 +41,7 @@ class DummySPOT:
 
 
 # ---------------------------------------------------------------------------
-# 1. fit_pot_threshold / pot_metrics reproduce pot.pot_eval
+# 1. fit_pot_threshold / common_metrics reproduce pot.pot_eval
 # ---------------------------------------------------------------------------
 
 def test_fit_pot_threshold_and_pot_metrics_match_pot_eval(monkeypatch):
@@ -54,17 +55,17 @@ def test_fit_pot_threshold_and_pot_metrics_match_pot_eval(monkeypatch):
     expected_exp, expected_preds_exp = pot.pot_eval(init_score, score, label, expand_segments=True)
 
     threshold = pot_fit.fit_pot_threshold(init_score, score, q=1e-5, level=AaltoAD.constants.level)
-    got = pot_fit.pot_metrics(score, label, threshold, expand_segments=False)
-    got_exp = pot_fit.pot_metrics(score, label, threshold, expand_segments=True)
+    got = common_metrics(score, label, threshold, expand_segments=False)
+    got_exp = common_metrics(score, label, threshold, expand_segments=True)
 
     assert threshold == pytest.approx(0.6)
     for k in expected:
-        if k == 'p_latency' and expected[k] is None:
+        if k == 'P_latency' and expected[k] is None:
             assert got[k] is None
             continue
         assert got[k] == pytest.approx(expected[k], nan_ok=True)
     for k in expected_exp:
-        if k == 'p_latency' and expected_exp[k] is None:
+        if k == 'P_latency' and expected_exp[k] is None:
             assert got_exp[k] is None
             continue
         assert got_exp[k] == pytest.approx(expected_exp[k], nan_ok=True)
@@ -80,14 +81,14 @@ def test_fit_pot_threshold_nan_input_gives_nan():
 def test_pot_metrics_nan_threshold_gives_all_nan_dict():
     score = np.array([0.2, 0.6, 0.1])
     label = np.array([0, 1, 0])
-    result = pot_fit.pot_metrics(score, label, float('nan'), expand_segments=False)
-    for k in ('f1', 'precision', 'recall', 'fpr', 'TP', 'TN', 'FP', 'FN', 'ROC/AUC', 'threshold'):
+    result = common_metrics(score, label, float('nan'), expand_segments=False)
+    for k in ('F1', 'precision', 'recall', 'FPR', 'TP', 'TN', 'FP', 'FN', 'ROC/AUC', 'threshold'):
         assert np.isnan(result[k])
-    assert result['p_latency'] is None
+    assert result['P_latency'] is None
 
 
 # ---------------------------------------------------------------------------
-# 2. oracle_metrics equals run_experiment.oracle_f1's block
+# 2. common_metrics equals run_experiment.oracle_f1's block
 # ---------------------------------------------------------------------------
 
 def test_oracle_metrics_matches_run_experiment_oracle_f1():
@@ -103,9 +104,9 @@ def test_oracle_metrics_matches_run_experiment_oracle_f1():
     for expand in (False, True):
         oracle_result, _ = run_experiment.oracle_f1(scores, labels, expand_segments=expand)
         assert oracle_result is not None
-        got = oracle_mod.oracle_metrics(scores, labels, oracle_result['threshold'], expand_segments=expand)
+        got = common_metrics(scores, labels, oracle_result['threshold'], expand_segments=expand)
         for k in oracle_result:
-            if k == 'p_latency' and oracle_result[k] is None:
+            if k == 'P_latency' and oracle_result[k] is None:
                 assert got[k] is None
             else:
                 assert got[k] == pytest.approx(oracle_result[k], nan_ok=True)
@@ -123,10 +124,10 @@ def _brute_force_pooled_threshold(scores_list, labels_list, expand_segments):
     for thr in candidates:
         tp = fp = fn = 0
         for scores, labels in zip(scores_list, labels_list):
-            m = oracle_mod.oracle_metrics(scores, labels, thr, expand_segments=expand_segments)
-            tp += m['tp']
-            fp += m['fp']
-            fn += m['fn']
+            m = common_metrics(scores, labels, thr, expand_segments=expand_segments)
+            tp += m['TP']
+            fp += m['FP']
+            fn += m['FN']
         denom = 2 * tp + fp + fn
         f1 = 0.0 if denom == 0 else 2 * tp / denom
         if f1 > best_f1 or (f1 == best_f1 and thr > best_thr):
@@ -149,10 +150,10 @@ def test_shared_oracle_threshold_matches_brute_force_sweep(expand_segments, synt
     got_f1 = 0.0
     tp = fp = fn = 0
     for scores, labels in zip(scores_list, labels_list):
-        m = oracle_mod.oracle_metrics(scores, labels, got_thr, expand_segments=expand_segments)
-        tp += m['tp']
-        fp += m['fp']
-        fn += m['fn']
+        m = common_metrics(scores, labels, got_thr, expand_segments=expand_segments)
+        tp += m['TP']
+        fp += m['FP']
+        fn += m['FN']
     denom = 2 * tp + fp + fn
     got_f1 = 0.0 if denom == 0 else 2 * tp / denom
 
@@ -172,9 +173,9 @@ def test_shared_oracle_threshold_single_dataset_matches_oracle_f1(synthetic_seri
         assert oracle_result is not None
 
         got_thr = oracle_mod.shared_oracle_threshold([scores], [labels], expand_segments=expand)
-        got = oracle_mod.oracle_metrics(scores, labels, got_thr, expand_segments=expand)
+        got = common_metrics(scores, labels, got_thr, expand_segments=expand)
 
-        assert got['f1'] == pytest.approx(oracle_result['f1'])
+        assert got['F1'] == pytest.approx(oracle_result['F1'])
 
 
 # ---------------------------------------------------------------------------
@@ -184,8 +185,8 @@ def test_shared_oracle_threshold_single_dataset_matches_oracle_f1(synthetic_seri
 def test_shared_threshold_blocks_identical_thresholds_and_summed_counts(tmp_path, monkeypatch, synthetic_dataset):
     monkeypatch.setattr(pot_fit, "SPOT", DummySPOT)
 
-    result_a, scores_a, labels_a, calib_a = synthetic_dataset("ds_a", seed=1)
-    result_b, scores_b, labels_b, calib_b = synthetic_dataset("ds_b", seed=2)
+    result_a, *_ = synthetic_dataset("ds_a", seed=1)
+    result_b, *_ = synthetic_dataset("ds_b", seed=2)
 
     results_by_dataset = {"ds_a": result_a, "ds_b": result_b}
     blocks = shared_mod.shared_threshold_blocks(results_by_dataset, q=1e-5, level=AaltoAD.constants.level)
@@ -198,17 +199,23 @@ def test_shared_threshold_blocks_identical_thresholds_and_summed_counts(tmp_path
     assert blocks["ds_a"]["pot"]["threshold"] == pytest.approx(blocks["ds_b"]["pot"]["threshold"])
     assert blocks["ds_a"]["oracle"]["threshold"] == pytest.approx(blocks["ds_b"]["oracle"]["threshold"])
 
+    # Pool the scores the blocks were computed from, as read back from disk:
+    # the CSV round trip can move a score by an ulp, flipping a point that
+    # sits exactly on the threshold.
+    _, disk_scores_a, disk_labels_a = scores_mod.load_run_scores(result_a)
+    _, disk_scores_b, disk_labels_b = scores_mod.load_run_scores(result_b)
+    pooled_scores = np.concatenate([disk_scores_a, disk_scores_b])
+    pooled_labels = np.concatenate([disk_labels_a, disk_labels_b])
+
     for method, tp_key, fp_key, fn_key in (
         ("pot", "TP", "FP", "FN"),
-        ("oracle", "tp", "fp", "fn"),
+        ("oracle", "TP", "FP", "FN"),
     ):
-        pooled_scores = np.concatenate([scores_a, scores_b])
-        pooled_labels = np.concatenate([labels_a, labels_b])
         thr = blocks["ds_a"][method]["threshold"]
         if method == "pot":
-            pooled_metrics = pot_fit.pot_metrics(pooled_scores, pooled_labels, thr, expand_segments=False)
+            pooled_metrics = common_metrics(pooled_scores, pooled_labels, thr, expand_segments=False)
         else:
-            pooled_metrics = oracle_mod.oracle_metrics(pooled_scores, pooled_labels, thr, expand_segments=False)
+            pooled_metrics = common_metrics(pooled_scores, pooled_labels, thr, expand_segments=False)
 
         sum_tp = blocks["ds_a"][method][tp_key] + blocks["ds_b"][method][tp_key]
         sum_fp = blocks["ds_a"][method][fp_key] + blocks["ds_b"][method][fp_key]
@@ -408,7 +415,7 @@ def test_load_results_returns_metric_block_from_file_when_present(
     synthetic_dataset("ds_a", seed=1)
     path = tmp_path / "ds_a" / "M_exp1.0_results.json"
     data = json.loads(path.read_text())
-    block = {"threshold": 42.0, "f1": 0.123}
+    block = {"threshold": 42.0, "F1": 0.123}
     data[method] = block
     path.write_text(json.dumps(data))
 
@@ -460,7 +467,7 @@ def test_load_results_calculates_metric_block_when_missing(
         ),
     }[method]
     assert result[method]["threshold"] == pytest.approx(expected_threshold)
-    assert "f1" in result[method]
+    assert "F1" in result[method]
 
 
 def test_group_configurations_groups_by_model_and_key_and_picks_best():
@@ -521,20 +528,20 @@ def test_pooled_result_sums_counts_and_recomputes_metrics():
     from AaltoAD.thresholds.pooled import pooled_result
     r1 = {"model": "M", "dataset": "a", "experiment_id": "1.0", "calibration_loss": 1.0, "eval_time": 2.0,
           "shared_threshold": True, "applied_hyperparameters": {"q": 1},
-          "pot": {"TP": 5, "FP": 5, "FN": 0, "TN": 10, "threshold": 0.3, "p_latency": 2.0},
-          "oracle": {"tp": 5, "fp": 0, "fn": 5, "tn": 10, "threshold": 0.7, "p_latency": None}}
+          "pot": {"TP": 5, "FP": 5, "FN": 0, "TN": 10, "threshold": 0.3, "P_latency": 2.0},
+          "oracle": {"TP": 5, "FP": 0, "FN": 5, "TN": 10, "threshold": 0.7, "P_latency": None}}
     r2 = {"model": "M", "dataset": "b", "experiment_id": "1.0", "calibration_loss": 3.0, "eval_time": 4.0,
           "shared_threshold": True, "applied_hyperparameters": {"q": 1},
-          "pot": {"TP": 5, "FP": 0, "FN": 5, "TN": 10, "threshold": 0.3, "p_latency": 4.0},
-          "oracle": {"tp": 10, "fp": 0, "fn": 0, "tn": 10, "threshold": 0.7, "p_latency": 1.0}}
+          "pot": {"TP": 5, "FP": 0, "FN": 5, "TN": 10, "threshold": 0.3, "P_latency": 4.0},
+          "oracle": {"TP": 10, "FP": 0, "FN": 0, "TN": 10, "threshold": 0.7, "P_latency": 1.0}}
     out = pooled_result([r1, r2])
     assert out["dataset"] == "combined" and out["datasets"] == ["a", "b"] and out["shared_threshold"]
     assert out["calibration_loss"] == 2.0 and out["eval_time"] == 6.0
     assert out["pot"]["TP"] == 10 and out["pot"]["FP"] == 5 and out["pot"]["FN"] == 5
-    assert out["pot"]["f1"] == pytest.approx(2 * 10 / (2 * 10 + 5 + 5))
-    assert out["pot"]["fpr"] == pytest.approx(5 / 25) and out["pot"]["threshold"] == 0.3
-    assert out["pot"]["p_latency"] == 3.0 and out["oracle"]["p_latency"] == 1.0
-    assert out["oracle"]["tp"] == 15 and out["oracle"]["threshold"] == 0.7
+    assert out["pot"]["F1"] == pytest.approx(2 * 10 / (2 * 10 + 5 + 5))
+    assert out["pot"]["FPR"] == pytest.approx(5 / 25) and out["pot"]["threshold"] == 0.3
+    assert out["pot"]["P_latency"] == 3.0 and out["oracle"]["P_latency"] == 1.0
+    assert out["oracle"]["TP"] == 15 and out["oracle"]["threshold"] == 0.7
     assert "pot_expanded" not in out
     assert pooled_result([]) is None
 
@@ -591,7 +598,7 @@ def test_conformal_metrics_scores_above_the_threshold():
     block = conformal.conformal_metrics(scores, labels, 1.0, False)
     assert block["TP"] == 2 and block["FP"] == 0
     # calc_point2point adds a small epsilon to keep its divisions finite.
-    assert block["f1"] == pytest.approx(1.0, abs=1e-4)
+    assert block["F1"] == pytest.approx(1.0, abs=1e-4)
     assert block["threshold"] == 1.0
 
 
@@ -599,7 +606,7 @@ def test_select_shared_best_pools_f1_and_averages_other_metrics():
 
     def result(hp, latency, tp, fp, fn, tn):
         return {"applied_hyperparameters": {"n": hp},
-                "conformal": {"p_latency": latency, "f1": 0.0, "fpr": fp / (fp + tn),
+                "conformal": {"P_latency": latency, "F1": 0.0, "FPR": fp / (fp + tn),
                               "TP": tp, "FP": fp, "FN": fn, "TN": tn}}
 
     # Config 1 is the faster of the two on average (mean 7 against mean 9),
@@ -612,5 +619,5 @@ def test_select_shared_best_pools_f1_and_averages_other_metrics():
     assert chosen["A"]["M"][0]["applied_hyperparameters"] == {"n": 1}
 
     # By f1 the two configs tie on pooled counts, so the first stays.
-    chosen_f1 = metrics.select_shared_best(by_dataset, "f1", "conformal")
+    chosen_f1 = metrics.select_shared_best(by_dataset, "F1", "conformal")
     assert chosen_f1["A"]["M"][0]["applied_hyperparameters"] == {"n": 1}

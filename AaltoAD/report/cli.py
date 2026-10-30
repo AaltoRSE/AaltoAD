@@ -5,12 +5,20 @@ from AaltoAD import constants
 # Option strings for the CLI
 METHODS = ["pot", "oracle", "conformal"]
 
-METHOD_METRICS = ["f1", "precision", "recall", "fpr", "threshold", "p_latency"]
+METHOD_METRICS = ["F1", "precision", "recall", "FPR", "threshold", "P_latency"]
 
-METRIC_ALIASES = {"latency": "p_latency", "precision": "precision", "recall": "recall"}
+# Lower-case CLI names map onto the upper-case metric keys.
+METRIC_ALIASES = {
+    "latency": "P_latency",
+    "p_latency": "P_latency",
+    "f1": "F1",
+    "fpr": "FPR",
+    "precision": "precision",
+    "recall": "recall",
+}
 
 # Suffix marking the point-adjusted variant of a method block ("pot_expanded"),
-# reached by dotted paths like "{method}_expanded.f1".
+# reached by dotted paths like "{method}_expanded.F1".
 EXPANDED_SUFFIX = "_expanded"
 
 # Whether one threshold per configuration is fit on the calibration data of all
@@ -25,12 +33,12 @@ THRESHOLD_METHOD = constants.THRESHOLD_METHOD
 # Header and lookup for every column --table-columns can name. An "_expanded"
 # path reaches the point-adjusted block of the same method.
 TABLE_COLUMN_SPECS = {
-    "f1": ("F1", "{method}.f1"),
-    "adjusted_f1": ("Adjusted F1", "{method}_expanded.f1"),
+    "F1": ("F1", "{method}.F1"),
+    "adjusted_f1": ("Adjusted F1", "{method}_expanded.F1"),
     "precision": ("Precision", "{method}.precision"),
     "recall": ("Recall", "{method}.recall"),
-    "fpr": ("FPR", "{method}.fpr"),
-    "p_latency": ("Latency", "{method}.p_latency"),
+    "FPR": ("FPR", "{method}.FPR"),
+    "P_latency": ("Latency", "{method}.P_latency"),
     "threshold": ("Threshold", "{method}.threshold"),
     "calibration_loss": ("Calib. loss", "calibration_loss"),
     "eval_time": ("Eval time (s)", "eval_time"),
@@ -54,8 +62,8 @@ def metric_list(metric):
     """Normalize a `--metric` argument into a tuple of bare metric names.
 
     Accepts a comma-separated string, a sequence, or a single name, and takes
-    the metric out of a dotted path, so 'latency,fpr,f1', ('p_latency', 'fpr',
-    'f1') and 'conformal.f1' all work. The threshold method comes from
+    the metric out of a dotted path, so 'latency,fpr,f1', ('P_latency', 'FPR',
+    'F1') and 'conformal.f1' all work. The threshold method comes from
     `--threshold`, not from here.
     """
     names = []

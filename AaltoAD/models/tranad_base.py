@@ -11,7 +11,7 @@ class TranADBase:
         data_x = torch.DoubleTensor(data)
         dataset = TensorDataset(data_x, data_x)
         bs = self.batch
-        dataloader = DataLoader(dataset, batch_size=bs)
+        dataloader = DataLoader(dataset, batch_size=bs, drop_last=True)
         n = epoch + 1
         l1s = []
         for d, _ in dataloader:
@@ -31,7 +31,6 @@ class TranADBase:
             optimizer.zero_grad()
             loss.backward(retain_graph=True)
             optimizer.step()
-        scheduler.step()
         tqdm.write(f"Epoch {epoch},\tL1 = {np.mean(l1s)}")
         return np.mean(l1s), optimizer.param_groups[0]["lr"]
 

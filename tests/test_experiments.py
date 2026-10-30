@@ -81,8 +81,8 @@ def test_append_benchmark_row_creates_file(tmp_path):
     bench_path = tmp_path / 'benchmarks.csv'
 
     result_dict = {
-        'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
-        'oracle': {'precision': 0.88, 'recall': 0.93, 'f1': 0.90, 'threshold': 0.42},
+        'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'F1': 0.87},
+        'oracle': {'precision': 0.88, 'recall': 0.93, 'F1': 0.90, 'threshold': 0.42},
     }
 
     run_experiment.append_benchmark_row('TranAD', 'TOL', result_dict, bench_path=str(bench_path))
@@ -107,13 +107,13 @@ def test_append_benchmark_row_appends_to_existing(tmp_path):
     bench_path = tmp_path / 'benchmarks.csv'
 
     # Create first entry
-    result1 = {'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
-               'oracle': {'precision': 0.86, 'recall': 0.91, 'f1': 0.88, 'threshold': 0.5}}
+    result1 = {'pot': {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'F1': 0.87},
+               'oracle': {'precision': 0.86, 'recall': 0.91, 'F1': 0.88, 'threshold': 0.5}}
     run_experiment.append_benchmark_row('TranAD', 'TOL', result1, bench_path=str(bench_path))
 
     # Append second entry
-    result2 = {'pot': {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90},
-               'oracle': {'precision': 0.89, 'recall': 0.93, 'f1': 0.91, 'threshold': 0.6}}
+    result2 = {'pot': {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'F1': 0.90},
+               'oracle': {'precision': 0.89, 'recall': 0.93, 'F1': 0.91, 'threshold': 0.6}}
     run_experiment.append_benchmark_row('USAD', 'MSL', result2, bench_path=str(bench_path))
 
     # Verify contents
@@ -199,7 +199,7 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
     ])
 
     # Mock pot_eval to return result and predictions (per-feature loop + 2 final calls)
-    mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
+    mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'F1': 0.87}
     mock_pot_eval.return_value = (mock_pot_result, np.random.rand(40))
 
     mock_hit_att.return_value = {'hit_rate': 0.80}
@@ -210,7 +210,7 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 
     # Verify nested results schema
     assert result['pot']['precision'] == 0.85
-    assert result['pot']['f1'] == 0.87
+    assert result['pot']['F1'] == 0.87
     assert result['hit_rate'] == 0.80
     assert result['ndcg'] == 0.75
     assert result['git_hash'] == 'abc123'
@@ -278,7 +278,7 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
         (np.random.rand(90, 5), np.random.rand(90, 5)),   # calib loss (unused: no calib set)
     ])
 
-    mock_pot_result = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
+    mock_pot_result = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'F1': 0.90}
     mock_pot_eval.return_value = (mock_pot_result, np.random.rand(40))
 
     mock_hit_att.return_value = {'hit_rate': 0.85}
@@ -312,7 +312,7 @@ def test_run_experiment_merlin(mock_append, mock_load_dataset, mock_run_merlin, 
 
     mock_load_dataset.return_value = (train_data, test_data, labels, None)
 
-    merlin_result = {'precision': 0.82, 'recall': 0.88, 'ROC/AUC': 0.91, 'f1': 0.85}
+    merlin_result = {'precision': 0.82, 'recall': 0.88, 'ROC/AUC': 0.91, 'F1': 0.85}
     mock_run_merlin.return_value = merlin_result
 
     # Run experiment with MERLIN
@@ -366,7 +366,7 @@ def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit
         (np.random.rand(90, 5), np.random.rand(90, 5)),
     ])
 
-    mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87}
+    mock_pot_result = {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'F1': 0.87}
     mock_pot_eval.return_value = (mock_pot_result, np.random.rand(40))
     mock_hit_att.return_value = {'hit_rate': 0.80}
     mock_ndcg.return_value = {'ndcg': 0.75}
@@ -396,8 +396,8 @@ def test_run_all_basic(mock_reload, mock_init, mock_run_experiment, tmp_path, mo
 
     # Mock run_experiment to return results
     mock_run_experiment.side_effect = [
-        {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'f1': 0.87},
-        {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90},
+        {'precision': 0.85, 'recall': 0.90, 'ROC/AUC': 0.95, 'F1': 0.87},
+        {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'F1': 0.90},
     ]
 
     # Run all with specific models and datasets
@@ -469,7 +469,7 @@ def test_run_all_with_retrain(mock_reload, mock_init, mock_run_experiment, tmp_p
         writer.writerow(['model', 'dataset', 'precision', 'recall', 'AUC', 'f1'])
         writer.writerow(['TranAD', 'TOL', '0.85', '0.90', '0.95', '0.87'])
 
-    mock_run_experiment.return_value = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'f1': 0.90}
+    mock_run_experiment.return_value = {'precision': 0.88, 'recall': 0.92, 'ROC/AUC': 0.96, 'F1': 0.90}
 
     # Create mock args object with retrain=True
     args_obj = SimpleNamespace(retrain=True)

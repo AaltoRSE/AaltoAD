@@ -34,14 +34,14 @@ def _pooled_block(blocks):
     rec = tp / (tp + fn) if (tp + fn) else 0.0
     f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
     fpr = fp / (fp + tn) if (fp + tn) else 0.0
-    latencies = [b["p_latency"] for b in blocks if b.get("p_latency") is not None]
+    latencies = [b["P_latency"] for b in blocks if b.get("P_latency") is not None]
     out = {
-        "f1": f1,
+        "F1": f1,
         "precision": prec,
         "recall": rec,
-        "fpr": fpr,
+        "FPR": fpr,
         "threshold": first.get("threshold"),
-        "p_latency": sum(latencies) / len(latencies) if latencies else None,
+        "P_latency": sum(latencies) / len(latencies) if latencies else None,
     }
     counts = {"TP": tp, "FP": fp, "FN": fn, "TN": tn}
     out.update(counts if upper else {k.lower(): int(v) for k, v in counts.items()})
