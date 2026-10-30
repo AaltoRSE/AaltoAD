@@ -76,7 +76,6 @@ class OmniAnomaly(BaseModel):
             loss.backward()
             optimizer.step()
         tqdm.write(f"Epoch {epoch},\tMSE = {np.mean(mses)},\tKLD = {np.mean(klds)}")
-        scheduler.step()
         return loss.item(), optimizer.param_groups[0]["lr"]
 
     def eval_step(self, epoch, data, optimizer, scheduler, feats):

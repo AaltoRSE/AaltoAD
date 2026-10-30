@@ -92,6 +92,16 @@ def oracle_f1(scores, labels, expand_segments=True):
     return common_metrics(scores, labels, best_thr, expand_segments), predictions
 
 
+def _eval_segments(model, segments, optimizer, scheduler, n_features):
+    """Run eval_step on each segment and concatenate the losses and predictions."""
+    results = [
+        model.eval_step(0, segment, optimizer, scheduler, n_features)
+        for segment in segments
+    ]
+    losses, predictions = zip(*results)
+    return np.concatenate(losses), np.concatenate(predictions)
+
+
 def _convert_json_types(obj):
     """Convert numpy/pandas types to native Python types for JSON serialisation."""
     if isinstance(obj, (np.integer, np.floating)):
@@ -345,6 +355,9 @@ def run_experiment(
             test.npy:  test data containing anomalies, used to evaluate the model's
                        predictions and compute metrics
             labels.npy: binary labels for test data (0 for normal, 1 for anomaly)
+            {train,calib,test}_lengths.npy: optional segment row counts. Each split is
+                       windowed, trained and evaluated per segment. Train segments
+                       shorter than a batch are skipped.
 
     Returns:
             dict: result dictionary produced at the end of the experiment.
@@ -393,36 +406,65 @@ def run_experiment(
         )
     )
 
+    # From here on trainD, testD and calibD are lists of segments, split before
+    # windowing so that no window crosses a segment boundary.
+    output_folder = constants.output_folder
+    trainD = utils.split_segments(trainD, dataset_name, "train", output_folder)
+    testD = utils.split_segments(testD, dataset_name, "test", output_folder)
+    calibD = utils.split_segments(calibD, dataset_name, "calib", output_folder)
+
     dropped = 0
     if hasattr(model, "n_window"):
-        # Windowing drops the first n_window positions of each split (no
+        # Windowing drops the first n_window positions of each segment (no
         # padding), so test labels must be trimmed to stay aligned.
         dropped = model.n_window
         if trainD is not None:
-            trainD = utils.convert_to_windows(trainD, model)
+            trainD = [utils.convert_to_windows(s, model) for s in trainD]
         if testD is not None:
-            testD = utils.convert_to_windows(testD, model)
+            testD = [utils.convert_to_windows(s, model) for s in testD]
         if calibD is not None:
-            calibD = utils.convert_to_windows(calibD, model)
+            calibD = [utils.convert_to_windows(s, model) for s in calibD]
         if labels is not None:
-            labels = labels[dropped:]
+            label_segments = utils.split_segments(
+                labels, dataset_name, "test", output_folder
+            )
+            labels = np.concatenate([s[dropped:] for s in label_segments])
 
     ### Training phase
     train_loss_curve, calib_loss_curve = [], []
     if not test and trainD is not None:
         print(f"{utils.color.HEADER}Training {model_name} on {utils.color.ENDC}")
         num_epochs = model.epochs
+        # Batched models drop partial batches, so a segment shorter than a batch
+        # has nothing to train on. Models without a batch size train per sample.
+        batch_size = getattr(model, "batch_size", getattr(model, "batch", 1))
+        train_segments = [s for s in trainD if len(s) >= batch_size]
+        if len(train_segments) < len(trainD):
+            print(
+                f"Warning: skipping {len(trainD) - len(train_segments)} train segment(s) shorter than batch size {batch_size}"
+            )
+        if not train_segments:
+            raise ValueError(
+                f"No train segment has at least batch size {batch_size} rows"
+            )
+        segment_sizes = [len(s) for s in train_segments]
         e = epoch + 1
         start = time()
         for e in tqdm(list(range(epoch + 1, epoch + num_epochs + 1))):
-            lossT, lr = model.train_step(e, trainD, optimizer, scheduler, n_features)
+            segment_losses = [
+                model.train_step(e, segment, optimizer, scheduler, n_features)[0]
+                for segment in train_segments
+            ]
+            scheduler.step()
+            lossT = np.average(segment_losses, weights=segment_sizes)
+            lr = optimizer.param_groups[0]["lr"]
             accuracy_list.append((lossT, lr))
             train_loss_curve.append(float(lossT))
             if calibD is not None:
                 model.eval()
                 with torch.no_grad():
-                    lossC, _ = model.eval_step(
-                        0, calibD, optimizer, scheduler, n_features
+                    lossC, _ = _eval_segments(
+                        model, calibD, optimizer, scheduler, n_features
                     )
                 model.train()
                 calib_loss_curve.append(float(np.mean(lossC)))
@@ -460,7 +502,9 @@ def run_experiment(
         start = time()
         if testD is not None:
             _eval_start = time()
-            loss, y_pred = model.eval_step(0, testD, optimizer, scheduler, n_features)
+            loss, y_pred = _eval_segments(
+                model, testD, optimizer, scheduler, n_features
+            )
             # test metrics
             lossFinal = np.mean(loss, axis=1)
             eval_time = float(time() - _eval_start)
@@ -471,19 +515,19 @@ def run_experiment(
                 + utils.color.ENDC
             )
             if plot:
-                testO = testD
+                testO = torch.cat(testD)
                 if "TranAD" in model.name:
-                    testO = torch.roll(testD, 1, 0)
+                    testO = torch.cat([torch.roll(s, 1, 0) for s in testD])
                 plotting.plotter(
                     f"{model_name}_{dataset_name}", testO, y_pred, loss, labels
                 )
 
         if trainD is not None:
-            lossT, _ = model.eval_step(0, trainD, optimizer, scheduler, n_features)
+            lossT, _ = _eval_segments(model, trainD, optimizer, scheduler, n_features)
             lossTfinal = np.mean(lossT, axis=1)
 
         if calibD is not None:
-            lossC, _ = model.eval_step(0, calibD, optimizer, scheduler, n_features)
+            lossC, _ = _eval_segments(model, calibD, optimizer, scheduler, n_features)
             lossCfinal = np.mean(lossC, axis=1)
 
         print(
@@ -560,7 +604,12 @@ def run_experiment(
     # Write labels with timestamps to a csv
     timestamps = utils.load_timestamps(dataset_name, constants.output_folder)
     if timestamps is not None and dropped:
-        timestamps = timestamps[dropped:].reset_index(drop=True)
+        timestamp_segments = utils.split_segments(
+            timestamps, dataset_name, "test", output_folder
+        )
+        timestamps = pd.concat(
+            [s[dropped:] for s in timestamp_segments]
+        ).reset_index(drop=True)
     labels_df = pd.DataFrame({"timestamp": timestamps})
     if labelsFinal is not None:
         labels_df["ground_truth"] = labelsFinal

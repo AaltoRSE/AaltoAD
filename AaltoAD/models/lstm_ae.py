@@ -49,7 +49,7 @@ class LSTM_AE(BaseModel):
 
         dataset = TensorDataset(data_x, data_x)
         dataloader = DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, drop_last=False
+            dataset, batch_size=self.batch_size, shuffle=True, drop_last=True
         )
         device = next(self.parameters()).device
 
@@ -66,7 +66,6 @@ class LSTM_AE(BaseModel):
             optimizer.step()
             batch_losses.append(loss.item())
 
-        scheduler.step()
         mean_loss = float(np.mean(batch_losses))
         tqdm.write(f"Epoch {epoch},\tMSE = {mean_loss}")
         return mean_loss, optimizer.param_groups[0]["lr"]

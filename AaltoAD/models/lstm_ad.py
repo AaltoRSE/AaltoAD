@@ -53,7 +53,7 @@ class LSTM_AD(BaseModel):
 
         dataset = TensorDataset(data_x, data_x)
         bs = self.batch_size
-        dataloader = DataLoader(dataset, batch_size=bs, shuffle=True, drop_last=False)
+        dataloader = DataLoader(dataset, batch_size=bs, shuffle=True, drop_last=True)
         device = next(self.parameters()).device
 
         self.train()
@@ -71,7 +71,6 @@ class LSTM_AD(BaseModel):
             total_loss += loss.item() * xb.size(0)
             n_samples += xb.size(0)
 
-        scheduler.step()
         mean_loss = total_loss / max(n_samples, 1)
         tqdm.write(f"Epoch {epoch},\tMSE = {mean_loss}")
         return mean_loss, optimizer.param_groups[0]["lr"]

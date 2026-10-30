@@ -224,7 +224,7 @@ class STAGNN(BaseModel):
         data_x = torch.DoubleTensor(data)
         dataset = TensorDataset(data_x, data_x)
         bs = self.batch
-        dataloader = DataLoader(dataset, batch_size=bs)
+        dataloader = DataLoader(dataset, batch_size=bs, drop_last=True)
         l1s = []
         for d, _ in dataloader:
             target = d[:, -1, :]
@@ -235,7 +235,6 @@ class STAGNN(BaseModel):
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
             optimizer.step()
-        scheduler.step()
         tqdm.write(f"Epoch {epoch},\tL1 = {np.mean(l1s)}")
         return np.mean(l1s), optimizer.param_groups[0]["lr"]
 

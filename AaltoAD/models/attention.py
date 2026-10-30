@@ -41,7 +41,6 @@ class Attention(BaseModel):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        scheduler.step()
         tqdm.write(f"Epoch {epoch},\tL1 = {np.mean(l1s)}")
         return np.mean(l1s), optimizer.param_groups[0]["lr"]
 

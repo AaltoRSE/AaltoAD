@@ -47,7 +47,7 @@ class LSTM_Univariate(BaseModel):
         l = nn.MSELoss(reduction="mean")
         total = 0.0
         n_samples = 0
-        for b in range(0, data.shape[0], self.batch_size):
+        for b in range(0, data.shape[0] - self.batch_size + 1, self.batch_size):
             batch_data = data[b : b + self.batch_size]
             batch_pred = self(batch_data)
             loss = l(batch_pred, batch_data)
@@ -56,7 +56,6 @@ class LSTM_Univariate(BaseModel):
             optimizer.step()
             total += loss.item() * batch_data.shape[0]
             n_samples += batch_data.shape[0]
-        scheduler.step()
         mean_loss = total / max(n_samples, 1)
         tqdm.write(f"Epoch {epoch},\tMSE = {mean_loss}")
         return mean_loss, optimizer.param_groups[0]["lr"]

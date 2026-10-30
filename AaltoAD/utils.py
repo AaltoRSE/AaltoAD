@@ -247,6 +247,36 @@ def load_dataset(
     return arrays[0], arrays[1], arrays[2], arrays[3]
 
 
+def split_segments(data, dataset: str, name: str, output_folder: str = "processed"):
+    """Split a concatenated partition into a list of segments.
+
+    Args:
+            data: Array, tensor or series with rows along the first axis, or None.
+            dataset (str): Name of the dataset (processed folder name).
+            name (str): Partition whose `{name}_lengths.npy` holds the segment lengths.
+            output_folder (str): Path to the processed data folder (default: 'processed').
+
+    Returns:
+            list: The segments in order, or [data] if the dataset has no lengths file.
+                    None if data is None.
+
+    Raises:
+            ValueError: If the lengths do not add up to the number of rows in data.
+    """
+    if data is None:
+        return None
+    path = os.path.join(output_folder, dataset, f"{name}_lengths.npy")
+    if not os.path.exists(path):
+        return [data]
+    lengths = np.load(path).tolist()
+    if sum(lengths) != len(data):
+        raise ValueError(
+            f"{path} adds up to {sum(lengths)} rows but the data has {len(data)}"
+        )
+    ends = np.cumsum(lengths).tolist()
+    return [data[end - length : end] for length, end in zip(lengths, ends)]
+
+
 def load_timestamps(dataset: str, output_folder: str = "processed") -> np.ndarray:
     """Load timestamps for a given dataset.
 
