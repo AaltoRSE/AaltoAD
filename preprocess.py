@@ -84,7 +84,7 @@ def load_data(
 		output_folder=DEFAULT_OUTPUT_FOLDER,
 		data_folder=DEFAULT_DATA_FOLDER,
         top_k=100, features=None, window=1,
-		interval=10, dataspec=None,
+		dataspec=None,
 	):
 	folder = os.path.join(output_folder, dataset)
 	os.makedirs(folder, exist_ok=True)
@@ -108,7 +108,6 @@ def load_data(
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
 		AaltoAD.preprocessing.load_nettraffic(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
-			interval=interval,
 			columns=dict(args.columns) if args.columns else None,
 			anomalies=args.anomaly,
 			dataspec=dataspec,
@@ -167,7 +166,6 @@ if __name__ == '__main__':
 		help='[TOL] Segment spec(s) TYPE[-]:SECONDS for the current group. TYPE is train|calib|test|valid|skip; trailing "-" marks the segment as anomalous (e.g. test-:240). Use skip:N to discard N seconds (e.g. lead-in before an attack).',
 	)
 	parser.add_argument('--top-k', type=int, default=100, help='[TOL] Keep the top-k most frequent IPs from baseline; the rest collapse into a single Other bucket (default: 100)')
-	parser.add_argument('--interval', type=int, default=10, help='Number of seconds to aggregate to one row of data in nettraffic data.')
 	parser.add_argument(
 		'--features', nargs='+', choices=TOL_FEATURES, default=None,
 		help=(
@@ -209,6 +207,5 @@ if __name__ == '__main__':
 			top_k=args.top_k,
 			features=args.features,
 			window=args.window,
-			interval=args.interval,
 			dataspec=dataspec,
 		)
