@@ -15,6 +15,10 @@ DEFAULT_SEGMENTS = [
     ("calib", False, 60),
 ]
 
+# Dataspec aggregations pandas has no name for. Every other aggregation is
+# passed to pandas by name (count, sum, mean, nunique, ...).
+CUSTOM_AGGREGATIONS = {"entropy": traffic_csv.shannon_entropy}
+
 
 def _load_and_prepare(csv_path, interval=1, columns=None):
     """Read CSV, detect needed columns, parse timestamps. Returns a     parsed-CSV record.
@@ -41,13 +45,11 @@ def _load_and_prepare(csv_path, interval=1, columns=None):
             )
         df = df.rename(columns={name: purpose for purpose, name in columns.items()})
     timestamp_col = traffic_csv.find_timestamp_column(df)
-    src_col, dst_col = traffic_csv.detect_ip_columns(df)
     bytes_col = traffic_csv.detect_column(
         df, ["bytes", "length", "len", "pkt_size", "size", "octets", "framelen"]
     )
     if bytes_col:
         df[bytes_col] = pd.to_numeric(df[bytes_col], errors="coerce").fillna(0)
-    src_port_col = traffic_csv.detect_column(df, ["src_port", "sport", "source_port"])
     df["ts_sec"] = traffic_csv.parse_timestamp_column(df[timestamp_col])
     df["interval"] = df["ts_sec"] // interval
     df = df.dropna(subset=["interval"])
@@ -57,9 +59,6 @@ def _load_and_prepare(csv_path, interval=1, columns=None):
     temperature_col = traffic_csv.detect_column(df, ["temperature", "temp"])
     if temperature_col:
         df[temperature_col] = pd.to_numeric(df[temperature_col], errors="coerce")
-    print(
-        f"  Detected columns in {csv_path}: timestamp='{timestamp_col}', src_ip='{src_col}', dst_ip='{dst_col}', bytes='{bytes_col}', src_port='{src_port_col}', temp='{temperature_col}'"
-    )
     if "has_temp" in df.columns:
         has_temp_mask = (
             pd.to_numeric(df["has_temp"], errors="coerce").fillna(0).astype(bool)
@@ -68,137 +67,138 @@ def _load_and_prepare(csv_path, interval=1, columns=None):
     return {
         "path": csv_path,
         "df": df,
-        "src_col": src_col,
-        "dst_col": dst_col,
-        "bytes_col": bytes_col,
-        "port_col": src_port_col,
-        "temp_col": temperature_col,
     }
 
 
-def _canonical_columns(top_ips, has_bytes, has_ports, has_temp, include_other):
-    """Build the canonical column list shared across all CSVs in a combined dataset."""
-    ip_keys = sorted(top_ips)
-    if include_other:
-        ip_keys += ["other_internal", "other_external"]
-    cols = []
-    # Outgoing block (per-IP num_dsts + extended)
-    for ip in ip_keys:
-        cols.append(f"{ip}_num_dsts")
-    for ip in ip_keys:
-        cols.append(f"{ip}_out_count")
-    if has_bytes:
-        for ip in ip_keys:
-            cols.append(f"{ip}_bytes_out")
-    if has_ports:
-        for ip in ip_keys:
-            cols.append(f"{ip}_port_entropy")
-    if has_temp:
-        for ip in ip_keys:
-            cols.append(f"{ip}_mean_temp")
-    # Incoming block (per-IP num_srcs + extended)
-    for ip in ip_keys:
-        cols.append(f"{ip}_num_srcs")
-    for ip in ip_keys:
-        cols.append(f"{ip}_in_count")
-    if has_bytes:
-        for ip in ip_keys:
-            cols.append(f"{ip}_bytes_in")
-        # Derived
-        for ip in ip_keys:
-            cols.append(f"{ip}_rw_ratio")
-    # Global
-    cols.append("rows_per_interval")
-    cols.append("empty_rows")
-    return cols
+def _cut_segments(parsed, segs, anomalies, interval):
+    """Cut one parsed CSV into segment dicts.
 
-
-def _aggregate_to_features(
-    parsed, top_ips, internal_prefix, port_entropy=False, bytes=False, temperature=False
-):
-    """Aggregate one parsed CSV into per second features dataframe.
-
-    Uses the supplied 'top_ips' and 'internal_prefix' to map the columm
-    space accross CSVs that share a baseline. Non-top-k IPS are grouped
-    into 'other_internal' vs 'other_external' based on the internal_prefix.
+    `segs` are (partition, anomalous, rows) with lengths in rows of `interval`
+    seconds, laid back to back from the CSV's first interval; "skip" segments
+    are dropped. `anomalies` are (start, duration) in seconds from the CSV start.
+    Each segment dict has:
+    - type: the partition (train, calib, test or valid)
+    - source: the CSV path
+    - start: start time in epoch seconds (aligned to `interval`)
+    - duration: length in seconds
+    - anomalies: (start, end) in seconds from the segment start, clipped to the
+      segment; empty if no anomaly overlaps it
+    - df: the raw rows that fall in the segment
     """
-    df = parsed["df"].copy()
-    src_col, dst_col = parsed["src_col"], parsed["dst_col"]
-    bytes_col, port_col, temp_col = (
-        parsed["bytes_col"],
-        parsed["port_col"],
-        parsed["temp_col"],
-    )
-
-    def _classify_ip(ip):
-        if internal_prefix is None:
-            return str(ip).strip()
-        ip_str = str(ip).strip()
-        if ip_str in top_ips:
-            return ip_str
-        return (
-            "other_internal" if ip_str.startswith(internal_prefix) else "other_external"
-        )
-
-    df[src_col] = df[src_col].astype(str).str.strip().map(_classify_ip)
-    df[dst_col] = df[dst_col].astype(str).str.strip().map(_classify_ip)
-
-    rows_per_interval = None
-    empty_rows = None
-    rows_per_interval = df.groupby("interval").size().rename("rows_per_interval")
-    empty_rows = (df[src_col].isna() | (df[src_col].astype(str).str.strip() == "")) & (
-        df[dst_col].isna() | (df[dst_col].astype(str).str.strip() == "")
-    )
-    empty_rows = df[empty_rows].groupby("interval").size().rename("empty_rows")
-
-    out_grp = df.groupby(["interval", src_col])
-    out_agg = pd.DataFrame({"num_dsts": out_grp[dst_col].nunique()})
-    out_agg["out_count"] = out_grp.size()
-    if bytes and bytes_col:
-        out_agg["bytes_out"] = out_grp[bytes_col].sum()
-    if port_entropy and port_col:
-        out_agg["port_entropy"] = out_grp[port_col].apply(traffic_csv.shannon_entropy)
-    if temperature and temp_col:
-        out_agg["mean_temp"] = out_grp[temp_col].mean()
-
-    in_grp = df.groupby(["interval", dst_col])
-    in_agg = pd.DataFrame({"num_srcs": in_grp[src_col].nunique()})
-    in_agg["in_count"] = in_grp.size()
-    if bytes and bytes_col:
-        in_agg["bytes_in"] = in_grp[bytes_col].sum()
-
-    out_wide = out_agg.unstack(fill_value=0)
-    out_wide.columns = [f"{ip}_{metric}" for metric, ip in out_wide.columns]
-    in_wide = in_agg.unstack(fill_value=0)
-    in_wide.columns = [f"{ip}_{metric}" for metric, ip in in_wide.columns]
-
-    ts_min, ts_max = df["interval"].min(), df["interval"].max()
-    full_idx = np.arange(ts_min, ts_max + 1)
-    features_df = (
-        out_wide.reindex(full_idx, fill_value=0)
-        .join(in_wide.reindex(full_idx, fill_value=0), how="outer")
-        .fillna(0)
-    )
-    features_df = (
-        features_df.join(rows_per_interval.reindex(full_idx, fill_value=0), how="outer")
-        .join(empty_rows.reindex(full_idx, fill_value=0), how="outer")
-        .fillna(0)
-    )
-    features_df.index.name = "interval"
-
-    feature_list = list(top_ips)
-    if internal_prefix is not None:
-        feature_list += ["other_internal", "other_external"]
-
-    for ip in feature_list:
-        b_in_col = f"{ip}_bytes_in"
-        b_out_col = f"{ip}_bytes_out"
-        if b_in_col in features_df.columns and b_out_col in features_df.columns:
-            features_df[f"{ip}_rw_ratio"] = features_df[b_out_col] / (
-                features_df[b_in_col] + 1e-6
+    df = parsed["df"]
+    first = int(df["interval"].min())
+    segments = []
+    offset = 0
+    for partition, _, rows in segs:
+        if partition != "skip":
+            seg_offset, duration = offset * interval, rows * interval
+            ranges = []
+            for a_start, a_duration in anomalies:
+                start = max(a_start - seg_offset, 0)
+                end = min(a_start + a_duration - seg_offset, duration)
+                if start < end:
+                    ranges.append((start, end))
+            in_segment = (df["interval"] >= first + offset) & (
+                df["interval"] < first + offset + rows
             )
+            segments.append(
+                {
+                    "type": partition,
+                    "source": parsed["path"],
+                    "start": (first + offset) * interval,
+                    "duration": duration,
+                    "anomalies": ranges,
+                    "df": df[in_segment],
+                }
+            )
+        offset += rows
+    return segments
 
-    return features_df
+
+def add_grouped_columns(segments, dataspec):
+    """Add a '{col}_grouped' column for every group_by column in the dataspec.
+
+    The values of all group_by columns are counted together over the rows of
+    every train segment, the top `dataspec["group_by_count_limit"]` are kept,
+    and every other value becomes "other" in the new columns. `segments` are
+    segment dicts (see `_cut_segments`). Returns new segment dicts whose "df"
+    has the new columns added (the input segments are not modified), and the
+    values the new columns can hold: the kept values sorted, then "other".
+    """
+    group_by_cols = sorted({feature["group_by"] for feature in dataspec["features"]})
+
+    baseline_values = [
+        segment["df"][col].dropna().astype(str).str.strip()
+        for segment in segments
+        if segment["type"] == "train"
+        for col in group_by_cols
+    ]
+    if not baseline_values:
+        raise ValueError(
+            "No train segments found across any CSV — cannot rank the group_by values"
+        )
+    all_values = pd.concat(baseline_values)
+    all_values = all_values[all_values != ""]
+    counts = all_values.value_counts()
+    if counts.empty:
+        raise ValueError(
+            f"No values in group_by columns {group_by_cols} in train segments across any CSV"
+        )
+    kept_values = set(counts.head(dataspec["group_by_count_limit"]).index)
+    print(
+        f"nettraffic: {len(counts)} unique values in group_by columns {group_by_cols} "
+        f"across all baselines; keeping the top {len(kept_values)}"
+    )
+
+    out = []
+    for segment in segments:
+        df = segment["df"]
+        new_cols = {}
+        for col in group_by_cols:
+            values = df[col].astype(str).str.strip()
+            new_cols[f"{col}_grouped"] = values.where(values.isin(kept_values), "other")
+        out.append({**segment, "df": df.assign(**new_cols)})
+    return out, sorted(kept_values) + ["other"]
+
+
+def _aggregate_segment(segment, features, feature_cols, interval):
+    """Aggregate one segment's raw rows into a feature table, one row per interval.
+
+    For every dataspec feature the rows are grouped by interval and by the
+    feature's '{group_by}_grouped' column, and its "column" is aggregated with
+    its "aggregation" (column "any" counts rows, so its aggregation must be
+    "count"). Columns are named '{value}_{feature name}'. The result has exactly
+    the columns `feature_cols`, in that order, and one row per interval of the
+    whole segment, `duration // interval` of them; anything without data is 0.
+    """
+    df = segment["df"]
+    first = segment["start"] // interval
+    index = pd.RangeIndex(
+        first, first + segment["duration"] // interval, name="interval"
+    )
+    tables = []
+    for feature in features:
+        group = df.groupby(["interval", f"{feature['group_by']}_grouped"])
+        if feature["column"] == "any":
+            if feature["aggregation"] != "count":
+                raise ValueError(
+                    f"Feature {feature['name']!r}: column 'any' only supports aggregation 'count'"
+                )
+            values = group.size()
+        else:
+            aggregation = CUSTOM_AGGREGATIONS.get(
+                feature["aggregation"], feature["aggregation"]
+            )
+            values = group[feature["column"]].agg(aggregation)
+        table = values.unstack()
+        table.columns = [f"{value}_{feature['name']}" for value in table.columns]
+        tables.append(table)
+    return (
+        pd.concat(tables, axis=1)
+        .reindex(index=index, columns=feature_cols)
+        .fillna(0)
+        .astype(float)
+    )
 
 
 def load_nettraffic(
@@ -207,13 +207,10 @@ def load_nettraffic(
     csv_path=None,
     segments=None,
     data_folder=DEFAULT_DATA_FOLDER,
-    top_k=10,
     interval=1,
-    bytes=False,
-    port_entropy=False,
-    temperature=False,
     columns=None,
     anomalies=None,
+    dataspec=None,
 ):
     """Load and preprocess one or more CSV files containing network
     traffic data and temperature readings.
@@ -244,6 +241,9 @@ def load_nettraffic(
     'anomalies' lists (start, duration) pairs in seconds from the start of each
     CSV, applied to every CSV. Overlapping test and valid rows are labeled
     anomalous.
+
+    'dataspec' is the preprocessing definition loaded from the --dataspec JSON
+    file (e.g. ELEC_dataspec.json), as a dict; None when not given.
 
     Data is aggregated into time intervals specified by interval (in seconds). The features are counts of unique src/dst IPs for each top_K IP address, port entropy and mean temperature.
     """
@@ -277,140 +277,58 @@ def load_nettraffic(
         for paths, segs in csv_groups
     ]
 
-    # Convert anomaly ranges from seconds to aggregated rows.
-    anomaly_rows = []
+    # Anomaly ranges must fall on interval boundaries.
     for start, duration in anomalies or []:
         if start % interval or duration % interval:
             raise ValueError(
                 f"Anomaly {start}:{duration} is not divisible by interval {interval}s"
             )
-        anomaly_rows.append((start // interval, (start + duration) // interval))
 
-    # Load each csv, parse columns and timestamp. Collect baseline IPs.
-    parsed_records = []
-    all_baseline_ips = []
+    # Load each csv, parse columns and timestamp, and cut it into segment dicts.
+    segments = []
     for paths, segs in csv_groups:
         for path in paths:
             parsed = _load_and_prepare(path, interval=interval, columns=columns)
-            parsed_records.append((parsed, segs))
-            mask = traffic_csv.baseline_mask(parsed["df"], segs, interval_col="interval")
-            if mask.any():
-                all_baseline_ips.append(
-                    parsed["df"]
-                    .loc[mask, parsed["src_col"]]
-                    .dropna()
-                    .astype(str)
-                    .str.strip()
-                )
-                all_baseline_ips.append(
-                    parsed["df"]
-                    .loc[mask, parsed["dst_col"]]
-                    .dropna()
-                    .astype(str)
-                    .str.strip()
-                )
+            segments.extend(_cut_segments(parsed, segs, anomalies or [], interval))
 
-    if not all_baseline_ips:
-        raise ValueError(
-            "No train segments found across any CSV — cannot determine baseline IP set"
+    # Add the group_by columns with values outside the top ones set to "other".
+    segments, grouped_values = add_grouped_columns(segments, dataspec)
+
+    # The columns every segment gets, in this order.
+    feature_cols = [
+        f"{value}_{feature['name']}"
+        for feature in dataspec["features"]
+        for value in grouped_values
+    ]
+
+    # Aggregate each segment.
+    for segment in segments:
+        segment["features"] = _aggregate_segment(
+            segment, dataspec["features"], feature_cols, interval
         )
 
-    all_ips_concat = pd.concat(all_baseline_ips)
-    all_ips_concat = all_ips_concat[all_ips_concat != ""]
-    counts = all_ips_concat.value_counts()
-    if counts.empty:
-        raise ValueError("No valid IP addresses found in train segments across any CSV")
-
-    most_common_ips = counts.idxmax()
-    top_ips = set(counts.head(top_k).index)
-
-    if len(top_ips) < top_k:
-        print("Using all IPs from baseline since unique IP count is less than top_k")
-        internal_prefix = None
-        use_all_ips = True
-    else:
-        internal_prefix = most_common_ips.split(".")[0]
-        use_all_ips = False
-
-    total_baseline_rows = (
-        sum(len(s) for s in all_baseline_ips) // 2
-    )  # we appended src + dst
-    print(
-        f"nettraffic: unique IPs across all baselines: {len(counts)} "
-        f"(total baseline rows aggregated: {total_baseline_rows})"
-    )
-    if not use_all_ips:
-        print(
-            f"nettraffic: most common IP {most_common_ips} => internal prefix {internal_prefix}"
-        )
-        print(
-            f"nettraffic: selecting top_{top_k} IPs from combined baseline (keeps {len(top_ips)})"
-        )
-
-    # Determine canonical column names.
-    has_bytes = bytes and any(
-        "framelen" in parsed["df"].columns for parsed, _ in parsed_records
-    )
-    has_temp = temperature and any(
-        "temperature" in parsed["df"].columns for parsed, _ in parsed_records
-    )
-    has_ports = port_entropy and any(
-        "src_port" in parsed["df"].columns and "dst_port" in parsed["df"].columns
-        for parsed, _ in parsed_records
-    )
-    canonical_cols = _canonical_columns(
-        top_ips, has_bytes, has_ports, has_temp, not use_all_ips
-    )
-
-    # Aggregate each csv reindex to canonical columns, slice and accumulate
-    partitions = {"train": [], "calib": [], "test": [], "valid": []}
-    label_seqs = {"train": [], "calib": [], "test": [], "valid": []}
-    for parsed, segs in parsed_records:
-        features_df = _aggregate_to_features(
-            parsed,
-            top_ips,
-            internal_prefix,
-            port_entropy=port_entropy,
-            bytes=bytes,
-            temperature=temperature,
-        )
-        print(f"  CSV {parsed['path']} aggregated to {features_df.shape[0]} intervals")
-
-        features_df = features_df.reindex(columns=canonical_cols, fill_value=0)
-        features = features_df.values.astype(float)
-        total_needed = sum(s[2] for s in segs[:-1])
-        if features.shape[0] < total_needed:
-            raise ValueError(
-                f"CSV {parsed['path']}: segments require {total_needed} rows but only {features.shape[0]} available after aggregation"
+    # Stack the features, labels and segment lengths of each partition.
+    n_feat = len(feature_cols)
+    data, partition_labels, lengths = {}, {}, {}
+    for name in ("train", "calib", "test", "valid"):
+        parts = [segment for segment in segments if segment["type"] == name]
+        label_parts = []
+        for segment in parts:
+            segment_labels = np.zeros((len(segment["features"]), n_feat))
+            for start, end in segment["anomalies"]:
+                segment_labels[start // interval : end // interval] = 1
+            label_parts.append(segment_labels)
+        if parts:
+            data[name] = np.concatenate(
+                [segment["features"].values for segment in parts], axis=0
             )
-        if features.shape[0] < total_needed + segs[-1][2]:
-            print(
-                f"  Warning: CSV {parsed['path']} has fewer rows than total segments. Last segment will be truncated to fit available data."
-            )
-        offset = 0
-        for partition, _, rows in segs:
-            if partition == "skip":
-                offset += rows
-                continue
-            partitions[partition].append(features[offset : offset + rows])
-            # Anomaly ranges relative to this segment's first row.
-            ranges = [
-                (max(start - offset, 0), min(end - offset, rows))
-                for start, end in anomaly_rows
-            ]
-            label_seqs[partition].append((rows, ranges))
-            offset += rows
+            partition_labels[name] = np.concatenate(label_parts, axis=0)
+        else:
+            data[name] = np.empty((0, n_feat))
+            partition_labels[name] = np.empty((0, n_feat))
+        lengths[name] = [len(segment["features"]) for segment in parts]
 
-    # Concatenate per partition.
-    n_feat = len(canonical_cols)
-
-    def _stack(parts):
-        return np.concatenate(parts, axis=0) if parts else np.empty((0, n_feat))
-
-    train = _stack(partitions["train"])
-    calib = _stack(partitions["calib"])
-    test = _stack(partitions["test"])
-    valid = _stack(partitions["valid"])
+    train, calib, test, valid = data["train"], data["calib"], data["test"], data["valid"]
 
     if train.size == 0:
         raise ValueError("Training partition is empty after split. Cannot normalize.")
@@ -421,7 +339,7 @@ def load_nettraffic(
     # drowning out signal from the well-behaved features.
     keep = train.max(axis=0) != train.min(axis=0)
     if not keep.all():
-        constant_cols = [c for c, k in zip(canonical_cols, keep) if not k]
+        constant_cols = [c for c, k in zip(feature_cols, keep) if not k]
         print(
             f"  zeroing {len(constant_cols)} baseline-constant columns: {constant_cols}"
         )
@@ -437,23 +355,12 @@ def load_nettraffic(
     if valid.size > 0:
         valid, _, _ = normalize(valid, min_a, max_a)
 
-    def _build_labels(arr, name):
-        out = np.zeros_like(arr)
-        row = 0
-        for rows, ranges in label_seqs.get(name, []):
-            for start, end in ranges:
-                if start < end:
-                    out[row + start : row + end] = 1
-            row += rows
-        return out
-
-    labels = _build_labels(test, "test")
-    valid_labels = _build_labels(valid, "valid")
+    labels = partition_labels["test"]
+    valid_labels = partition_labels["valid"]
     print(
         f"   Anomaly labels: {int(labels.sum() / n_feat) if labels.size else 0}/{labels.shape[0]} test rows, "
         f"{int(valid_labels.sum() / n_feat) if valid_labels.size else 0}/{valid_labels.shape[0]} valid rows"
     )
-    print(f"  Feature columns ({len(canonical_cols)}): {canonical_cols}")
 
     for name, arr in [
         ("train", train),
@@ -468,10 +375,10 @@ def load_nettraffic(
             np.ascontiguousarray(arr.astype("float64")),
         )
     # Row count of each segment, to split the concatenated partition arrays.
-    for name, parts in partitions.items():
+    for name, segment_lengths in lengths.items():
         np.save(
             os.path.join(folder, f"{name}_lengths.npy"),
-            np.array([len(part) for part in parts], dtype=int),
+            np.array(segment_lengths, dtype=int),
         )
     all_paths = [p for paths, _ in csv_groups for p in paths]
     print(f"Processed {len(all_paths)} CSV(s) as nettraffic -> {folder}/")

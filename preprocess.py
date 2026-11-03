@@ -84,7 +84,7 @@ def load_data(
 		output_folder=DEFAULT_OUTPUT_FOLDER,
 		data_folder=DEFAULT_DATA_FOLDER,
         top_k=100, features=None, window=1,
-		interval=10,
+		interval=10, dataspec=None,
 	):
 	folder = os.path.join(output_folder, dataset)
 	os.makedirs(folder, exist_ok=True)
@@ -108,10 +108,10 @@ def load_data(
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
 		AaltoAD.preprocessing.load_nettraffic(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
-			top_k=top_k, interval=interval, port_entropy=args.port_entropy,
-			bytes=args.bytes, temperature=args.temperature,
+			interval=interval,
 			columns=dict(args.columns) if args.columns else None,
 			anomalies=args.anomaly,
+			dataspec=dataspec,
 		)
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
@@ -179,9 +179,6 @@ if __name__ == '__main__':
 		'--window', type=int, default=1,
 		help='[TOL] Aggregation window in seconds; each output row aggregates this many seconds (segment lengths must be divisible by it)',
 	)
-	parser.add_argument('--port-entropy', action='store_true', help='[nettraffic] Include port entropy features', default=False)
-	parser.add_argument('--bytes', action='store_true', help='[nettraffic] Include byte count features', default=False)
-	parser.add_argument('--temperature', action='store_true', help='[nettraffic] Include temperature features', default=False)
 	parser.add_argument(
 		'--columns', nargs='+', type=parse_column_spec, default=None,
 		help='[nettraffic] Column map PURPOSE:COLUMN_NAME; each CSV column COLUMN_NAME is renamed to PURPOSE after loading (e.g. timestamp:epoch_time).',
@@ -213,4 +210,5 @@ if __name__ == '__main__':
 			features=args.features,
 			window=args.window,
 			interval=args.interval,
+			dataspec=dataspec,
 		)
