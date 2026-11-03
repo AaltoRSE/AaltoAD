@@ -1,4 +1,5 @@
 import os
+import json
 import AaltoAD
 import argparse
 
@@ -189,8 +190,16 @@ if __name__ == '__main__':
 		'--anomaly', nargs='+', type=parse_anomaly, default=None,
 		help='[nettraffic] Anomaly spec(s) START:DURATION in seconds from the start of each CSV, applied to every CSV (e.g. 47160:3660). Matching rows are labeled anomalous in test and valid.',
 	)
+	parser.add_argument(
+		'--dataspec', default=None,
+		help='[nettraffic] JSON file defining the preprocessing (interval, features), e.g. ELEC_dataspec.json.',
+	)
 	args = parser.parse_args()
 	csv_groups = getattr(args, 'csv_groups', None)
+	dataspec = None
+	if args.dataspec:
+		with open(args.dataspec) as f:
+			dataspec = json.load(f)
 
 	# Iterate over provided dataset names and process each
 	for ds in args.datasets:
