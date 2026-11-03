@@ -84,9 +84,17 @@ def _cut_segments(parsed, segs, anomalies, interval):
     - anomalies: (start, end) in seconds from the segment start, clipped to the
       segment; empty if no anomaly overlaps it
     - df: the raw rows that fall in the segment
+    Raises ValueError if the segments run past the CSV's last interval.
     """
     df = parsed["df"]
     first = int(df["interval"].min())
+    last = int(df["interval"].max())
+    if first + sum(rows for _, _, rows in segs) > last + 1:
+        raise ValueError(
+            f"CSV {parsed['path']}: segments cover "
+            f"{sum(rows for _, _, rows in segs) * interval}s but the data covers "
+            f"{(last + 1 - first) * interval}s"
+        )
     segments = []
     offset = 0
     for partition, _, rows in segs:
@@ -207,7 +215,6 @@ def load_nettraffic(
     csv_path=None,
     segments=None,
     data_folder=DEFAULT_DATA_FOLDER,
-    interval=1,
     columns=None,
     anomalies=None,
     dataspec=None,
@@ -243,10 +250,17 @@ def load_nettraffic(
     anomalous.
 
     'dataspec' is the preprocessing definition loaded from the --dataspec JSON
-    file (e.g. ELEC_dataspec.json), as a dict; None when not given.
+    file (e.g. ELEC_dataspec.json), as a dict; None when not given. Its
+    "interval" sets the aggregation interval in seconds. Feature names must be
+    unique.
 
     Data is aggregated into time intervals specified by interval (in seconds). The features are counts of unique src/dst IPs for each top_K IP address, port entropy and mean temperature.
     """
+    interval = dataspec["interval"]
+    names = [feature["name"] for feature in dataspec["features"]]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        raise ValueError(f"Duplicate feature names in the dataspec: {duplicates}")
 
     # Normalize input modes into a uniform csv_groups list.
     if csv_groups is None:
