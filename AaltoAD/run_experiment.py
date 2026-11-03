@@ -27,6 +27,7 @@ from AaltoAD import merlin
 from AaltoAD import diagnosis
 from AaltoAD import utils
 from AaltoAD.metrics.base import common_metrics, f1_metrics
+from AaltoAD.thresholds import conformal
 
 import tempfile
 import shutil
@@ -334,6 +335,9 @@ def run_experiment(
     test: bool = False,
     retrain: bool = False,
     plot: bool = False,
+    run_oracle: bool = True,
+    run_pot: bool = True,
+    run_conformal: bool = True,
 ) -> Dict:
     """Run a single experiment with specified parameters.
 
@@ -346,6 +350,10 @@ def run_experiment(
             less (bool): Whether to train using less data
             test (bool): Test mode (skip training)
             retrain (bool): Force retrain
+            run_oracle (bool): Compute the oracle (best-F1) threshold metrics
+            run_pot (bool): Compute the POT threshold metrics
+            run_conformal (bool): Compute the conformal threshold metrics at
+                       constants.CONFORMAL_Q (needs calibration data)
 
     Reads multiple dataset splits from the dataset folder,
         train.npy: training data used to determine model weights and internal parameters
@@ -547,7 +555,8 @@ def run_experiment(
     if testD is not None:
         loss_stats("test  loss (mean over feats)", lossFinal)
 
-    if testD is not None and labels is not None:
+    q = applied_hyperparams.get("q", 1e-5)
+    if run_oracle and testD is not None and labels is not None:
         oracle_expanded, oracle_expanded_pred = oracle_f1(
             lossFinal, labelsFinal, expand_segments=True
         )
@@ -555,8 +564,16 @@ def run_experiment(
         result["oracle"] = oracle
         result["oracle_expanded"] = oracle_expanded
 
-    q = applied_hyperparams.get("q", 1e-5)
-    if calibD is not None and testD is not None and labels is not None:
+    if run_conformal and calibD is not None and testD is not None and labels is not None:
+        conformal_thr = conformal.conformal_threshold(lossCfinal, constants.CONFORMAL_Q)
+        result["conformal"] = conformal.conformal_metrics(
+            lossFinal, labelsFinal, conformal_thr, False
+        )
+        result["conformal_expanded"] = conformal.conformal_metrics(
+            lossFinal, labelsFinal, conformal_thr, True
+        )
+
+    if run_pot and calibD is not None and testD is not None and labels is not None:
         pot_expanded_result, pot_expanded_pred = pot.pot_eval(
             lossCfinal, lossFinal, labelsFinal, q=q, expand_segments=True
         )
@@ -565,28 +582,6 @@ def run_experiment(
         )
         result["pot"] = pot_result
         result["pot_expanded"] = pot_expanded_result
-    elif trainD is not None and testD is not None and labels is not None:
-        print(
-            f"Warning: no calibration set found, using training data for POT thresholding."
-        )
-        pot_expanded_result, pot_expanded_pred = pot.pot_eval(
-            lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=True
-        )
-        pot_result, pot_pred = pot.pot_eval(
-            lossTfinal, lossFinal, labelsFinal, q=q, expand_segments=False
-        )
-        result["pot"] = pot_result
-        result["pot_expanded"] = pot_expanded_result
-    elif calibD is not None:
-        # We have calibration data for thresholding but no test labels
-        # Calculate pot threshold from calibration data and apply it to test data, but can't compute metrics
-        labels = np.zeros_like(lossCfinal)
-        pot_result, pot_pred = pot.pot_eval(lossCfinal, lossFinal, labelsFinal, q=q)
-        if testD is not None:
-            result["pot"] = {
-                "threshold": pot_result["threshold"],
-                "anomalies": pot_pred.sum(),
-            }
 
     if calibD is not None:
         result["calibration_loss"] = float(lossCfinal.mean())

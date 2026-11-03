@@ -1,4 +1,5 @@
 import os
+import json
 import AaltoAD
 import argparse
 
@@ -83,7 +84,7 @@ def load_data(
 		output_folder=DEFAULT_OUTPUT_FOLDER,
 		data_folder=DEFAULT_DATA_FOLDER,
         top_k=100, features=None, window=1,
-		interval=10,
+		dataspec=None,
 	):
 	folder = os.path.join(output_folder, dataset)
 	os.makedirs(folder, exist_ok=True)
@@ -107,10 +108,9 @@ def load_data(
 		groups_arg = [(paths, segs) for paths, segs in csv_groups] if csv_groups else None
 		AaltoAD.preprocessing.load_nettraffic(
 			folder, csv_groups=groups_arg, data_folder=data_folder,
-			top_k=top_k, interval=interval, port_entropy=args.port_entropy,
-			bytes=args.bytes, temperature=args.temperature,
 			columns=dict(args.columns) if args.columns else None,
 			anomalies=args.anomaly,
+			dataspec=dataspec,
 		)
 	elif csv_groups:
 		raise Exception(f'CSV processing not implemented for dataset type {dataset}. Currently only TOL is supported.')
@@ -166,7 +166,6 @@ if __name__ == '__main__':
 		help='[TOL] Segment spec(s) TYPE[-]:SECONDS for the current group. TYPE is train|calib|test|valid|skip; trailing "-" marks the segment as anomalous (e.g. test-:240). Use skip:N to discard N seconds (e.g. lead-in before an attack).',
 	)
 	parser.add_argument('--top-k', type=int, default=100, help='[TOL] Keep the top-k most frequent IPs from baseline; the rest collapse into a single Other bucket (default: 100)')
-	parser.add_argument('--interval', type=int, default=10, help='Number of seconds to aggregate to one row of data in nettraffic data.')
 	parser.add_argument(
 		'--features', nargs='+', choices=TOL_FEATURES, default=None,
 		help=(
@@ -178,9 +177,6 @@ if __name__ == '__main__':
 		'--window', type=int, default=1,
 		help='[TOL] Aggregation window in seconds; each output row aggregates this many seconds (segment lengths must be divisible by it)',
 	)
-	parser.add_argument('--port-entropy', action='store_true', help='[nettraffic] Include port entropy features', default=False)
-	parser.add_argument('--bytes', action='store_true', help='[nettraffic] Include byte count features', default=False)
-	parser.add_argument('--temperature', action='store_true', help='[nettraffic] Include temperature features', default=False)
 	parser.add_argument(
 		'--columns', nargs='+', type=parse_column_spec, default=None,
 		help='[nettraffic] Column map PURPOSE:COLUMN_NAME; each CSV column COLUMN_NAME is renamed to PURPOSE after loading (e.g. timestamp:epoch_time).',
@@ -189,8 +185,16 @@ if __name__ == '__main__':
 		'--anomaly', nargs='+', type=parse_anomaly, default=None,
 		help='[nettraffic] Anomaly spec(s) START:DURATION in seconds from the start of each CSV, applied to every CSV (e.g. 47160:3660). Matching rows are labeled anomalous in test and valid.',
 	)
+	parser.add_argument(
+		'--dataspec', default=None,
+		help='[nettraffic] JSON file defining the preprocessing (interval, features), e.g. ELEC_dataspec.json.',
+	)
 	args = parser.parse_args()
 	csv_groups = getattr(args, 'csv_groups', None)
+	dataspec = None
+	if args.dataspec:
+		with open(args.dataspec) as f:
+			dataspec = json.load(f)
 
 	# Iterate over provided dataset names and process each
 	for ds in args.datasets:
@@ -203,5 +207,5 @@ if __name__ == '__main__':
 			top_k=args.top_k,
 			features=args.features,
 			window=args.window,
-			interval=args.interval,
+			dataspec=dataspec,
 		)
