@@ -1,0 +1,55 @@
+{
+    "name": "ELEC",
+    "interval": 60,
+    "group_by_count_limit": 15,
+    "features": [
+        {
+            "name": "outgoing count per ip",
+            "column": "any",
+            "aggregation": "count",
+            "group_by": "src_ip"
+        },
+        {
+            "name": "incoming count per ip",
+            "column": "any",
+            "aggregation": "count",
+            "group_by": "dst_ip"
+        },
+        {
+            "name": "number of destination IPs",
+            "column": "src_ip",
+            "aggregation": "nunique",
+            "group_by": "dst_ip"
+        },
+        {
+            "name": "number of source IPs",
+            "column": "dst_ip",
+            "aggregation": "nunique",
+            "group_by": "src_ip"
+        },
+        {
+            "name": "port_entropy",
+            "column": "src_port",
+            "aggregation": "entropy",
+            "group_by": "src_ip"
+        },
+        {
+            "name": "temperature",
+            "column": "temperature",
+            "aggregation": "mean",
+            "group_by": "src_ip"
+        },
+        {
+            "name": "bytes in",
+            "column": "framelen",
+            "aggregation": "sum",
+            "group_by": "dst_ip"
+        },
+        {
+            "name": "bytes out",
+            "column": "framelen",
+            "aggregation": "sum",
+            "group_by": "src_ip"
+        }
+    ]
+}
