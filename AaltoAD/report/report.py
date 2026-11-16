@@ -3,7 +3,7 @@ selecting and ordering each model's runs by metric."""
 
 import os
 
-from AaltoAD.report import cli, load_results, metrics, plot, tables
+from AaltoAD.report import cli, load_results, loss_curves, metrics, plot, tables
 
 
 def generate_report(args, results_folder="results"):
@@ -89,6 +89,13 @@ def generate_report(args, results_folder="results"):
             downsample_window=downsample_window,
             table_columns=table_columns,
             table_blocks=table_blocks,
+        )
+        # Loss curves show every run of the dataset, not only the selected one.
+        loss_curves.generate_loss_curve_plots(
+            ds,
+            by_dataset[ds],
+            os.path.join("reports", ds, "loss_curves"),
+            selected=selected[ds],
         )
     if len(by_dataset) > 1:
         tables.generate_overview_latex(
