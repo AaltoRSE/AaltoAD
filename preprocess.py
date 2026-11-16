@@ -86,7 +86,9 @@ def load_data(
         top_k=100, features=None, window=1,
 		dataspec=None,
 	):
-	folder = os.path.join(output_folder, dataset)
+	# A dataspec "name" overrides the dataset type as the output folder name.
+	name = (dataspec or {}).get('name') or dataset
+	folder = os.path.join(output_folder, name)
 	os.makedirs(folder, exist_ok=True)
 
 	# Validate all referenced CSV files exist before kicking off any processing.
@@ -155,7 +157,7 @@ if __name__ == '__main__':
 		),
 		formatter_class=argparse.RawDescriptionHelpFormatter,
 	)
-	parser.add_argument('datasets', nargs='+', help='One or more dataset types to preprocess (e.g. SMAP SMD SWaT). Names starting with TOL are dispatched to the TOL loader.')
+	parser.add_argument('dataset', help='Dataset type to preprocess (e.g. SMAP). Names starting with TOL are dispatched to the TOL loader.')
 	# TOL group flags: --csv and --segment are paired by occurrence order via _GroupBuilder.
 	parser.add_argument(
 		'--csv', nargs='+', action=_GroupBuilder, role='csv', dest='_csv',
@@ -196,16 +198,14 @@ if __name__ == '__main__':
 		with open(args.dataspec) as f:
 			dataspec = json.load(f)
 
-	# Iterate over provided dataset names and process each
-	for ds in args.datasets:
-		if ds not in datasets and not ds.startswith('TOL'):
-			print(f"Skipping unknown dataset '{ds}'. Supported: {datasets} (or any name starting with 'TOL')")
-			continue
-		load_data(
-			ds,
-			csv_groups=csv_groups,
-			top_k=args.top_k,
-			features=args.features,
-			window=args.window,
-			dataspec=dataspec,
-		)
+	ds = args.dataset
+	if ds not in datasets and not ds.startswith('TOL'):
+		parser.error(f"Unknown dataset '{ds}'. Supported: {datasets} (or any name starting with 'TOL')")
+	load_data(
+		ds,
+		csv_groups=csv_groups,
+		top_k=args.top_k,
+		features=args.features,
+		window=args.window,
+		dataspec=dataspec,
+	)
