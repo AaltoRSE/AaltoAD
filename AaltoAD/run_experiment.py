@@ -21,7 +21,6 @@ from sklearn.metrics import precision_recall_curve, confusion_matrix
 import AaltoAD
 from AaltoAD import models
 from AaltoAD import constants
-from AaltoAD import plotting
 from AaltoAD import pot
 from AaltoAD import merlin
 from AaltoAD import diagnosis
@@ -334,7 +333,6 @@ def run_experiment(
     less: bool = False,
     test: bool = False,
     retrain: bool = False,
-    plot: bool = False,
     run_oracle: bool = True,
     run_pot: bool = True,
     run_conformal: bool = True,
@@ -498,8 +496,6 @@ def run_experiment(
             hyperparams=applied_hyperparams,
             metadata=data_metadata,
         )
-        if plot:
-            utils.plot_accuracies(accuracy_list, f"{model_name}_{dataset_name}")
 
     ### Testing phase
     model.eval()
@@ -522,13 +518,6 @@ def run_experiment(
                 + "{:10.4f}".format(eval_time)
                 + utils.color.ENDC
             )
-            if plot:
-                testO = torch.cat(testD)
-                if "TranAD" in model.name:
-                    testO = torch.cat([torch.roll(s, 1, 0) for s in testD])
-                plotting.plotter(
-                    f"{model_name}_{dataset_name}", testO, y_pred, loss, labels
-                )
 
         if trainD is not None:
             lossT, _ = _eval_segments(model, trainD, optimizer, scheduler, n_features)

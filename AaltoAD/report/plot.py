@@ -8,6 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import numpy as np
 import pandas as pd
 
 from AaltoAD import constants
@@ -24,6 +25,10 @@ PLOT_VALUE_CLIP = 2.0
 
 
 PLOT_Y_TOP = 2.2
+
+
+# Tick label of each test segment on the overlay's x axis.
+SEGMENT_LABEL = "segment {}"
 
 
 # Default downsampling of plotted series (--downsample, --downsample-window).
@@ -82,6 +87,57 @@ def _plot_threshold(result, method):
     return value if value > 0 and not math.isnan(value) else None
 
 
+def _by_timestamp(df, column):
+    """Return `df[column]` indexed by the CSV's integer ``timestamp`` column.
+
+    Windowed models drop the first rows of every segment, so row numbers do not
+    line up between models; the timestamp does. Falls back to the row number
+    when the column is missing or not integer.
+    """
+    values = df[column]
+    if "timestamp" in df.columns and pd.api.types.is_integer_dtype(df["timestamp"]):
+        return pd.Series(values.values, index=df["timestamp"].values)
+    return values.reset_index(drop=True)
+
+
+def _test_segment_bounds(dataset):
+    """Return the start row of each test segment plus the end, or None.
+
+    Read from ``<output_folder>/<dataset>/test_lengths.npy``. None when the
+    file is missing or there is only one segment, so the caller keeps a plain
+    numeric axis.
+    """
+    path = os.path.join(constants.output_folder, dataset, "test_lengths.npy")
+    if not os.path.exists(path):
+        return None
+    lengths = np.load(path).tolist()
+    if len(lengths) < 2:
+        return None
+    return [0] + np.cumsum(lengths).tolist()
+
+
+def _label_test_segments(ax, bounds):
+    """Mark segment boundaries and label each test segment at its centre."""
+    for edge in bounds[1:-1]:
+        ax.axvline(edge, color="grey", linewidth=0.8)
+    centres = [(a + b) / 2 for a, b in zip(bounds[:-1], bounds[1:])]
+    ax.set_xticks(centres)
+    ax.set_xticklabels([SEGMENT_LABEL.format(i + 1) for i in range(len(centres))])
+    ax.set_xlim(bounds[0], bounds[-1])
+
+
+def _window_anomalies(ground_truth, mode=DOWNSAMPLE, window=None):
+    """Mark every row of a downsampling window anomalous if any row in it is.
+
+    Uses the same windows as `_downsample`, which draws each window at its
+    first row; shading whole windows keeps the shading on the same grid as the
+    plotted series.
+    """
+    window = DOWNSAMPLE_WINDOWS.get(mode, 10) if window is None else window
+    starts = (ground_truth.index // window) * window
+    return ground_truth.groupby(starts).transform("max")
+
+
 def _clip_for_plot(values):
     """Clip threshold-scaled values to `PLOT_VALUE_CLIP` so every plot shares one y scale."""
     return values.clip(upper=PLOT_VALUE_CLIP)
@@ -111,7 +167,10 @@ def generate_prediction_error_plot(
     For each model, take its best result (by `metric`), read the matching
     ``*_labels.csv``, and plot the ``prediction_error`` column scaled by that
     model's `threshold_method` threshold, so the threshold is 1 for every
-    model. It is drawn once (dashed) and anomaly regions are shaded once. The
+    model. Series are aligned on the CSV's ``timestamp`` column, since windowed
+    models drop different rows at each segment start; calibration scores are
+    left out because they carry no timestamps. The threshold is drawn once
+    (dashed) and anomaly regions are shaded once. The
     series are downsampled to every 10th time step before plotting. The
     figure is saved as a PNG at ``output_path``.
     """
@@ -145,28 +204,15 @@ def generate_prediction_error_plot(
                 f"No usable {threshold_method} threshold for {model}; skipping in plot."
             )
             continue
-        test_scores = df["prediction_error"].reset_index(drop=True) / threshold
-        # Prepend calibration scores (negative steps) when the sidecar CSV
-        # exists, so the plot shows the data the threshold was fitted on.
-        calib_path = src.replace("_results.json", "_calib_scores.csv")
-        if os.path.exists(calib_path):
-            try:
-                calib = pd.read_csv(calib_path)["prediction_error"] / threshold
-                test_scores = pd.concat(
-                    [
-                        pd.Series(calib.values, index=range(-len(calib), 0)),
-                        test_scores,
-                    ]
-                )
-            except (ValueError, OSError, KeyError):
-                pass
-        series[model] = test_scores
+        series[model] = _by_timestamp(df, "prediction_error") / threshold
         # Rank on the same blocks the series is scaled by, so a shared-threshold
         # plot ranks by the shared metrics.
         best_by_model[model] = thr_source
-        # Ground truth is shared across models for a dataset; capture it once.
-        if ground_truth is None and "ground_truth" in df.columns:
-            ground_truth = df["ground_truth"].reset_index(drop=True)
+        # Ground truth is shared across models for a dataset; each windowed
+        # model misses some rows, so take the union over the models.
+        if "ground_truth" in df.columns:
+            gt = _by_timestamp(df, "ground_truth")
+            ground_truth = gt if ground_truth is None else ground_truth.combine_first(gt)
 
     if not series:
         print(f"No prediction_error data found for {dataset}; skipping plot.")
@@ -185,8 +231,8 @@ def generate_prediction_error_plot(
         )[:n_models]
         series = {m: series[m] for m in keep}
 
-    # Models have different calibration lengths, so the outer join leaves the
-    # union index unsorted; sort it or the lines wrap back to the start.
+    # Models drop different rows, so the outer join leaves the union index
+    # unsorted; sort it or the lines wrap back to the start.
     combined = pd.concat(series, axis=1).sort_index()
 
     low, combined = _downsample(combined, downsample_mode, downsample_window)
@@ -201,10 +247,15 @@ def generate_prediction_error_plot(
     # threshold for all models.
     style.draw_threshold_line(ax, 1.0, f"{threshold_method} threshold")
     if ground_truth is not None:
-        style.shade_anomalies(ax, ground_truth)
-    if combined.index.min() < 0:
-        style.mark_calibration_end(ax)
-    ax.set_xlabel("time step")
+        style.shade_anomalies(
+            ax, _window_anomalies(ground_truth, downsample_mode, downsample_window)
+        )
+    bounds = _test_segment_bounds(dataset)
+    if bounds:
+        _label_test_segments(ax, bounds)
+        ax.set_xlabel("test segment")
+    else:
+        ax.set_xlabel("time step")
     ax.set_ylabel(f"prediction error / {threshold_method} threshold")
     style.legend_below(ax)
     style.save_png(fig, output_path)

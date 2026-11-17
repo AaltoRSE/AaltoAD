@@ -1,17 +1,5 @@
 [
   {
-    "id": 1,
-    "title": "Keep training data as a list of segments instead of concatenating",
-    "description": "Partitions are stitched by concatenating segment arrays, which creates artificial boundaries between non-contiguous segments (e.g. train blocks before and after a test/anomaly period, or train data from several days). Store each partition as a list of segments and have training iterate over them in a loop.",
-    "refs": ["AaltoAD/preprocessing/nettraffic.py:355", "AaltoAD/preprocessing/nettraffic.py:359"]
-  },
-  {
-    "id": 2,
-    "title": "Multi-day nettraffic datasets",
-    "description": "8 one-day sets, each with one anomaly. Training data must not contain anomalies but can be stitched from clean segments of many days. Tests should cover several different anomalies, so keep a few days in reserve as test days.",
-    "refs": []
-  },
-  {
     "id": 3,
     "title": "Allow choosing the output folder / dataset name in preprocess.py",
     "description": "Output always goes to processed/<dataset>; output_folder is not exposed on the CLI. Only names in the datasets list or starting with 'TOL' are accepted, so e.g. 'nettraffic_day1' is skipped even though load_data would dispatch it. Currently worked around by renaming the output folder by hand.",
@@ -19,21 +7,15 @@
   },
   {
     "id": 4,
-    "title": "Unify TOL --window and nettraffic --interval",
-    "description": "Both aggregate time into rows, but TOL uses --window (segment lengths in seconds, divisible by the window) while nettraffic uses --interval (segment lengths count intervals). --window is not passed to nettraffic. The --segment help says SECONDS, which is wrong for nettraffic. Defaults differ: CLI --interval is 10, load_nettraffic defaults to interval=1.",
-    "refs": ["preprocess.py:81", "preprocess.py:88", "preprocess.py:144", "preprocess.py:147", "AaltoAD/preprocessing/nettraffic.py:200"]
+    "title": "Replace the TOL preprocessor with a TOL dataspec",
+    "description": "Remove the separate TOL loader (and its --window, --top-k, --features options) in favor of a TOL dataspec JSON for the generic event-row processor (see issue 5). TOL data comes from a private source and will never be public, so the TOL spec is saved with the data, not committed to this repository. Check that the dataspec covers TOL's features (sent/received row counts, bytes/frame length, port entropy per IP) before removing tol.py.",
+    "refs": ["AaltoAD/preprocessing/tol.py", "AaltoAD/preprocessing/nettraffic.py", "preprocess.py"]
   },
   {
     "id": 5,
     "title": "General preprocessing method / common dataset format",
-    "description": "Datasets are formatted differently from each other and the nettraffic format has changed. Design a more general preprocessing method instead of per-dataset loaders.",
-    "refs": ["AaltoAD/preprocessing/"]
-  },
-  {
-    "id": 6,
-    "title": "Anomalous device can fall outside top-k IPs",
-    "description": "In the 2026-10-03 test (--top-k 10), 10.78.1.129 got its own columns but 10.78.1.126 (also anomalous, doubletemp) did not, so its temperature is averaged into other_internal_mean_temp. Top-k by packet frequency may drop devices whose signal is in temperature.",
-    "refs": ["AaltoAD/preprocessing/nettraffic.py:285", "anomalies.csv"]
+    "description": "Design. (1) Processed data format, the single contract between preprocessing and training/testing/reporting: a folder of .npy files, each a [timesteps, features] matrix, optionally with a segment-length list, and a label file for the test data. Any data in this form can be trained, tested and reported on. (2) Preprocessors: keep converters for common benchmark formats; the generic event-row processor (currently nettraffic with a dataspec JSON: a list of events with wide named columns, aggregated per interval) becomes the default preprocessing type. TOL folds into it and its separate preprocessor is removed. (3) Add a generic timestep-row processor: rows are already timesteps and columns are features (pandas or numpy input); it only splits and normalizes. (4) main.py: dataset is either the name of a folder in processed/ or a path to a folder with the required files.",
+    "refs": ["AaltoAD/preprocessing/", "preprocess.py", "main.py"]
   },
   {
     "id": 7,
@@ -58,5 +40,65 @@
     "title": "Create a CITATIONS file",
     "description": "Create a CITATIONS file to document references and citations for the project. Moved from TODO.md.",
     "refs": []
+  },
+  {
+    "id": 17,
+    "title": "Tests for --columns, timestamp detection and segment conversion",
+    "description": "No tests cover parse_column_spec, find_timestamp_column raising when no candidate matches, or segment seconds->rows conversion (including the non-divisible error). The column rename and missing mapped column ValueError are covered in tests/test_preprocessing.py.",
+    "refs": ["preprocess.py", "AaltoAD/preprocessing/nettraffic.py", "AaltoAD/preprocessing/traffic_csv.py:69"]
+  },
+  {
+    "id": 18,
+    "title": "Move count-based metric calculations into the metrics module",
+    "description": "Rates recomputed from summed confusion counts (no alarms involved) are implemented outside AaltoAD/metrics with different F1 conventions: thresholds.pooled._pooled_block (P/R/F1/fpr, zero-guard, keeps key case), report.metrics._pooled_f1 (exact 2tp/(2tp+fp+fn)), report.metrics.detected and detection_rate (alarm count/rate from upper-case POT counts only), the vectorised F1 in thresholds.oracle.shared_oracle_threshold (exact formula, now '>' via searchsorted side='right'), and utils.getresults2 (legacy TranAD helper, averages P/R then computes f1*; only used by tests/test_utils.py). Add a rates-from-counts function to the metrics module, which metrics.base._f1_from_predictions (epsilon 1e-5) can also use, and move these onto it. Alarm-based calculations (oracle_f1 final block, oracle_metrics, pot_fit.pot_metrics, merlin.get_result, pot.calc_seq, calc_point2point, thresholds.utils.prediction_metrics) are a separate step: replace them with metrics.common_metrics.",
+    "refs": ["AaltoAD/thresholds/pooled.py:20", "AaltoAD/report/metrics.py:120", "AaltoAD/report/metrics.py:259", "AaltoAD/report/metrics.py:274", "AaltoAD/thresholds/oracle.py:149", "AaltoAD/utils.py:68", "AaltoAD/metrics/base.py:32"]
+  },
+  {
+    "id": 19,
+    "title": "data_hash ignores segment lengths",
+    "description": "data_hash hashes only train.npy. Changing only how the train data is split into segments leaves train.npy byte-identical, so a checkpoint trained with the old splits is reused. Include train_lengths.npy in the hash.",
+    "refs": ["AaltoAD/utils.py:148", "AaltoAD/utils.py:160"]
+  },
+  {
+    "id": 20,
+    "title": "nettraffic processes columns by hardcoded name",
+    "description": "_load_and_prepare still picks columns by name: the bytes column from a candidate list (bytes, length, len, ..., framelen) is converted to numeric with NaN -> 0, the temperature column (temperature or temp) to numeric, and temperature is set to NaN where a column named has_temp is false. Column names could be anything, and the dataspec features can use columns this does not touch (e.g. payload_len, n_msgs), which then rely on pandas' own type inference. Type handling (numeric conversion, fill, validity masks like has_temp) needs a place that does not depend on column names. Putting number types in the dataspec JSON seems like too much, but it has to be defined somewhere. Also: with has_temp present but no temperature column, the masking assigns to a column named None.",
+    "refs": ["AaltoAD/preprocessing/nettraffic.py:48", "AaltoAD/preprocessing/nettraffic.py:59", "AaltoAD/preprocessing/nettraffic.py:66"]
+  },
+  {
+    "id": 21,
+    "title": "Move segments into the dataspec",
+    "description": "Segments are given with --segment on the command line, and the same segments are applied to every CSV in a --csv group. Put them in the dataspec JSON instead, so the segmentation stays with the data definition.",
+    "refs": ["preprocess.py", "AaltoAD/preprocessing/nettraffic.py", "ELEC_dataspec.json"]
+  },
+  {
+    "id": 22,
+    "title": "Feature blocks for STAGNN and similar models",
+    "description": "A feature block is a group_by value: every grouped feature gives one column per value, so each block has the same features in the same order (STAGNN's N x F node layout). Block construction was removed from the dataspec preprocessing for now; the columns are feature-major ({value}_{feature name}). Decide how blocks are built and marked, and wire them to the model calls. This applies to all GNN models (STAGNN, GDN, MTAD_GAT): they should receive features in packages, collected by the IP they relate to. Once supported, add it as an experiment variation (each GNN model with and without IP blocks).",
+    "refs": ["AaltoAD/preprocessing/nettraffic.py", "AaltoAD/models/stagnn.py", "AaltoAD/models/gdn.py", "AaltoAD/models/mtad_gat.py"]
+  },
+  {
+    "id": 23,
+    "title": "Threshold method switches in the experiments JSON",
+    "description": "This is about the experiments JSON files. run_experiment has run_oracle, run_pot and run_conformal keyword arguments (default True); nothing passes them yet (run_all, worker, experiments JSON). Related problems to fix with it: with run_pot=False or run_oracle=False the labels CSV code raises NameError (pot_pred, pot_expanded_pred, oracle_pred, oracle_expanded_pred are undefined); there is no conformal_label column in the labels CSV; append_benchmark_row writes no conformal columns; the report's shared.apply_blocks overwrites the runtime conformal blocks at the top level.",
+    "refs": ["AaltoAD/run_experiment.py", "AaltoAD/thresholds/shared.py:213"]
+  },
+  {
+    "id": 24,
+    "title": "Tests for the dataspec preprocessing",
+    "description": "Nothing covers the new nettraffic path: _cut_segments (anomaly clipping, skip segments, the end-of-CSV check), add_grouped_columns (ranking over train segments, 'other'), _aggregate_segment (aggregations incl. entropy, column 'any', fixed columns and zero fill) and the per-partition stacking of features, labels and lengths.",
+    "refs": ["AaltoAD/preprocessing/nettraffic.py", "tests/test_preprocessing.py"]
+  },
+  {
+    "id": 25,
+    "title": "Stale docs after the dataspec change",
+    "description": "The last sentence of load_nettraffic's docstring still describes the old features (top_K IPs, port entropy, mean temperature) and the interval parameter. The first line of _load_and_prepare's docstring overstates column detection. DATASPEC_STEPS.md marks only step 1 done. README.md and doc/DATA_FORMAT_GUIDE.md may still mention the removed --interval, --temperature, --bytes and --port-entropy options.",
+    "refs": ["AaltoAD/preprocessing/nettraffic.py", "DATASPEC_STEPS.md", "README.md", "doc/DATA_FORMAT_GUIDE.md"]
+  },
+  {
+    "id": 26,
+    "title": "Split main.py and install entry points",
+    "description": "Everything runs through main.py or preprocess.py, and main.py combines training and reporting. Split it into separate training and reporting commands, and make these and preprocessing console entry points installed with the library (pyproject.toml).",
+    "refs": ["main.py", "preprocess.py", "pyproject.toml"]
   }
 ]

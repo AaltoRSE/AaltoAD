@@ -32,15 +32,3 @@ def test_getresults2_basic():
     # f1* should be computed
     expected_f1 = 2 * res['precision'] * res['recall'] / (res['precision'] + res['recall'])
     assert abs(res['f1*'] - expected_f1) < 1e-8
-
-
-def test_plot_accuracies_creates_file(tmp_path, monkeypatch):
-    # Run the plotting inside a temporary directory to avoid repo changes
-    monkeypatch.chdir(tmp_path)
-    folder = "testplots"
-    accs = [(0.1, 0.001), (0.05, 0.0005), (0.01, 0.0001)]
-    # call plotting function
-    utils.plot_accuracies(accs, folder)
-    out_file = tmp_path / 'plots' / folder / 'training-graph.pdf'
-    assert out_file.exists()
-    # cleanup is handled by tmp_path

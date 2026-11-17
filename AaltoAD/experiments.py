@@ -453,7 +453,6 @@ def handle_single_run(args):
 			less=args.less,
 			test=args.test,
 			retrain=args.retrain,
-			plot=args.plot
 		)
 
 

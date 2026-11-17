@@ -150,13 +150,12 @@ def test_append_benchmark_row_handles_missing_values(tmp_path):
 @patch('AaltoAD.utils.load_dataset')
 @patch('AaltoAD.utils.convert_to_windows')
 @patch('AaltoAD.utils.load_timestamps')
-@patch('AaltoAD.plotting.plotter')
 @patch('AaltoAD.pot.pot_eval')
 @patch('AaltoAD.diagnosis.hit_att')
 @patch('AaltoAD.diagnosis.ndcg')
 @patch('AaltoAD.utils.get_git_hash')
 def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
-                               mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
+                               mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment function with mocked models."""
     monkeypatch.chdir(tmp_path)
 
@@ -228,14 +227,12 @@ def test_run_experiment_basic(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_e
 @patch('AaltoAD.utils.convert_to_windows')
 @patch('AaltoAD.utils.load_timestamps')
 @patch('AaltoAD.run_experiment.save_model')
-@patch('AaltoAD.utils.plot_accuracies')
-@patch('AaltoAD.plotting.plotter')
 @patch('AaltoAD.pot.pot_eval')
 @patch('AaltoAD.diagnosis.hit_att')
 @patch('AaltoAD.diagnosis.ndcg')
 @patch('AaltoAD.utils.get_git_hash')
 def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
-                                      mock_plotter, mock_plot_accuracies, mock_save_model, mock_load_timestamps,
+                                      mock_save_model, mock_load_timestamps,
                                       mock_convert_to_windows, mock_load_dataset, mock_load_model, tmp_path, monkeypatch):
     """Test run_experiment with training enabled."""
     monkeypatch.chdir(tmp_path)
@@ -285,12 +282,11 @@ def test_run_experiment_withtrain_steping(mock_git_hash, mock_ndcg, mock_hit_att
     mock_ndcg.return_value = {'ndcg': 0.78}
 
     # Run experiment with training
-    result = run_experiment.run_experiment('USAD', 'MSL', test=False, plot=True)
+    result = run_experiment.run_experiment('USAD', 'MSL', test=False)
 
     # Verify training was performed
     assert mock_model.train_step.call_count >= 5  # at least 5 training epochs
     assert mock_save_model.called
-    assert mock_plot_accuracies.called
 
     # Verify nested results schema
     assert result['pot']['precision'] == 0.88
@@ -328,13 +324,12 @@ def test_run_experiment_merlin(mock_append, mock_load_dataset, mock_run_merlin, 
 @patch('AaltoAD.utils.load_dataset')
 @patch('AaltoAD.utils.convert_to_windows')
 @patch('AaltoAD.utils.load_timestamps')
-@patch('AaltoAD.plotting.plotter')
 @patch('AaltoAD.pot.pot_eval')
 @patch('AaltoAD.diagnosis.hit_att')
 @patch('AaltoAD.diagnosis.ndcg')
 @patch('AaltoAD.utils.get_git_hash')
 def test_run_experiment_with_experiment_index(mock_git_hash, mock_ndcg, mock_hit_att, mock_pot_eval,
-                                              mock_plotter, mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model,
+                                              mock_load_timestamps, mock_convert_to_windows, mock_load_dataset, mock_load_model,
                                               tmp_path, monkeypatch):
     """Test run_experiment with experiment_index parameter."""
     monkeypatch.chdir(tmp_path)
