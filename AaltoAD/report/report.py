@@ -247,7 +247,13 @@ def _generate_dataset_report(
         dataset, metric, by_model, pdf_path, unlabeled=unlabeled, order=order
     )
     tables.generate_csv(
-        dataset, metric, by_model, csv_path, unlabeled=unlabeled, order=order
+        dataset,
+        metric,
+        by_model,
+        csv_path,
+        unlabeled=unlabeled,
+        order=order,
+        threshold_method=threshold_method,
     )
     tables.generate_hp_markdown(dataset, metric, by_model, hp_path, order=order)
     tables.generate_latex(
@@ -282,6 +288,9 @@ def _generate_dataset_report(
         downsample_mode=downsample_mode,
         downsample_window=downsample_window,
     )
+    # The grid follows the metric order that picks the overlay's top models.
+    grid_order = _order_models(by_model, metric, threshold_method, model_order)
+    plot.generate_model_grid(plots_dir, grid_order)
     if shared_plots:
         shared_plot_path = os.path.join(dataset_dir, "prediction_errors_shared.png")
         plot.generate_prediction_error_plot(
@@ -307,3 +316,4 @@ def _generate_dataset_report(
             downsample_mode=downsample_mode,
             downsample_window=downsample_window,
         )
+        plot.generate_model_grid(os.path.join(dataset_dir, "plots_shared"), grid_order)

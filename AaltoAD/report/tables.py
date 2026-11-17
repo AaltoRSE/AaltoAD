@@ -31,12 +31,12 @@ for _m in cli.METHOD_METRICS:
     DISPLAY_COLUMNS.append(f"{_m} (PA)")
 
 
-# Slim metric set for presentation tables. Each entry is (column_label, dotted_path_or_callable).
+# Slim metric set for presentation tables. Each entry is (column_label,
+# dotted_path); "{method}" is filled with the report's threshold method.
 SLIDE_COLUMNS = [
-    ("POT F1", "pot.F1"),
-    ("POT F1 (PA)", "pot_expanded.F1"),
-    ("POT FPR", "pot.FPR"),
-    ("POT latency", "pot.P_latency"),
+    ("{method} F1", "{method}.F1"),
+    ("{method} FPR", "{method}.FPR"),
+    ("{method} latency", "{method}.P_latency"),
     ("Oracle F1", "oracle.F1"),
     ("Eval time (s)", "eval_time"),
 ]
@@ -319,17 +319,32 @@ def generate_hp_markdown(dataset, metric, by_model, output_path, order=None):
     print(f"Hyperparameter summary written to {output_path}")
 
 
-def generate_csv(dataset, metric, by_model, output_path, unlabeled=False, order=None):
+def generate_csv(
+    dataset,
+    metric,
+    by_model,
+    output_path,
+    unlabeled=False,
+    order=None,
+    threshold_method=cli.THRESHOLD_METHOD,
+):
     """One row per model, slim metric set; selected and ordered by `metric`
-    (falling back to F1 ordering for non-comparable metrics)."""
+    (falling back to F1 ordering for non-comparable metrics). Labeled columns
+    read the `threshold_method` block, plus the oracle F1 for reference."""
     sort_metric = metrics.table_sort_metric(metric)
     lower_is_better = sort_metric in metrics.LOWER_IS_BETTER
     missing_sort_val = float("inf") if lower_is_better else float("-inf")
 
-    slide_cols = UNLABELED_SLIDE_COLUMNS if unlabeled else SLIDE_COLUMNS
+    if unlabeled:
+        slide_cols = UNLABELED_SLIDE_COLUMNS
+    else:
+        slide_cols = [
+            (label.format(method=threshold_method), path.format(method=threshold_method))
+            for label, path in SLIDE_COLUMNS
+        ]
     rows = []
     for model, results in by_model.items():
-        best = metrics.best_result(results, metric)
+        best = metrics.best_result(results, metric, threshold_method)
         row = {"model": model}
         for label, path_or_fn in slide_cols:
             if best:
