@@ -9,4 +9,4 @@ echo "Worker $SLURM_ARRAY_TASK_ID starting on $(hostname)"
 module load mamba
 source activate TranAD
 
-srun python3 main.py --experiment-file experiments.json --worker
+srun python3 main.py --experiment-file experiments_nettraffic.json --worker
