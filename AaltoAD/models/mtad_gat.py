@@ -10,14 +10,13 @@ from .base import BaseModel
 
 ## MTAD_GAT Model (ICDM 20)
 class MTAD_GAT(BaseModel):
-    def __init__(
-        self, feats, n_window=None, learning_rate=0.0001, epochs=5, weight_decay=1e-5
-    ):
+    def __init__(self, feats, learning_rate=0.0001, epochs=5, weight_decay=1e-5):
         super().__init__(
             feats, learning_rate=learning_rate, epochs=epochs, weight_decay=weight_decay
         )
         self.name = "MTAD_GAT"
-        self.n_window = n_window or feats
+        # The graph and GRU sizes assume a square window: one step per feature.
+        self.n_window = feats
         self.flat_window = True
         edge_index = torch.tensor(
             [list(range(1, feats + 1)), [0] * feats], dtype=torch.long
