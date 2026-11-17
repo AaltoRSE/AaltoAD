@@ -24,6 +24,12 @@ DEFAULT_PLOT_MODELS = constants.PLOT_MODELS
 PLOT_VALUE_CLIP = 2.0
 
 
+# Combined image of every per-model plot, written into the plots folder, and
+# how many plots it sets per row.
+MODEL_GRID_FILE = "all_models.png"
+MODEL_GRID_COLUMNS = 3
+
+
 PLOT_Y_TOP = 2.2
 
 
@@ -355,6 +361,42 @@ def generate_model_plots(
         style.legend_below(ax)
         out_path = os.path.join(output_dir, f"{model}.png")
         style.save_png(fig, out_path)
+
+
+def generate_model_grid(output_dir, models, ncols=MODEL_GRID_COLUMNS):
+    """Combine the per-model PNGs in `output_dir` into one grid image.
+
+    Args:
+        output_dir: Folder holding ``<model>.png`` files from
+            `generate_model_plots`; the grid is written there as
+            ``all_models.png``.
+        models: Model names in the order the grid shows them, row by row;
+            names without a PNG are skipped.
+        ncols: Number of plots per grid row.
+    """
+    import matplotlib.pyplot as plt
+
+    paths = [os.path.join(output_dir, f"{m}.png") for m in models]
+    paths = [p for p in paths if os.path.exists(p)]
+    if not paths:
+        return
+    images = [plt.imread(p) for p in paths]
+    ncols = min(ncols, len(images))
+    nrows = math.ceil(len(images) / ncols)
+    height, width = images[0].shape[:2]
+    scale = 6 / width
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(6 * ncols, height * scale * nrows),
+        squeeze=False,
+    )
+    for ax in axes.flat:
+        ax.axis("off")
+    for ax, image in zip(axes.flat, images):
+        ax.imshow(image)
+    fig.subplots_adjust(wspace=0.02, hspace=0.02)
+    style.save_png(fig, os.path.join(output_dir, MODEL_GRID_FILE))
 
 
 def _model_order_path(dataset):

@@ -59,9 +59,7 @@ VARIATIONS = {
         "learning_rate": [0.0001, 0.001],
     },
     "MTAD_GAT": {
-        # n_window must equal feats due to time_gat architecture (GATConv(feats, feats))
-        "n_window": [5],
-        "n_hidden": [16, 25],
+        # The window is fixed to feats (see MTAD_GAT), so it is not varied here.
         "learning_rate": [0.0001, 0.001],
     },
     "GDN": {
@@ -294,7 +292,7 @@ def test_conv_models_fallback_on_falsy_n_window(ModelClass, n_window):
 
 @pytest.mark.parametrize("feats", [3, 5, 8])
 def test_mtad_gat_feature_variations(feats):
-    """MTAD_GAT requires n_window == feats; test with different feature counts."""
+    """MTAD_GAT's window is fixed to feats; test with different feature counts."""
     model = MTAD_GAT(feats)
     input_shape = (1, feats * feats)
 
