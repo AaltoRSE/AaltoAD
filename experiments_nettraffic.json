@@ -117,7 +117,6 @@
       "dataset": "nettraffic",
       "model": "MTAD_GAT",
       "learning_rate": [0.00001, 0.0001, 0.001],
-      "n_window": [5, 10, 20],
       "notes": "MTAD_GAT",
       "q": [1e-05],
       "weight_decay": [1e-06, 1e-05, 1e-04],
